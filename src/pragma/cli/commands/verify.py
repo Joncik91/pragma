@@ -37,6 +37,42 @@ verify_app = typer.Typer(
 )
 
 
+def _check_integrity(cwd: Path) -> dict[str, object]:
+    from pragma.core.errors import HashNotFoundError, IntegrityMismatchError
+
+    settings = cwd / ".claude" / "settings.json"
+    pragma_dir = cwd / ".pragma"
+
+    if not settings.exists():
+        return {"ok": True, "check": "integrity", "reason": "no_settings"}
+
+    result = verify_settings_integrity(settings, pragma_dir)
+    if result is None:
+        raise HashNotFoundError(
+            message=(
+                ".claude/settings.json exists but .pragma/claude-settings.hash "
+                "is missing."
+            ),
+            remediation="Run `pragma hooks seal` to store the canonical hash.",
+            context={"settings": str(settings)},
+        )
+
+    if result is False:
+        raise IntegrityMismatchError(
+            message=(
+                ".claude/settings.json has been modified since `pragma hooks seal`."
+            ),
+            remediation=(
+                "Inspect the change with `pragma hooks show`. If intentional, "
+                "run `pragma hooks seal` to re-canonicalise. If not, restore "
+                "from git history."
+            ),
+            context={"settings": str(settings), "hash": str(pragma_dir / "claude-settings.hash")},
+        )
+
+    return {"ok": True, "check": "integrity"}
+
+
 def _check_discipline(cwd: Path) -> dict[str, object]:
     from pragma.core.errors import DisciplineViolationError
 
@@ -249,6 +285,17 @@ def verify_discipline() -> None:
     typer.echo(json.dumps(result, sort_keys=True, separators=(",", ":")))
 
 
+@verify_app.command(name="integrity")
+def verify_integrity() -> None:
+    cwd = Path.cwd()
+    try:
+        result = _check_integrity(cwd)
+    except PragmaError as exc:
+        typer.echo(exc.to_json())
+        raise typer.Exit(code=1) from None
+    typer.echo(json.dumps(result, sort_keys=True, separators=(",", ":")))
+
+
 @verify_app.command(name="commits")
 def verify_commits(
     base: str = typer.Option(
@@ -271,12 +318,14 @@ def verify_all() -> None:
     try:
         _check_manifest(cwd)
         _check_gate(cwd)
+        _check_discipline(cwd)
+        _check_integrity(cwd)
     except PragmaError as exc:
         typer.echo(exc.to_json())
         raise typer.Exit(code=1) from None
     typer.echo(
         json.dumps(
-            {"ok": True, "checks": ["manifest", "gate"]},
+            {"ok": True, "checks": ["manifest", "gate", "discipline", "integrity"]},
             sort_keys=True,
             separators=(",", ":"),
         )
