@@ -5,6 +5,58 @@ All notable changes to Pragma are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0] — 2026-04-20
+
+Adds the first real discipline layer: test-first gate. Slice
+activation locks `src/`, `pragma unlock` demands failing tests for
+every permutation in the active slice, `pragma slice complete`
+demands the same tests green. State and audit land under `.pragma/`.
+
+### Added
+
+- Manifest schema v2: optional `milestones:` / `slices:` blocks;
+  per-requirement `milestone` / `slice` fields. v1 manifests still
+  load verbatim.
+- `pragma migrate` — one-shot v1 → v2 upgrade. Idempotent; supports
+  `--dry-run`.
+- `pragma slice activate|complete|cancel|status` — slice lifecycle
+  CLI.
+- `pragma unlock` — TDD red-phase gate, driven by the naming
+  convention `test_req_<req_id>_<permutation_id>`.
+- `pragma verify gate` — state/manifest coherence + red-phase check.
+- `pragma verify all` — runs manifest + gate in order; used by
+  pre-commit.
+- `.pragma/state.json` (gitignored, atomic, flock-guarded) +
+  `.pragma/audit.jsonl` (committed, append-only, fsync'd).
+- Typed errors for every new failure mode — `state_not_found`,
+  `state_schema_error`, `state_locked`, `slice_not_found`,
+  `slice_already_active`, `slice_not_active`, `gate_wrong_state`,
+  `gate_hash_drift`, `milestone_dep_unshipped`,
+  `unlock_missing_tests`, `unlock_test_passing`,
+  `complete_tests_failing`.
+- Template upgrade: `pragma init` now writes
+  `.pre-commit-config.yaml` with `entry: python3 -m pragma verify all`.
+- PRAGMA.md template documents the slice workflow + test-naming
+  convention.
+
+### Dogfood
+
+Pragma's own repo ran `pragma migrate`, added REQ-003 declaring
+v0.2's gate behaviour, and carved slice `M01.S1` for it (cancelled
+rather than retro-fitted, since v0.2 code shipped before the
+manifest entry).
+
+### Known limitations (by design)
+
+- Claude Code hook integration (SessionStart / PreToolUse /
+  PostToolUse / Stop) is **v0.3**.
+- `pragma-sdk` and OpenTelemetry spans are **v0.5**.
+- No safety battery beyond manifest + gate — **v0.4**.
+- `pragma doctor` is still a stub; `--emergency-unlock` lands in
+  **v0.4**.
+
+[0.2.0]: https://github.com/Joncik91/pragma/releases/tag/v0.2.0
+
 ## [0.1.0] — 2026-04-20
 
 First public release. v0.1 is the Gall-compliant thin slice: a manifest
