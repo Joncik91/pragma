@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import subprocess
 from pathlib import Path
 
 import typer
@@ -10,6 +11,7 @@ import typer
 from pragma.core.commits import validate_commit_shape
 from pragma.core.discipline import check_file
 from pragma.core.errors import (
+    CommitShapeViolationError,
     GateHashDrift,
     ManifestHashMismatch,
     PragmaError,
@@ -65,6 +67,55 @@ def _check_discipline(cwd: Path) -> dict[str, object]:
         )
 
     return {"ok": True, "check": "discipline"}
+
+
+def _check_commits(cwd: Path, base: str = "main") -> dict[str, object]:
+    try:
+        subprocess.run(
+            ["git", "rev-parse", "--verify", base],
+            cwd=str(cwd), capture_output=True, check=True,
+        )
+        range_spec = f"{base}..HEAD"
+    except subprocess.CalledProcessError:
+        range_spec = "HEAD"
+
+    try:
+        out = subprocess.run(
+            ["git", "log", range_spec, "--format=%H%x00%B%x1e"],
+            cwd=str(cwd), capture_output=True, text=True, check=True,
+        ).stdout
+    except subprocess.CalledProcessError as exc:
+        raise PragmaError(
+            code="git_unavailable",
+            message=f"git log failed: {exc.stderr}",
+            remediation="Ensure this is a git repo and base exists.",
+        )
+
+    bad_commits: list[dict[str, object]] = []
+    for entry in out.split("\x1e"):
+        entry = entry.strip()
+        if not entry:
+            continue
+        sha, _, message = entry.partition("\x00")
+        errors = validate_commit_shape(message)
+        if errors:
+            bad_commits.append({
+                "sha": sha.strip(),
+                "rules": [e.rule for e in errors],
+                "remediation": [e.remediation for e in errors],
+            })
+
+    if bad_commits:
+        raise CommitShapeViolationError(
+            message=f"{len(bad_commits)} commit(s) fail shape validation.",
+            remediation=(
+                "Amend each commit body to include a WHY: line, a "
+                "Co-Authored-By: trailer, and keep the subject ≤72 chars."
+            ),
+            context={"commits": bad_commits},
+        )
+
+    return {"ok": True, "check": "commits"}
 
 
 def _check_manifest(cwd: Path) -> dict[str, object]:
@@ -192,6 +243,22 @@ def verify_discipline() -> None:
     cwd = Path.cwd()
     try:
         result = _check_discipline(cwd)
+    except PragmaError as exc:
+        typer.echo(exc.to_json())
+        raise typer.Exit(code=1) from None
+    typer.echo(json.dumps(result, sort_keys=True, separators=(",", ":")))
+
+
+@verify_app.command(name="commits")
+def verify_commits(
+    base: str = typer.Option(
+        "main", "--base",
+        help="Walk commits from <base>..HEAD. Defaults to main.",
+    ),
+) -> None:
+    cwd = Path.cwd()
+    try:
+        result = _check_commits(cwd, base=base)
     except PragmaError as exc:
         typer.echo(exc.to_json())
         raise typer.Exit(code=1) from None
