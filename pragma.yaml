@@ -1,4 +1,4 @@
-version: '1'
+version: '2'
 project:
   name: pragma
   mode: brownfield
@@ -38,6 +38,8 @@ requirements:
   - id: doctor_always_zero
     description: doctor always exits zero
     expected: success
+  milestone: M00
+  slice: M00.S0
 - id: REQ-002
   title: Manifest and lockfile round-trip deterministically
   description: The sha256 hash of pragma.yaml is stable across loads and changes only when the canonical
@@ -59,3 +61,19 @@ requirements:
   - id: read_malformed
     description: read_lock on invalid json raises manifest_schema_error
     expected: reject
+  milestone: M00
+  slice: M00.S0
+milestones:
+- id: M00
+  title: Implicit brownfield milestone
+  description: Auto-created by `pragma migrate` to wrap pre-v0.2 flat requirements. Safe to rename when
+    the project grows real milestones.
+  depends_on: []
+  slices:
+  - id: M00.S0
+    title: Implicit brownfield slice
+    description: Auto-created by `pragma migrate`. All pre-v0.2 requirements live here until the user
+      carves real slices.
+    requirements:
+    - REQ-001
+    - REQ-002
