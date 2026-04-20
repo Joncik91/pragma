@@ -1,7 +1,7 @@
 {
   "version": "1",
-  "manifest_hash": "sha256:d3e5947e1debc92f791a9d9dbd9f76c7ad971f2c4885c0488b7ad0a9039827b1",
-  "generated_at": "2026-04-20T18:57:56Z",
+  "manifest_hash": "sha256:81971e0fad5b1ae877aa3fe51ea4352947a102d65011a242a9a75a0c9115277d",
+  "generated_at": "2026-04-20T18:59:00Z",
   "manifest": {
     "version": "2",
     "project": {
@@ -25,6 +25,24 @@
             "requirements": [
               "REQ-001",
               "REQ-002"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "M01",
+        "title": "Gate and slice",
+        "description": "v0.2 gate state machine, slice lifecycle, unlock.",
+        "depends_on": [
+          "M00"
+        ],
+        "slices": [
+          {
+            "id": "M01.S1",
+            "title": "Slice gate",
+            "description": "activate, unlock with red tests, complete.",
+            "requirements": [
+              "REQ-003"
             ]
           }
         ]
@@ -114,6 +132,53 @@
         ],
         "milestone": "M00",
         "slice": "M00.S0"
+      },
+      {
+        "id": "REQ-003",
+        "title": "Slice gate enforces test-first discipline",
+        "description": "Once a slice is activated the gate is LOCKED. `pragma unlock` flips\nthe gate only when every permutation of every requirement in the\nactive slice has a matching failing test per the naming convention\n`test_req_<req_id>_<permutation_id>`. `pragma slice complete`\nrequires all slice tests to be green. `audit.jsonl` records every\ntransition.",
+        "touches": [
+          "src/pragma/core/state.py",
+          "src/pragma/core/audit.py",
+          "src/pragma/core/gate.py",
+          "src/pragma/core/tests_discovery.py",
+          "src/pragma/cli/commands/slice.py",
+          "src/pragma/cli/commands/unlock.py"
+        ],
+        "permutations": [
+          {
+            "id": "activate_locks",
+            "description": "slice activate transitions inactive -> LOCKED and writes audit",
+            "expected": "success"
+          },
+          {
+            "id": "unlock_requires_red_tests",
+            "description": "unlock fails when required tests are absent or passing",
+            "expected": "reject"
+          },
+          {
+            "id": "unlock_from_locked_with_red_tests",
+            "description": "unlock succeeds when every permutation has a red test",
+            "expected": "success"
+          },
+          {
+            "id": "complete_requires_green",
+            "description": "slice complete fails if any required test is red",
+            "expected": "reject"
+          },
+          {
+            "id": "complete_ships_when_green",
+            "description": "slice complete transitions UNLOCKED -> shipped when tests pass",
+            "expected": "success"
+          },
+          {
+            "id": "audit_append_only",
+            "description": "every transition appends one line to audit.jsonl",
+            "expected": "success"
+          }
+        ],
+        "milestone": "M01",
+        "slice": "M01.S1"
       }
     ]
   }
