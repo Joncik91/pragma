@@ -2,8 +2,8 @@
 
 Senior engineer on rails for AI-driven development.
 
-**Status:** v0.2 — manifest + test-first gate. Claude Code hooks, SDK,
-and PIL come in v0.3–v1.0.
+**Status:** v0.3 — manifest + gate + Claude Code hooks + safety
+battery. SDK and PIL come in v0.4–v1.0.
 
 ## Install
 

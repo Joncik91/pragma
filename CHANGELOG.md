@@ -5,6 +5,52 @@ All notable changes to Pragma are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] — 2026-04-20
+
+Adds Claude Code hook integration and the full safety battery. An AI
+session can no longer edit `src/` while the gate is LOCKED (enforced
+at the tool-use boundary, before permission mode), cannot land a
+commit that fails any check in the battery, and cannot silently
+disable a hook (`.claude/settings.json` has a committed integrity
+hash).
+
+### Added
+
+- Four Claude Code hooks wired by `pragma init`: SessionStart,
+  PreToolUse, PostToolUse, Stop. Dispatched via `pragma hook <event>`.
+- `pragma verify discipline` — AST-based overengineering checks
+  (complexity, LoC, depth, single-subclass, single-method util,
+  empty __init__, TODO/FIXME sentinels). Shared logic with
+  PostToolUse hook.
+- `pragma verify commits` — WHY/Co-Authored-By/subject-length shape
+  validation across `main..HEAD`.
+- `pragma verify integrity` — `.claude/settings.json` hash check.
+- `pragma verify all` — runs manifest + gate + integrity.
+- `pragma hooks seal/verify/show` — manage the settings integrity hash.
+- Full pre-commit battery in the `pragma init` template: gitleaks,
+  ruff format + lint, mypy --strict, semgrep, pip-audit, deptry,
+  check-added-large-files, pytest.
+- `pre-push` stage runs `pragma verify all --ci` — closes the
+  `git commit --no-verify` bypass.
+- `--ci` flag on `pragma verify all` for strict mode.
+- New `PragmaError` subtypes: discipline_violation, commit_shape_violation,
+  integrity_mismatch, settings_not_found, hash_not_found,
+  unknown_hook_event, hook_input_missing.
+
+### Dogfood
+
+REQ-004 declared in Pragma's own `pragma.yaml` under slice M01.S2;
+eight convention tests pin the v0.3 contract.
+
+### Known limitations (by design)
+
+- `pragma-sdk` + OpenTelemetry spans — **v0.4**.
+- Post-Implementation Log — **v0.4**.
+- `narrative/` module for auto-commits/PRs/ADRs — **v0.4**.
+- `pragma init --greenfield` — **v1.0**.
+
+[0.3.0]: https://github.com/Joncik91/pragma/releases/tag/v0.3.0
+
 ## [0.2.0] — 2026-04-20
 
 Adds the first real discipline layer: test-first gate. Slice
