@@ -28,4 +28,10 @@ Senior engineer on rails for AI-driven development.
 - `pragma verify manifest` exits non-zero when the YAML and lock disagree or the YAML is malformed.
 - A pre-commit hook runs `pragma verify manifest` automatically.
 
-See `docs/superpowers/specs/2026-04-20-pragma-v1-design.md` for the full v1 design.
+## Docs
+
+- [`docs/design.md`](docs/design.md) — full v1 design. What Pragma looks
+  like when the complete vision lands.
+- [`docs/roadmap.md`](docs/roadmap.md) — evolutionary rollout v0.1 → v1.0.
+  Each increment is useful on its own and dogfooded before the next.
+- [`CHANGELOG.md`](CHANGELOG.md) — release history.

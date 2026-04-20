@@ -1,11 +1,10 @@
 # Machine-local Claude Code settings
 .claude/settings.local.json
 
-# Design notes, specs, and implementation plans live next to the code for
-# convenience but are never shipped to the repo. Pragma's thesis is that the
-# manifest (pragma.yaml) is the source of truth going forward; design docs
-# are scaffolding used to get there and are kept local-only.
-docs/
+# Internal brainstorming trail — dated process notes from design sessions.
+# These are working scaffolding; the curated public docs live in docs/
+# (design.md, roadmap.md) and are committed.
+docs/superpowers/
 
 # Python
 __pycache__/
