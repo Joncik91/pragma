@@ -1,0 +1,37 @@
+# Machine-local Claude Code settings
+.claude/settings.local.json
+
+# Design notes, specs, and implementation plans live next to the code for
+# convenience but are never shipped to the repo. Pragma's thesis is that the
+# manifest (pragma.yaml) is the source of truth going forward; design docs
+# are scaffolding used to get there and are kept local-only.
+docs/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+build/
+dist/
+*.egg
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# OS and editor cruft
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+.idea/
+.vscode/
