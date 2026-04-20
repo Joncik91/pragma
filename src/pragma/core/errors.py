@@ -66,3 +66,18 @@ class AlreadyInitialised(PragmaError):
 @dataclass(kw_only=True)
 class DuplicateRequirementId(PragmaError):
     code: str = "duplicate_requirement_id"
+
+
+@dataclass(kw_only=True)
+class StateNotFound(PragmaError):
+    code: str = "state_not_found"
+
+
+@dataclass(kw_only=True)
+class StateSchemaError(PragmaError):
+    code: str = "state_schema_error"
+
+
+@dataclass(kw_only=True)
+class StateLocked(PragmaError):
+    code: str = "state_locked"
