@@ -313,7 +313,9 @@ def verify_commits(
 
 
 @verify_app.command(name="all")
-def verify_all() -> None:
+def verify_all(
+    ci: bool = typer.Option(False, "--ci", help="CI strict mode (reserved for v0.4)."),
+) -> None:
     cwd = Path.cwd()
     try:
         _check_manifest(cwd)
@@ -322,9 +324,12 @@ def verify_all() -> None:
     except PragmaError as exc:
         typer.echo(exc.to_json())
         raise typer.Exit(code=1) from None
+    checks = ["manifest", "gate", "integrity"]
+    if ci:
+        checks.append("ci")
     typer.echo(
         json.dumps(
-            {"ok": True, "checks": ["manifest", "gate", "integrity"]},
+            {"ok": True, "checks": checks},
             sort_keys=True,
             separators=(",", ":"),
         )
