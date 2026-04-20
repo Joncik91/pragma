@@ -7,6 +7,7 @@ import typer
 from pragma.cli.commands.doctor import doctor
 from pragma.cli.commands.freeze import freeze
 from pragma.cli.commands.init import init
+from pragma.cli.commands.migrate import migrate
 from pragma.cli.commands.spec import spec_app
 from pragma.cli.commands.verify import verify_app
 
@@ -26,6 +27,7 @@ def _main() -> None:
 app.command(name="init")(init)
 app.command(name="freeze")(freeze)
 app.command(name="doctor")(doctor)
+app.command(name="migrate")(migrate)
 app.add_typer(spec_app)
 app.add_typer(verify_app)
 
