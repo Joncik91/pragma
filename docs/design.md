@@ -167,7 +167,64 @@ the code layer.**
 - Teams larger than ~3 people — v1 doesn't model multi-user gate
   coordination.
 - Projects where the target app isn't Python — v1 SDK and safety battery
-  are Python-only.
+  are Python-only. **Most of Pragma is already language-agnostic**
+  though; see §2.2.1 for what ports cheaply vs. what has to be rewritten
+  per language.
+
+#### 2.2.1 What's language-agnostic vs. Python-specific
+
+Pragma is designed so the majority of its surface is
+language-independent. The Python coupling is concentrated in two
+identifiable layers; everything else can serve a target app in any
+language when the per-language adapters land.
+
+**Already language-agnostic (~70% of Pragma):**
+
+| Component | Why it doesn't care about the target language |
+|---|---|
+| Manifest (`pragma.yaml`) | Plain YAML; REQ / permutation / touches are string-level concepts |
+| Lockfile + integrity hash | SHA-256 over canonical JSON; no code parsing |
+| Gate state machine | JSON state file + atomic writes; transitions are event-driven |
+| Slice activation / completion | Lifecycle, not code analysis |
+| Claude Code hooks | `.claude/settings.json` + subprocess; LOCKED/UNLOCKED logic reads state.json, not source code |
+| Commit-message shape check | Regex on the message body |
+| PR-description template | Jinja, filled from manifest + state |
+| ADR scaffolding | Jinja; required-field enforcement is string-level |
+| Hook remediation templates | Jinja + state.json lookups |
+| Audit log (`.pragma/audit.jsonl`) | Append-only JSON lines |
+| `pragma doctor` / `pragma migrate` | Self-check and schema migration, no target-code parsing |
+| PIL aggregation logic | Groups OpenTelemetry spans by `logic_id` — the OTel protocol is language-neutral; any SDK in any language that emits the span schema feeds it |
+
+**Python-specific (the two remaining layers):**
+
+| Component | Why it's Python-only today | Cost to port |
+|---|---|---|
+| `pragma-sdk` — `@pragma.trace`, `set_permutation` | Python decorator + OTel Baggage via `contextvars` | **Medium.** Each target language gets its own SDK package (`@pragma/sdk` on npm for TS, `pragma-sdk` Go module, etc.). All share the one `logic_id` attribute schema in `shared/logic_id_schema.md`. The protocol is already language-neutral; only the wrapping ergonomics differ |
+| Safety battery tool config | `ruff` / `mypy` are Python-only; `ruff format`, `mypy --strict` flags are Python-specific | **Medium.** Each language needs its own battery: TS gets `biome` / `tsc --strict` / `eslint` / `npm audit`; Go gets `golangci-lint` / `staticcheck` / `govulncheck`; Rust gets `clippy` / `cargo-audit`. Pragma ships the battery manifest per language; `pragma init --language=ts` picks the right `.pre-commit-config.yaml` template |
+| AST overengineering checks | `pragma/core/discipline.py` uses Python's built-in `ast` module | **Medium.** Each language needs a parser: tree-sitter covers TS / Go / Rust / Java in one dependency; language-native parsers (`ts-morph`, `go/ast`, `syn`) give better fidelity. The *budgets* (complexity ≤ 10, LoC ≤ 60, depth ≤ 3) are universal; only the measurement implementation changes |
+
+**What this means for v2:**
+
+The v1 architecture already accommodates a TypeScript (or Go, or Rust)
+target app without rewriting the core. Adding a language is additive: a
+new SDK package, a new pre-commit battery template, and a new
+discipline-checker plug-in. The manifest, gate, hooks, state machine,
+audit log, and narrative templates don't change. This is why the
+`pragma-sdk` vs. `pragma` package split in §3.1 matters — it isolates the
+one thing that must ship per language from the dev-tool orchestrator that
+stays in Python.
+
+**Why v1 is Python-only anyway:**
+
+Shipping one language well through all six increments (v0.1 → v1.0) is
+already six and a half weeks (see [`roadmap.md`](roadmap.md)). Splitting
+effort across three languages means none ship well. Python is first
+because: (a) Pragma's own codebase is Python and we dogfood every
+increment on ourselves; (b) OpenTelemetry's Python SDK is the most
+mature; (c) the AI-hallucination-prone stack (loose-typed scripting with
+heavy dependency surfaces) is where Pragma's value prop lands hardest.
+TypeScript is the natural v1.1 target (same ecosystem, same kind of
+user); Go and Rust follow if demand surfaces.
 
 ### 2.3 Operating model
 
@@ -903,7 +960,10 @@ migrator.
 ### 7.4 Open questions (deferred beyond v1)
 
 1. Multi-user gate coordination — v1.1.
-2. Non-Python target apps — TypeScript SDK, ~2 weeks in v1.1.
+2. Non-Python target apps — TypeScript SDK, ~2 weeks in v1.1. The core
+   (manifest, gate, hooks, narrative, PIL aggregation) is already
+   language-agnostic; only the SDK, battery config, and discipline AST
+   checks are Python-specific. See §2.2.1.
 3. Docker / k8s / IaC scanning — checkov; auto-enable when detected; v1.1.
 4. Non-GitHub CI — GitLab / Bitbucket; v1.x on demand.
 5. Plugin architecture for gates / reporters — only when real demand

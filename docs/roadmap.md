@@ -48,7 +48,12 @@ lands.
 
 ## Out of scope (deferred beyond v1.0)
 
-- Non-Python target apps (TypeScript SDK is v1.1).
+- Non-Python target apps — ~70% of Pragma is already language-agnostic
+  (manifest, gate, hooks, narrative, PIL aggregation); adding a language
+  means a new SDK package + a new pre-commit battery template + a new
+  discipline-checker, not a core rewrite. TypeScript is the v1.1 target;
+  Go / Rust follow on demand. See
+  [`design.md` §2.2.1](design.md#221-whats-language-agnostic-vs-python-specific).
 - Multi-user gate coordination (v1.1).
 - Non-GitHub CI (GitLab / Bitbucket; v1.x on demand).
 - Plugin architecture for custom gates / reporters.
