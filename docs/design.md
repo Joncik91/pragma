@@ -216,9 +216,9 @@ stays in Python.
 
 **Why v1 is Python-only anyway:**
 
-Shipping one language well through all six increments (v0.1 → v1.0) is
-already six and a half weeks (see [`roadmap.md`](roadmap.md)). Splitting
-effort across three languages means none ship well. Python is first
+Shipping one language well through the full v0.1 → v1.0 rollout is
+already ~6 weeks (see [`roadmap.md`](roadmap.md)). Splitting effort
+across three languages means none ship well. Python is first
 because: (a) Pragma's own codebase is Python and we dogfood every
 increment on ourselves; (b) OpenTelemetry's Python SDK is the most
 mature; (c) the AI-hallucination-prone stack (loose-typed scripting with
