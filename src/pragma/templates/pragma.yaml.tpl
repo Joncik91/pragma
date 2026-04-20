@@ -1,7 +1,7 @@
 version: "1"
 
 project:
-  name: {{ project_name }}
+  name: "{{ project_name }}"
   mode: brownfield
   language: python
   source_root: src/

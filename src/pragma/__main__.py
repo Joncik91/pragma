@@ -4,18 +4,22 @@ from __future__ import annotations
 
 import typer
 
+from pragma.cli.commands.init import init
+
 app = typer.Typer(
     name="pragma",
     help="Senior engineer on rails for AI-driven development.",
     no_args_is_help=True,
     add_completion=False,
-    invoke_without_command=True,
 )
 
 
 @app.callback()
-def _main(ctx: typer.Context) -> None:
+def _main() -> None:
     """Senior engineer on rails for AI-driven development."""
+
+
+app.command(name="init")(init)
 
 
 if __name__ == "__main__":
