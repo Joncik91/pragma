@@ -100,6 +100,59 @@ requirements:
     expected: success
   milestone: M01
   slice: M01.S1
+- id: REQ-004
+  title: "Claude Code hooks and pre-commit battery enforce v0.3 contract"
+  description: |
+    SessionStart emits additionalContext with gate state (≤9500 chars).
+    PreToolUse denies src/ edits when LOCKED and denies non-touches
+    edits when UNLOCKED. PostToolUse blocks on discipline violations.
+    Stop runs `pragma verify all` and blocks on failure. `pragma hooks
+    seal/verify/show` manage the integrity hash. `pragma verify
+    discipline/commits/integrity` each have one exit code and one
+    remediation. `pragma init --brownfield` writes .claude/settings.json
+    + hash + expanded .pre-commit-config.yaml.
+  touches:
+    - src/pragma/core/discipline.py
+    - src/pragma/core/integrity.py
+    - src/pragma/core/commits.py
+    - src/pragma/hooks/session_start.py
+    - src/pragma/hooks/pre_tool_use.py
+    - src/pragma/hooks/post_tool_use.py
+    - src/pragma/hooks/stop.py
+    - src/pragma/hooks/dispatcher.py
+    - src/pragma/cli/commands/hook.py
+    - src/pragma/cli/commands/hooks.py
+    - src/pragma/cli/commands/verify.py
+    - src/pragma/cli/commands/init.py
+    - src/pragma/templates/claude-settings.json.tpl
+    - src/pragma/templates/pre-commit-config.yaml.tpl
+  permutations:
+    - id: session_start_emits_context
+      description: "SessionStart returns additionalContext with gate state"
+      expected: success
+    - id: pre_tool_use_denies_locked_src
+      description: "PreToolUse denies src/ edit when gate LOCKED"
+      expected: reject
+    - id: pre_tool_use_allows_test_files
+      description: "PreToolUse allows edits outside source_root"
+      expected: success
+    - id: post_tool_use_blocks_complexity
+      description: "PostToolUse blocks on cyclomatic complexity > 10"
+      expected: reject
+    - id: stop_blocks_on_verify_fail
+      description: "Stop blocks turn-end when verify all fails"
+      expected: reject
+    - id: hooks_seal_writes_hash
+      description: "pragma hooks seal writes .pragma/claude-settings.hash"
+      expected: success
+    - id: verify_integrity_rejects_drift
+      description: "pragma verify integrity exits 1 on hash mismatch"
+      expected: reject
+    - id: init_writes_v03_artifacts
+      description: "pragma init --brownfield writes claude settings and hash"
+      expected: success
+  milestone: M01
+  slice: M01.S2
 milestones:
 - id: M00
   title: Implicit brownfield milestone
@@ -123,3 +176,7 @@ milestones:
     title: Slice gate
     description: activate, unlock with red tests, complete.
     requirements: [REQ-003]
+  - id: M01.S2
+    title: "v0.3 hooks and battery"
+    description: "Claude Code hooks + safety battery + integrity seal."
+    requirements: [REQ-004]
