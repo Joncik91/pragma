@@ -81,3 +81,43 @@ class StateSchemaError(PragmaError):
 @dataclass(kw_only=True)
 class StateLocked(PragmaError):
     code: str = "state_locked"
+
+
+@dataclass(kw_only=True)
+class SliceNotFound(PragmaError):
+    code: str = "slice_not_found"
+
+
+@dataclass(kw_only=True)
+class SliceAlreadyActive(PragmaError):
+    code: str = "slice_already_active"
+
+
+@dataclass(kw_only=True)
+class SliceNotActive(PragmaError):
+    code: str = "slice_not_active"
+
+
+@dataclass(kw_only=True)
+class GateWrongState(PragmaError):
+    code: str = "gate_wrong_state"
+
+
+@dataclass(kw_only=True)
+class MilestoneDepUnshipped(PragmaError):
+    code: str = "milestone_dep_unshipped"
+
+
+@dataclass(kw_only=True)
+class UnlockMissingTests(PragmaError):
+    code: str = "unlock_missing_tests"
+
+
+@dataclass(kw_only=True)
+class UnlockTestPassing(PragmaError):
+    code: str = "unlock_test_passing"
+
+
+@dataclass(kw_only=True)
+class CompleteTestsFailing(PragmaError):
+    code: str = "complete_tests_failing"

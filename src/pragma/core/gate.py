@@ -1,0 +1,271 @@
+"""Pure transition functions for the v0.2 gate.
+
+Each function takes (state, ...) and returns (new_state, audit_entry).
+No IO — callers (cli/commands/slice.py, cli/commands/unlock.py) handle
+writing state.json and audit.jsonl.
+"""
+
+from __future__ import annotations
+
+from typing import Any
+
+from pragma.core.errors import (
+    GateWrongState,
+    MilestoneDepUnshipped,
+    SliceAlreadyActive,
+    SliceNotActive,
+    SliceNotFound,
+)
+from pragma.core.models import Manifest
+from pragma.core.state import LastTransition, SliceState, State
+
+
+def _find_slice(manifest: Manifest, slice_id: str) -> tuple[str, str] | None:
+    for m in manifest.milestones:
+        for s in m.slices:
+            if s.id == slice_id:
+                return (m.id, s.id)
+    return None
+
+
+def activate(
+    *,
+    state: State,
+    manifest: Manifest,
+    slice_id: str,
+    now_iso: str,
+    force: bool = False,
+) -> tuple[State, dict[str, Any]]:
+    location = _find_slice(manifest, slice_id)
+    if location is None:
+        raise SliceNotFound(
+            message=f"Slice {slice_id!r} not declared in manifest.",
+            remediation=(
+                "Add the slice under milestones[].slices[] in "
+                "pragma.yaml, or pick one of the declared slice ids."
+            ),
+            context={"slice": slice_id},
+        )
+    milestone_id, _ = location
+
+    if state.active_slice is not None and not force:
+        raise SliceAlreadyActive(
+            message=f"Slice {state.active_slice!r} is already active.",
+            remediation=(
+                "Complete it (`pragma slice complete`), cancel it "
+                "(`pragma slice cancel`), or pass --force to switch."
+            ),
+            context={"active": state.active_slice, "requested": slice_id},
+        )
+
+    milestone = next(
+        m for m in manifest.milestones if m.id == milestone_id
+    )
+    for dep in milestone.depends_on:
+        dep_slices = next(
+            m for m in manifest.milestones if m.id == dep
+        ).slices
+        for s in dep_slices:
+            st = state.slices.get(s.id)
+            if st is None or st.status != "shipped":
+                raise MilestoneDepUnshipped(
+                    message=(
+                        f"Cannot activate {slice_id!r}: milestone "
+                        f"{milestone_id!r} depends on {dep!r} which "
+                        f"still has unshipped slice {s.id!r}."
+                    ),
+                    remediation=(
+                        f"Finish {dep!r} first: activate, unlock, "
+                        f"and complete each of its slices."
+                    ),
+                    context={
+                        "milestone": milestone_id,
+                        "dep": dep,
+                        "pending": s.id,
+                    },
+                )
+
+    new_slices = dict(state.slices)
+    new_slices[slice_id] = SliceState(
+        status="in_progress",
+        gate="LOCKED",
+        activated_at=now_iso,
+        unlocked_at=None,
+        completed_at=None,
+    )
+    new_state = State(
+        version=1,
+        active_slice=slice_id,
+        gate="LOCKED",
+        manifest_hash=state.manifest_hash,
+        slices=new_slices,
+        last_transition=LastTransition(
+            event="slice_activated",
+            at=now_iso,
+            reason=f"pragma slice activate {slice_id}",
+            from_gate=None,
+            to_gate="LOCKED",
+            slice=slice_id,
+        ),
+    )
+    audit = {
+        "event": "slice_activated",
+        "slice": slice_id,
+        "from_state": None,
+        "to_state": "LOCKED",
+        "reason": f"pragma slice activate {slice_id}",
+    }
+    return new_state, audit
+
+
+def unlock_transition(
+    state: State, *, now_iso: str
+) -> tuple[State, dict[str, Any]]:
+    if state.active_slice is None:
+        raise SliceNotActive(
+            message="No active slice; nothing to unlock.",
+            remediation="Run `pragma slice activate <id>` first.",
+            context={},
+        )
+    if state.gate != "LOCKED":
+        raise GateWrongState(
+            message=(
+                f"unlock requires gate=LOCKED; current "
+                f"gate={state.gate}."
+            ),
+            remediation="This slice is already UNLOCKED or completed.",
+            context={"gate": state.gate, "slice": state.active_slice},
+        )
+    sid = state.active_slice
+    old = state.slices[sid]
+    new_slices = dict(state.slices)
+    new_slices[sid] = SliceState(
+        status=old.status,
+        gate="UNLOCKED",
+        activated_at=old.activated_at,
+        unlocked_at=now_iso,
+        completed_at=old.completed_at,
+    )
+    new_state = State(
+        version=1,
+        active_slice=sid,
+        gate="UNLOCKED",
+        manifest_hash=state.manifest_hash,
+        slices=new_slices,
+        last_transition=LastTransition(
+            event="unlocked",
+            at=now_iso,
+            reason=f"pragma unlock (slice {sid})",
+            from_gate="LOCKED",
+            to_gate="UNLOCKED",
+            slice=sid,
+        ),
+    )
+    audit = {
+        "event": "unlocked",
+        "slice": sid,
+        "from_state": "LOCKED",
+        "to_state": "UNLOCKED",
+        "reason": f"pragma unlock (slice {sid})",
+    }
+    return new_state, audit
+
+
+def complete(
+    state: State, *, now_iso: str
+) -> tuple[State, dict[str, Any]]:
+    if state.active_slice is None:
+        raise SliceNotActive(
+            message="No active slice; nothing to complete.",
+            remediation="Activate a slice first.",
+            context={},
+        )
+    if state.gate != "UNLOCKED":
+        raise GateWrongState(
+            message=(
+                f"complete requires gate=UNLOCKED; current "
+                f"gate={state.gate}."
+            ),
+            remediation=(
+                "Run `pragma unlock` first after writing failing "
+                "tests."
+            ),
+            context={"gate": state.gate, "slice": state.active_slice},
+        )
+    sid = state.active_slice
+    old = state.slices[sid]
+    new_slices = dict(state.slices)
+    new_slices[sid] = SliceState(
+        status="shipped",
+        gate=None,
+        activated_at=old.activated_at,
+        unlocked_at=old.unlocked_at,
+        completed_at=now_iso,
+    )
+    new_state = State(
+        version=1,
+        active_slice=None,
+        gate=None,
+        manifest_hash=state.manifest_hash,
+        slices=new_slices,
+        last_transition=LastTransition(
+            event="slice_completed",
+            at=now_iso,
+            reason=f"pragma slice complete (slice {sid})",
+            from_gate="UNLOCKED",
+            to_gate=None,
+            slice=sid,
+        ),
+    )
+    audit = {
+        "event": "slice_completed",
+        "slice": sid,
+        "from_state": "UNLOCKED",
+        "to_state": None,
+        "reason": f"pragma slice complete (slice {sid})",
+    }
+    return new_state, audit
+
+
+def cancel(
+    state: State, *, now_iso: str
+) -> tuple[State, dict[str, Any]]:
+    if state.active_slice is None:
+        raise SliceNotActive(
+            message="No active slice; nothing to cancel.",
+            remediation="Activate a slice first.",
+            context={},
+        )
+    sid = state.active_slice
+    old = state.slices[sid]
+    new_slices = dict(state.slices)
+    new_slices[sid] = SliceState(
+        status="cancelled",
+        gate=None,
+        activated_at=old.activated_at,
+        unlocked_at=old.unlocked_at,
+        completed_at=old.completed_at,
+    )
+    new_state = State(
+        version=1,
+        active_slice=None,
+        gate=None,
+        manifest_hash=state.manifest_hash,
+        slices=new_slices,
+        last_transition=LastTransition(
+            event="slice_cancelled",
+            at=now_iso,
+            reason=f"pragma slice cancel (slice {sid})",
+            from_gate=state.gate,
+            to_gate=None,
+            slice=sid,
+        ),
+    )
+    audit = {
+        "event": "slice_cancelled",
+        "slice": sid,
+        "from_state": state.gate,
+        "to_state": None,
+        "reason": f"pragma slice cancel (slice {sid})",
+    }
+    return new_state, audit
