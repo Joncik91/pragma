@@ -6,6 +6,7 @@ import typer
 
 from pragma.cli.commands.doctor import doctor
 from pragma.cli.commands.freeze import freeze
+from pragma.cli.commands.hook import hook
 from pragma.cli.commands.init import init
 from pragma.cli.commands.migrate import migrate
 from pragma.cli.commands.slice import slice_app
@@ -28,6 +29,7 @@ def _main() -> None:
 
 app.command(name="init")(init)
 app.command(name="freeze")(freeze)
+app.command(name="hook")(hook)
 app.command(name="doctor")(doctor)
 app.command(name="migrate")(migrate)
 app.command(name="unlock")(unlock)
