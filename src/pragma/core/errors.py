@@ -121,3 +121,8 @@ class UnlockTestPassing(PragmaError):
 @dataclass(kw_only=True)
 class CompleteTestsFailing(PragmaError):
     code: str = "complete_tests_failing"
+
+
+@dataclass(kw_only=True)
+class GateHashDrift(PragmaError):
+    code: str = "gate_hash_drift"
