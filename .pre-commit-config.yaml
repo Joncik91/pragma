@@ -6,7 +6,7 @@ repos:
     hooks:
       - id: pragma-verify-manifest
         name: pragma verify manifest
-        entry: python3 -m pragma verify manifest
+        entry: .venv/bin/python3 -m pragma verify manifest
         language: system
         pass_filenames: false
         always_run: true
