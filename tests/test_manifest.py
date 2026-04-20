@@ -74,8 +74,8 @@ def test_canonicalise_is_sorted_json(minimal_valid_yaml: str, tmp_project: Path)
     (tmp_project / "pragma.yaml").write_text(minimal_valid_yaml)
     m = load_manifest(tmp_project / "pragma.yaml")
     canonical = canonicalise(m).decode()
-    # sort_keys=True means 'project' alphabetises before 'requirements' and 'version'
-    assert canonical.startswith(b'{"project":'.decode())
+    # sort_keys=True means 'milestones' alphabetises before 'project', 'requirements', 'version'
+    assert canonical.startswith(b'{"milestones":'.decode())
 
 
 def test_hash_is_sha256_hex(minimal_valid_yaml: str, tmp_project: Path) -> None:

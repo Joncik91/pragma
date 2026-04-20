@@ -1,7 +1,7 @@
 {
   "version": "1",
-  "manifest_hash": "sha256:88ccc52228abbe2460957ddefa6a538017207fec78ec6ac82c841c8815b2d9cf",
-  "generated_at": "2026-04-20T15:19:38Z",
+  "manifest_hash": "sha256:fa3341d34563b0bf379e7ba8b6ae16d0609acd28c72ae034019e05a4dedfe8c0",
+  "generated_at": "2026-04-20T18:02:45Z",
   "manifest": {
     "version": "1",
     "project": {
@@ -11,6 +11,7 @@
       "source_root": "src/",
       "tests_root": "tests/"
     },
+    "milestones": [],
     "requirements": [
       {
         "id": "REQ-001",
@@ -59,7 +60,9 @@
             "description": "doctor always exits zero",
             "expected": "success"
           }
-        ]
+        ],
+        "milestone": null,
+        "slice": null
       },
       {
         "id": "REQ-002",
@@ -90,7 +93,9 @@
             "description": "read_lock on invalid json raises manifest_schema_error",
             "expected": "reject"
           }
-        ]
+        ],
+        "milestone": null,
+        "slice": null
       }
     ]
   }

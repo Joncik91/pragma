@@ -6,6 +6,7 @@ from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
+import yaml
 
 
 @pytest.fixture()
@@ -29,3 +30,93 @@ def minimal_valid_yaml() -> str:
         "  tests_root: tests/\n"
         "requirements: []\n"
     )
+
+
+@pytest.fixture
+def v2_manifest_dict() -> dict:
+    """A minimal v2 manifest with one milestone, one slice, one requirement."""
+    return {
+        "version": "2",
+        "project": {
+            "name": "demo",
+            "mode": "brownfield",
+            "language": "python",
+            "source_root": "src/",
+            "tests_root": "tests/",
+        },
+        "milestones": [
+            {
+                "id": "M01",
+                "title": "Core",
+                "description": "Core features.",
+                "depends_on": [],
+                "slices": [
+                    {
+                        "id": "M01.S1",
+                        "title": "First slice",
+                        "description": "First deliverable.",
+                        "requirements": ["REQ-001"],
+                    }
+                ],
+            }
+        ],
+        "requirements": [
+            {
+                "id": "REQ-001",
+                "title": "Do a thing",
+                "description": "The system does a thing.",
+                "touches": ["src/demo/thing.py"],
+                "permutations": [
+                    {"id": "happy", "description": "happy path", "expected": "success"},
+                    {"id": "sad", "description": "sad path", "expected": "reject"},
+                ],
+                "milestone": "M01",
+                "slice": "M01.S1",
+            }
+        ],
+    }
+
+
+@pytest.fixture
+def v1_manifest_dict() -> dict:
+    """A minimal v1 manifest (pre-migration)."""
+    return {
+        "version": "1",
+        "project": {
+            "name": "demo",
+            "mode": "brownfield",
+            "language": "python",
+            "source_root": "src/",
+            "tests_root": "tests/",
+        },
+        "requirements": [
+            {
+                "id": "REQ-001",
+                "title": "Do a thing",
+                "description": "The system does a thing.",
+                "touches": ["src/demo/thing.py"],
+                "permutations": [
+                    {"id": "happy", "description": "happy path", "expected": "success"}
+                ],
+            }
+        ],
+    }
+
+
+@pytest.fixture
+def tmp_project_v2(tmp_path: Path, v2_manifest_dict: dict) -> Path:
+    """Project dir containing a valid v2 pragma.yaml + fresh pragma.lock.json."""
+    (tmp_path / "pragma.yaml").write_text(
+        yaml.safe_dump(v2_manifest_dict, sort_keys=False), encoding="utf-8"
+    )
+    (tmp_path / ".pragma").mkdir()
+    return tmp_path
+
+
+@pytest.fixture
+def tmp_project_v1(tmp_path: Path, v1_manifest_dict: dict) -> Path:
+    """Project dir containing a v1 pragma.yaml (pre-migration)."""
+    (tmp_path / "pragma.yaml").write_text(
+        yaml.safe_dump(v1_manifest_dict, sort_keys=False), encoding="utf-8"
+    )
+    return tmp_path
