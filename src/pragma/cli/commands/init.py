@@ -9,13 +9,17 @@ import typer
 from jinja2 import Environment, FileSystemLoader, StrictUndefined
 
 from pragma.core.errors import AlreadyInitialised, PragmaError
+from pragma.core.integrity import compute_settings_hash, write_stored_hash
 from pragma.templates import TEMPLATES_DIR
 
 _FILES_TO_CREATE = {
     "pragma.yaml.tpl": "pragma.yaml",
     "pre-commit-config.yaml.tpl": ".pre-commit-config.yaml",
     "README.md.tpl": "PRAGMA.md",
+    "claude-settings.json.tpl": ".claude/settings.json",
 }
+
+_SETTINGS_KEY = "claude-settings.json.tpl"
 
 
 def init(
@@ -29,7 +33,7 @@ def init(
     ),
     force: bool = typer.Option(False, "--force", help="Overwrite existing files if present."),
 ) -> None:
-    """Scaffold pragma.yaml, .pre-commit-config.yaml, PRAGMA.md."""
+    """Scaffold pragma.yaml, .pre-commit-config.yaml, PRAGMA.md, .claude/settings.json."""
     if not brownfield:
         typer.echo(
             json.dumps(
@@ -64,12 +68,20 @@ def init(
 
 
 def _scaffold(cwd: Path, *, project_name: str, force: bool) -> list[str]:
-    existing = [dest for dest in _FILES_TO_CREATE.values() if (cwd / dest).exists()]
+    plain_dests = {
+        k: v for k, v in _FILES_TO_CREATE.items() if k != _SETTINGS_KEY
+    }
+    existing = [dest for dest in plain_dests.values() if (cwd / dest).exists()]
+
+    settings_path = cwd / _FILES_TO_CREATE[_SETTINGS_KEY]
+    if settings_path.exists() and not force:
+        existing.append(str(settings_path.relative_to(cwd)))
+
     if existing and not force:
         raise AlreadyInitialised(
-            message=(f"Refusing to overwrite existing files: {', '.join(existing)}"),
+            message=(f"Refusing to overwrite existing files: {', '.join(sorted(existing))}"),
             remediation="Pass --force to overwrite, or remove the files manually.",
-            context={"existing": existing},
+            context={"existing": sorted(existing)},
         )
 
     env = Environment(
@@ -81,8 +93,16 @@ def _scaffold(cwd: Path, *, project_name: str, force: bool) -> list[str]:
 
     created: list[str] = []
     for tpl_name, dest_name in _FILES_TO_CREATE.items():
+        dest = cwd / dest_name
+        dest.parent.mkdir(parents=True, exist_ok=True)
         tpl = env.get_template(tpl_name)
         rendered = tpl.render(project_name=project_name)
-        (cwd / dest_name).write_text(rendered, encoding="utf-8")
+        dest.write_text(rendered, encoding="utf-8")
         created.append(dest_name)
+
+    pragma_dir = cwd / ".pragma"
+    pragma_dir.mkdir(exist_ok=True)
+    write_stored_hash(pragma_dir, compute_settings_hash(settings_path))
+    created.append(".pragma/claude-settings.hash")
+
     return created

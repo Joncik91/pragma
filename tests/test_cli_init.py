@@ -91,4 +91,6 @@ def test_init_prints_success_json(tmp_project: Path, monkeypatch: pytest.MonkeyP
         "pragma.yaml",
         ".pre-commit-config.yaml",
         "PRAGMA.md",
+        ".claude/settings.json",
+        ".pragma/claude-settings.hash",
     }
