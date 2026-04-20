@@ -10,6 +10,7 @@ from pragma.cli.commands.init import init
 from pragma.cli.commands.migrate import migrate
 from pragma.cli.commands.slice import slice_app
 from pragma.cli.commands.spec import spec_app
+from pragma.cli.commands.unlock import unlock
 from pragma.cli.commands.verify import verify_app
 
 app = typer.Typer(
@@ -29,6 +30,7 @@ app.command(name="init")(init)
 app.command(name="freeze")(freeze)
 app.command(name="doctor")(doctor)
 app.command(name="migrate")(migrate)
+app.command(name="unlock")(unlock)
 app.add_typer(slice_app)
 app.add_typer(spec_app)
 app.add_typer(verify_app)
