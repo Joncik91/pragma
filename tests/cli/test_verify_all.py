@@ -17,7 +17,7 @@ def test_verify_all_fresh_project(monkeypatch, tmp_project_v2: Path) -> None:
     assert result.exit_code == 0, result.output
     payload = json.loads(result.output)
     assert payload["ok"] is True
-    assert payload["checks"] == ["manifest", "gate", "discipline", "integrity"]
+    assert payload["checks"] == ["manifest", "gate", "integrity"]
 
 
 def test_verify_all_fails_fast_on_manifest(monkeypatch, tmp_project_v2: Path) -> None:
