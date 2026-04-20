@@ -1,0 +1,61 @@
+version: '1'
+project:
+  name: pragma
+  mode: brownfield
+  language: python
+  source_root: src/
+  tests_root: tests/
+requirements:
+- id: REQ-001
+  title: CLI emits stable JSON on success and failure
+  description: Every pragma subcommand exits zero with {ok:true,...} JSON on success and non-zero with
+    {error:'code',message,remediation,context} JSON on failure, so Claude Code can branch on either path.
+  touches:
+  - src/pragma/cli/commands/init.py
+  - src/pragma/cli/commands/spec.py
+  - src/pragma/cli/commands/freeze.py
+  - src/pragma/cli/commands/verify.py
+  - src/pragma/cli/commands/doctor.py
+  permutations:
+  - id: init_success
+    description: init emits {ok:true,created:[...]}
+    expected: success
+  - id: init_duplicate
+    description: init on existing project emits already_initialised
+    expected: reject
+  - id: freeze_success
+    description: freeze writes lock with sha256 hash
+    expected: success
+  - id: freeze_missing
+    description: freeze without manifest emits manifest_not_found
+    expected: reject
+  - id: verify_success
+    description: verify manifest passes on fresh freeze
+    expected: success
+  - id: verify_mismatch
+    description: verify fails on stale lock with hash_mismatch
+    expected: reject
+  - id: doctor_always_zero
+    description: doctor always exits zero
+    expected: success
+- id: REQ-002
+  title: Manifest and lockfile round-trip deterministically
+  description: The sha256 hash of pragma.yaml is stable across loads and changes only when the canonical
+    YAML content changes. Lockfile writes are atomic (tempfile + rename) so an interrupted freeze never
+    leaves a half-written lock.
+  touches:
+  - src/pragma/core/manifest.py
+  - src/pragma/core/lockfile.py
+  permutations:
+  - id: hash_stable
+    description: hash_manifest is stable across two loads of the same yaml
+    expected: success
+  - id: hash_changes
+    description: hash_manifest changes when yaml content changes
+    expected: success
+  - id: write_atomic
+    description: write_lock leaves no .tmp files on success
+    expected: success
+  - id: read_malformed
+    description: read_lock on invalid json raises manifest_schema_error
+    expected: reject

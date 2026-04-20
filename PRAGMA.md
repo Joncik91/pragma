@@ -21,14 +21,3 @@ manifest-driven discipline on AI-generated code.
     git commit -m "..."          # pre-commit blocks if verify fails
 
 See the Pragma v1 design spec for what's coming in v0.2+ (gate, hooks, SDK, PIL).
-
-## Adjusting the pre-commit entry
-
-`.pre-commit-config.yaml` uses `python3 -m pragma verify manifest` by default,
-which works on Debian/Ubuntu/Alpine/macOS/GitHub Actions (where `python3`
-always exists). If your environment is different:
-
-- **pipx install pragma** — change the `entry:` to `pragma verify manifest`.
-- **Windows (no python3 alias)** — change the `entry:` to `python -m pragma verify manifest`.
-- **Specific venv you want to pin** — change the `entry:` to
-  `path/to/venv/bin/python -m pragma verify manifest`.
