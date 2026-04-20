@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import typer
 
+from pragma.cli.commands.freeze import freeze
 from pragma.cli.commands.init import init
 from pragma.cli.commands.spec import spec_app
 
@@ -21,6 +22,7 @@ def _main() -> None:
 
 
 app.command(name="init")(init)
+app.command(name="freeze")(freeze)
 app.add_typer(spec_app)
 
 
