@@ -17,9 +17,7 @@ def _init() -> None:
     assert runner.invoke(app, ["init", "--brownfield", "--name", "example"]).exit_code == 0
 
 
-def test_freeze_creates_lockfile(
-    tmp_project: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_freeze_creates_lockfile(tmp_project: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.chdir(tmp_project)
     _init()
     result = runner.invoke(app, ["freeze"])
@@ -31,9 +29,7 @@ def test_freeze_creates_lockfile(
     assert lock["manifest_hash"].startswith("sha256:")
 
 
-def test_freeze_is_idempotent(
-    tmp_project: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_freeze_is_idempotent(tmp_project: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.chdir(tmp_project)
     _init()
     runner.invoke(app, ["freeze"])
@@ -74,9 +70,7 @@ def test_freeze_updates_hash_when_yaml_changes(
     assert h1 != h2
 
 
-def test_freeze_errors_when_no_manifest(
-    tmp_project: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_freeze_errors_when_no_manifest(tmp_project: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.chdir(tmp_project)
     result = runner.invoke(app, ["freeze"])
     assert result.exit_code != 0
@@ -95,9 +89,7 @@ def test_freeze_errors_on_malformed_yaml(
     assert parsed["error"] == "manifest_syntax_error"
 
 
-def test_freeze_emits_ok_json_with_hash(
-    tmp_project: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_freeze_emits_ok_json_with_hash(tmp_project: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.chdir(tmp_project)
     _init()
     result = runner.invoke(app, ["freeze"])

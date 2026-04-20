@@ -172,9 +172,7 @@ class TestManifest:
             title="t",
             description="d",
             touches=["src/x.py"],
-            permutations=[
-                Permutation(id="happy", description="d", expected="success")
-            ],
+            permutations=[Permutation(id="happy", description="d", expected="success")],
         )
 
     def test_empty_brownfield_manifest(self) -> None:

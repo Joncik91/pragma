@@ -1,0 +1,47 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    name: test + lint + types
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: pip-${{ runner.os }}-3.11-${{ hashFiles('pyproject.toml') }}
+          restore-keys: pip-${{ runner.os }}-3.11-
+
+      - name: Install Pragma (editable + dev deps)
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e '.[dev]'
+
+      - name: Verify Pragma's own manifest
+        run: pragma verify manifest
+
+      - name: Lint (ruff)
+        run: python -m ruff check src tests
+
+      - name: Format check (ruff)
+        run: python -m ruff format --check src tests
+
+      - name: Type check (mypy --strict)
+        run: python -m mypy src/pragma
+
+      - name: Run tests (pytest)
+        run: python -m pytest tests/ -q

@@ -60,9 +60,7 @@ def load_manifest(path: Path) -> Manifest:
     except ValidationError as exc:
         raise ManifestSchemaError(
             message=_first_error_message(exc),
-            remediation=(
-                "Fix the highlighted field. See manifest schema in spec §4."
-            ),
+            remediation=("Fix the highlighted field. See manifest schema in spec §4."),
             context={"path": str(path), "errors": exc.errors(include_url=False)},
         ) from exc
 

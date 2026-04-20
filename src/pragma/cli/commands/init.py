@@ -27,9 +27,7 @@ def init(
     name: str | None = typer.Option(
         None, "--name", help="Project name. Defaults to the current directory name."
     ),
-    force: bool = typer.Option(
-        False, "--force", help="Overwrite existing files if present."
-    ),
+    force: bool = typer.Option(False, "--force", help="Overwrite existing files if present."),
 ) -> None:
     """Scaffold pragma.yaml, .pre-commit-config.yaml, PRAGMA.md."""
     if not brownfield:
@@ -66,14 +64,10 @@ def init(
 
 
 def _scaffold(cwd: Path, *, project_name: str, force: bool) -> list[str]:
-    existing = [
-        dest for dest in _FILES_TO_CREATE.values() if (cwd / dest).exists()
-    ]
+    existing = [dest for dest in _FILES_TO_CREATE.values() if (cwd / dest).exists()]
     if existing and not force:
         raise AlreadyInitialised(
-            message=(
-                f"Refusing to overwrite existing files: {', '.join(existing)}"
-            ),
+            message=(f"Refusing to overwrite existing files: {', '.join(existing)}"),
             remediation="Pass --force to overwrite, or remove the files manually.",
             context={"existing": existing},
         )

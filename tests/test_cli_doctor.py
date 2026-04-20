@@ -18,9 +18,7 @@ from pragma.__main__ import app
 runner = CliRunner()
 
 
-def test_doctor_prints_version_and_cwd(
-    tmp_project: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_doctor_prints_version_and_cwd(tmp_project: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.chdir(tmp_project)
     result = runner.invoke(app, ["doctor"])
     assert result.exit_code == 0
@@ -55,9 +53,7 @@ def test_doctor_reports_lock_after_freeze(
     assert parsed["lock_exists"] is True
 
 
-def test_doctor_always_exits_zero(
-    tmp_project: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_doctor_always_exits_zero(tmp_project: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Doctor is a diagnostic tool; it never fails the shell.
 
     Concerns like 'lock is missing' are reported in the payload, not as

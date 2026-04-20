@@ -32,9 +32,7 @@ spec_app = typer.Typer(
 def add_requirement(
     id: str = typer.Option(..., "--id", help="Requirement ID, e.g. REQ-001"),
     title: str = typer.Option(..., "--title", help="Short one-line title."),
-    description: str = typer.Option(
-        ..., "--description", help="Multi-sentence description."
-    ),
+    description: str = typer.Option(..., "--description", help="Multi-sentence description."),
     touches: list[str] = typer.Option(
         ...,
         "--touches",
@@ -90,10 +88,7 @@ def _parse_permutation_arg(arg: str) -> Permutation:
     if len(first_split) < 2:
         raise PragmaError(
             code="invalid_permutation_spec",
-            message=(
-                f"--permutation must be '<id>|<description>|<success|reject>'; "
-                f"got {arg!r}."
-            ),
+            message=(f"--permutation must be '<id>|<description>|<success|reject>'; got {arg!r}."),
             remediation=(
                 "Example: --permutation 'valid_email|Accepts well-formed emails|success'. "
                 "The description field may contain '|'; only the first two '|' are significant."
@@ -104,10 +99,7 @@ def _parse_permutation_arg(arg: str) -> Permutation:
     if len(last_split) < 2:
         raise PragmaError(
             code="invalid_permutation_spec",
-            message=(
-                f"--permutation must be '<id>|<description>|<success|reject>'; "
-                f"got {arg!r}."
-            ),
+            message=(f"--permutation must be '<id>|<description>|<success|reject>'; got {arg!r}."),
             remediation=(
                 "Example: --permutation 'valid_email|Accepts well-formed emails|success'. "
                 "The description field may contain '|'; only the first two '|' are significant."

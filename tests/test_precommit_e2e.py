@@ -28,9 +28,7 @@ def _have(cmd: str) -> bool:
 
 
 @pytest.mark.skipif(not _have("git"), reason="git required for e2e")
-@pytest.mark.skipif(
-    not _have("pre-commit"), reason="pre-commit required for e2e"
-)
+@pytest.mark.skipif(not _have("pre-commit"), reason="pre-commit required for e2e")
 def test_precommit_blocks_commit_when_lock_is_stale(tmp_project: Path) -> None:
     # Prepend .venv/bin so pragma + pre-commit resolve correctly even if the
     # test runner was invoked with the system Python.
@@ -66,9 +64,7 @@ def test_precommit_blocks_commit_when_lock_is_stale(tmp_project: Path) -> None:
 
     # Drift: edit pragma.yaml without re-freezing.
     yaml_path = tmp_project / "pragma.yaml"
-    yaml_path.write_text(
-        yaml_path.read_text().replace('name: "e2e"', 'name: "drifted"')
-    )
+    yaml_path.write_text(yaml_path.read_text().replace('name: "e2e"', 'name: "drifted"'))
     run("git", "add", "pragma.yaml")
 
     blocked = run("git", "commit", "-m", "drift", check=False)

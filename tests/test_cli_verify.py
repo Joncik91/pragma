@@ -14,9 +14,7 @@ runner = CliRunner()
 
 
 def _init_and_freeze() -> None:
-    assert runner.invoke(
-        app, ["init", "--brownfield", "--name", "example"]
-    ).exit_code == 0
+    assert runner.invoke(app, ["init", "--brownfield", "--name", "example"]).exit_code == 0
     assert runner.invoke(app, ["freeze"]).exit_code == 0
 
 
@@ -42,9 +40,7 @@ def test_verify_fails_when_manifest_missing(
     assert parsed["error"] == "manifest_not_found"
 
 
-def test_verify_fails_when_lock_missing(
-    tmp_project: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_verify_fails_when_lock_missing(tmp_project: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.chdir(tmp_project)
     assert runner.invoke(app, ["init", "--brownfield", "--name", "example"]).exit_code == 0
     result = runner.invoke(app, ["verify", "manifest"])
@@ -53,9 +49,7 @@ def test_verify_fails_when_lock_missing(
     assert parsed["error"] == "lock_not_found"
 
 
-def test_verify_fails_on_hash_mismatch(
-    tmp_project: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_verify_fails_on_hash_mismatch(tmp_project: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.chdir(tmp_project)
     _init_and_freeze()
     # Edit pragma.yaml without re-freezing.
@@ -69,9 +63,7 @@ def test_verify_fails_on_hash_mismatch(
     assert "pragma freeze" in parsed["remediation"]
 
 
-def test_verify_fails_on_malformed_yaml(
-    tmp_project: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_verify_fails_on_malformed_yaml(tmp_project: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.chdir(tmp_project)
     _init_and_freeze()
     (tmp_project / "pragma.yaml").write_text("project: [unclosed")

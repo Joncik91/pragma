@@ -55,9 +55,7 @@ class Requirement(_StrictModel):
     @classmethod
     def _validate_requirement_id(cls, v: str) -> str:
         if not _REQUIREMENT_ID_RE.fullmatch(v):
-            raise ValueError(
-                "requirement id must match ^REQ-\\d{3,4}$ (e.g. REQ-001, REQ-0017)"
-            )
+            raise ValueError("requirement id must match ^REQ-\\d{3,4}$ (e.g. REQ-001, REQ-0017)")
         return v
 
     @model_validator(mode="after")

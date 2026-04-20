@@ -30,9 +30,7 @@ def test_write_lock_creates_file_with_expected_envelope(
     assert raw["manifest"]["project"]["name"] == "example"
 
 
-def test_read_lock_returns_typed_lockfile(
-    tmp_project: Path, minimal_valid_yaml: str
-) -> None:
+def test_read_lock_returns_typed_lockfile(tmp_project: Path, minimal_valid_yaml: str) -> None:
     yaml_path = tmp_project / "pragma.yaml"
     yaml_path.write_text(minimal_valid_yaml)
     lock_path = tmp_project / "pragma.lock.json"
@@ -57,9 +55,7 @@ def test_read_malformed_lock_raises_schema_error(tmp_project: Path) -> None:
         read_lock(tmp_project / "pragma.lock.json")
 
 
-def test_write_is_atomic_temp_then_rename(
-    tmp_project: Path, minimal_valid_yaml: str
-) -> None:
+def test_write_is_atomic_temp_then_rename(tmp_project: Path, minimal_valid_yaml: str) -> None:
     """write_lock must never leave a half-written file on disk."""
     yaml_path = tmp_project / "pragma.yaml"
     yaml_path.write_text(minimal_valid_yaml)

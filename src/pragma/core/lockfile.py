@@ -53,9 +53,7 @@ def write_lock(path: Path, manifest: Manifest, *, now_iso: str) -> None:
 
     # Atomic write: tempfile in the same dir (so rename is atomic on POSIX),
     # then os.replace().
-    fd, tmp_name = tempfile.mkstemp(
-        prefix=f"{_LOCK_FILENAME}.tmp-", dir=str(parent)
-    )
+    fd, tmp_name = tempfile.mkstemp(prefix=f"{_LOCK_FILENAME}.tmp-", dir=str(parent))
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as fh:
             fh.write(payload)
