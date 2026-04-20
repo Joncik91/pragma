@@ -22,9 +22,50 @@ class DisciplineViolation:
     remediation: str
 
 
-def check_source(source: str, *, path: str) -> list[DisciplineViolation]:
+def _build_subclass_map(tree: ast.AST) -> dict[str, list[str]]:
+    subclass_map: dict[str, list[str]] = {}
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ClassDef):
+            for base in node.bases:
+                name = _dec_name(base)
+                if name:
+                    subclass_map.setdefault(name, []).append(node.name)
+    return subclass_map
+
+
+def _walk_tree_violations(
+    tree: ast.AST, path: str, subclass_map: dict[str, list[str]]
+) -> list[DisciplineViolation]:
     violations: list[DisciplineViolation] = []
-    violations.extend(_empty_init(source, path))
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            violations.extend(_check_function(node, path))
+        elif isinstance(node, ast.ClassDef):
+            violations.extend(_check_class(node, path, subclass_map))
+    return violations
+
+
+def _file_level_violations(source: str, path: str) -> list[DisciplineViolation]:
+    if not source.strip():
+        return []
+    violations = list(_check_todo_sentinels(source, path))
+    lines = source.splitlines()
+    if len(lines) > _LOC_PER_FILE_BUDGET:
+        violations.append(
+            DisciplineViolation(
+                rule="loc_per_file",
+                path=path,
+                line=1,
+                got=len(lines),
+                budget=_LOC_PER_FILE_BUDGET,
+                remediation="Split this file into smaller modules.",
+            )
+        )
+    return violations
+
+
+def check_source(source: str, *, path: str) -> list[DisciplineViolation]:
+    violations: list[DisciplineViolation] = list(_empty_init(source, path))
     try:
         tree = ast.parse(source, filename=path)
     except SyntaxError as exc:
@@ -38,32 +79,9 @@ def check_source(source: str, *, path: str) -> list[DisciplineViolation]:
                 remediation="Fix the syntax error before running discipline checks.",
             )
         ]
-    subclass_map: dict[str, list[str]] = {}
-    for node in ast.walk(tree):
-        if isinstance(node, ast.ClassDef):
-            for base in node.bases:
-                name = _dec_name(base)
-                if name:
-                    subclass_map.setdefault(name, []).append(node.name)
-    for node in ast.walk(tree):
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-            violations.extend(_check_function(node, path))
-        elif isinstance(node, ast.ClassDef):
-            violations.extend(_check_class(node, path, subclass_map))
-    if source.strip():
-        violations.extend(_check_todo_sentinels(source, path))
-        lines = source.splitlines()
-        if len(lines) > _LOC_PER_FILE_BUDGET:
-            violations.append(
-                DisciplineViolation(
-                    rule="loc_per_file",
-                    path=path,
-                    line=1,
-                    got=len(lines),
-                    budget=_LOC_PER_FILE_BUDGET,
-                    remediation="Split this file into smaller modules.",
-                )
-            )
+    subclass_map = _build_subclass_map(tree)
+    violations.extend(_walk_tree_violations(tree, path, subclass_map))
+    violations.extend(_file_level_violations(source, path))
     return violations
 
 
@@ -172,8 +190,7 @@ def _is_single_method_util(node: ast.ClassDef) -> bool:
     methods = [
         n
         for n in node.body
-        if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))
-        and n.name != "__init__"
+        if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef)) and n.name != "__init__"
     ]
     return len(methods) == 1 and len(node.body) <= 3
 
@@ -197,9 +214,7 @@ def _cyclomatic(node: ast.AST) -> int:
             count += 1
         elif isinstance(child, ast.BoolOp):
             count += len(child.values) - 1
-        elif isinstance(
-            child, (ast.ListComp, ast.SetComp, ast.DictComp, ast.GeneratorExp)
-        ):
+        elif isinstance(child, (ast.ListComp, ast.SetComp, ast.DictComp, ast.GeneratorExp)):
             count += 1
     return count
 
@@ -228,9 +243,7 @@ def _max_nesting_depth(node: ast.AST) -> int:
     return _walk(node, 0)
 
 
-def _check_todo_sentinels(
-    source: str, path: str
-) -> list[DisciplineViolation]:
+def _check_todo_sentinels(source: str, path: str) -> list[DisciplineViolation]:
     violations: list[DisciplineViolation] = []
     for i, line in enumerate(source.splitlines(), start=1):
         for marker in _TODO_MARKERS:

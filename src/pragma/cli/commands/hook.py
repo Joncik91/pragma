@@ -10,7 +10,8 @@ from pragma.hooks.dispatcher import dispatch
 
 def hook(
     event: str = typer.Argument(
-        ..., metavar="EVENT",
+        ...,
+        metavar="EVENT",
         help="One of: session-start, pre-tool-use, post-tool-use, stop.",
     ),
 ) -> None:

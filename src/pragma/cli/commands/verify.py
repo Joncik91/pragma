@@ -49,19 +49,14 @@ def _check_integrity(cwd: Path) -> dict[str, object]:
     result = verify_settings_integrity(settings, pragma_dir)
     if result is None:
         raise HashNotFoundError(
-            message=(
-                ".claude/settings.json exists but .pragma/claude-settings.hash "
-                "is missing."
-            ),
+            message=(".claude/settings.json exists but .pragma/claude-settings.hash is missing."),
             remediation="Run `pragma hooks seal` to store the canonical hash.",
             context={"settings": str(settings)},
         )
 
     if result is False:
         raise IntegrityMismatchError(
-            message=(
-                ".claude/settings.json has been modified since `pragma hooks seal`."
-            ),
+            message=(".claude/settings.json has been modified since `pragma hooks seal`."),
             remediation=(
                 "Inspect the change with `pragma hooks show`. If intentional, "
                 "run `pragma hooks seal` to re-canonicalise. If not, restore "
@@ -86,14 +81,16 @@ def _check_discipline(cwd: Path) -> dict[str, object]:
     if src_root.exists():
         for py in sorted(src_root.rglob("*.py")):
             for v in check_file(py):
-                violations.append({
-                    "rule": v.rule,
-                    "path": v.path,
-                    "line": v.line,
-                    "got": v.got,
-                    "budget": v.budget,
-                    "remediation": v.remediation,
-                })
+                violations.append(
+                    {
+                        "rule": v.rule,
+                        "path": v.path,
+                        "line": v.line,
+                        "got": v.got,
+                        "budget": v.budget,
+                        "remediation": v.remediation,
+                    }
+                )
 
     if violations:
         raise DisciplineViolationError(
@@ -107,25 +104,30 @@ def _check_discipline(cwd: Path) -> dict[str, object]:
 
 def _check_commits(cwd: Path, base: str = "main") -> dict[str, object]:
     try:
-        subprocess.run(
-            ["git", "rev-parse", "--verify", base],
-            cwd=str(cwd), capture_output=True, check=True,
+        subprocess.run(  # noqa: S603
+            ["git", "rev-parse", "--verify", base],  # noqa: S607
+            cwd=str(cwd),
+            capture_output=True,
+            check=True,
         )
         range_spec = f"{base}..HEAD"
     except subprocess.CalledProcessError:
         range_spec = "HEAD"
 
     try:
-        out = subprocess.run(
-            ["git", "log", range_spec, "--format=%H%x00%B%x1e"],
-            cwd=str(cwd), capture_output=True, text=True, check=True,
+        out = subprocess.run(  # noqa: S603
+            ["git", "log", range_spec, "--format=%H%x00%B%x1e"],  # noqa: S607
+            cwd=str(cwd),
+            capture_output=True,
+            text=True,
+            check=True,
         ).stdout
     except subprocess.CalledProcessError as exc:
         raise PragmaError(
             code="git_unavailable",
             message=f"git log failed: {exc.stderr}",
             remediation="Ensure this is a git repo and base exists.",
-        )
+        ) from exc
 
     bad_commits: list[dict[str, object]] = []
     for entry in out.split("\x1e"):
@@ -135,11 +137,13 @@ def _check_commits(cwd: Path, base: str = "main") -> dict[str, object]:
         sha, _, message = entry.partition("\x00")
         errors = validate_commit_shape(message)
         if errors:
-            bad_commits.append({
-                "sha": sha.strip(),
-                "rules": [e.rule for e in errors],
-                "remediation": [e.remediation for e in errors],
-            })
+            bad_commits.append(
+                {
+                    "sha": sha.strip(),
+                    "rules": [e.rule for e in errors],
+                    "remediation": [e.remediation for e in errors],
+                }
+            )
 
     if bad_commits:
         raise CommitShapeViolationError(
@@ -299,7 +303,8 @@ def verify_integrity() -> None:
 @verify_app.command(name="commits")
 def verify_commits(
     base: str = typer.Option(
-        "main", "--base",
+        "main",
+        "--base",
         help="Walk commits from <base>..HEAD. Defaults to main.",
     ),
 ) -> None:

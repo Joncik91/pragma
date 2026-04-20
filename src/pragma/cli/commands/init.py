@@ -68,9 +68,7 @@ def init(
 
 
 def _scaffold(cwd: Path, *, project_name: str, force: bool) -> list[str]:
-    plain_dests = {
-        k: v for k, v in _FILES_TO_CREATE.items() if k != _SETTINGS_KEY
-    }
+    plain_dests = {k: v for k, v in _FILES_TO_CREATE.items() if k != _SETTINGS_KEY}
     existing = [dest for dest in plain_dests.values() if (cwd / dest).exists()]
 
     settings_path = cwd / _FILES_TO_CREATE[_SETTINGS_KEY]

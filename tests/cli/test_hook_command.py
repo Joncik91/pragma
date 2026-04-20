@@ -3,11 +3,9 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-import pytest
 from typer.testing import CliRunner
 
 from pragma.__main__ import app
-
 
 runner = CliRunner()
 
@@ -15,7 +13,8 @@ runner = CliRunner()
 def test_hook_session_start(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.chdir(tmp_path)
     r = runner.invoke(
-        app, ["hook", "session-start"],
+        app,
+        ["hook", "session-start"],
         input=json.dumps({"session_id": "x", "source": "startup"}),
     )
     assert r.exit_code == 0, r.output

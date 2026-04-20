@@ -37,7 +37,8 @@ def test_missing_co_authored_by_flagged() -> None:
 
 def test_subject_too_long_flagged() -> None:
     long_subj = (
-        "feat(really-long-scope): " + "x" * 80
+        "feat(really-long-scope): "
+        + "x" * 80
         + "\n\nWHY: y\nWHAT: z\nWHERE: q\n\nCo-Authored-By: a\n"
     )
     errors = validate_commit_shape(long_subj)

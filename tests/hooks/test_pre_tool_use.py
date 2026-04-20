@@ -2,12 +2,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import pytest
 from typer.testing import CliRunner
 
 from pragma.__main__ import app
 from pragma.hooks.pre_tool_use import handle
-
 
 runner = CliRunner()
 
@@ -21,7 +19,8 @@ def test_allow_when_no_active_slice(tmp_path: Path) -> None:
 
 
 def test_deny_when_locked_and_src_edit(
-    monkeypatch, tmp_project_v2: Path,
+    monkeypatch,
+    tmp_project_v2: Path,
 ) -> None:
     monkeypatch.chdir(tmp_project_v2)
     assert runner.invoke(app, ["freeze"]).exit_code == 0
@@ -36,7 +35,8 @@ def test_deny_when_locked_and_src_edit(
 
 
 def test_allow_when_locked_but_non_src_edit(
-    monkeypatch, tmp_project_v2: Path,
+    monkeypatch,
+    tmp_project_v2: Path,
 ) -> None:
     monkeypatch.chdir(tmp_project_v2)
     assert runner.invoke(app, ["freeze"]).exit_code == 0
@@ -49,7 +49,9 @@ def test_allow_when_locked_but_non_src_edit(
 
 
 def test_deny_when_unlocked_and_file_not_in_touches(
-    monkeypatch, tmp_project_v2: Path, tmp_path: Path,
+    monkeypatch,
+    tmp_project_v2: Path,
+    tmp_path: Path,
 ) -> None:
     monkeypatch.chdir(tmp_project_v2)
     assert runner.invoke(app, ["freeze"]).exit_code == 0
@@ -57,8 +59,7 @@ def test_deny_when_unlocked_and_file_not_in_touches(
     tdir = tmp_project_v2 / "tests"
     tdir.mkdir(exist_ok=True)
     (tdir / "test_req_001.py").write_text(
-        "def test_req_001_happy(): assert False\n"
-        "def test_req_001_sad(): assert False\n",
+        "def test_req_001_happy(): assert False\ndef test_req_001_sad(): assert False\n",
         encoding="utf-8",
     )
     assert runner.invoke(app, ["unlock"]).exit_code == 0
@@ -71,7 +72,8 @@ def test_deny_when_unlocked_and_file_not_in_touches(
 
 
 def test_allow_when_unlocked_and_file_in_touches(
-    monkeypatch, tmp_project_v2: Path,
+    monkeypatch,
+    tmp_project_v2: Path,
 ) -> None:
     monkeypatch.chdir(tmp_project_v2)
     assert runner.invoke(app, ["freeze"]).exit_code == 0
@@ -79,8 +81,7 @@ def test_allow_when_unlocked_and_file_in_touches(
     tdir = tmp_project_v2 / "tests"
     tdir.mkdir(exist_ok=True)
     (tdir / "test_req_001.py").write_text(
-        "def test_req_001_happy(): assert False\n"
-        "def test_req_001_sad(): assert False\n",
+        "def test_req_001_happy(): assert False\ndef test_req_001_sad(): assert False\n",
         encoding="utf-8",
     )
     assert runner.invoke(app, ["unlock"]).exit_code == 0

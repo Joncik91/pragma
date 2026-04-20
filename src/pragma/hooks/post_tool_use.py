@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
 import yaml
 
@@ -11,10 +12,10 @@ from pragma.core.discipline import check_file
 def _load_source_root(project_dir: Path) -> str:
     manifest_path = project_dir / "pragma.yaml"
     raw = yaml.safe_load(manifest_path.read_text(encoding="utf-8"))
-    return raw["project"]["source_root"]
+    return str(raw["project"]["source_root"])
 
 
-def handle(event_input: dict, cwd: Path) -> dict:
+def handle(event_input: dict[str, Any], cwd: Path) -> dict[str, Any]:
     tool_input = event_input.get("tool_input", {})
     file_path = tool_input.get("file_path", "")
 
@@ -36,8 +37,7 @@ def handle(event_input: dict, cwd: Path) -> dict:
 
     if violations:
         details = "; ".join(
-            f"{v.rule} (line {v.line}: got {v.got}, budget {v.budget})"
-            for v in violations
+            f"{v.rule} (line {v.line}: got {v.got}, budget {v.budget})" for v in violations
         )
         append_audit(
             cwd / ".pragma",

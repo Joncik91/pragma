@@ -1,16 +1,14 @@
 from __future__ import annotations
 
 import json
-import textwrap
 from pathlib import Path
 
-import yaml
-
 import pytest
+import yaml
 from typer.testing import CliRunner
 
 from pragma.__main__ import app
-from pragma.core.integrity import compute_settings_hash, read_stored_hash, write_stored_hash
+from pragma.core.integrity import read_stored_hash, write_stored_hash
 from pragma.hooks.post_tool_use import handle as post_tool_use_handle
 from pragma.hooks.pre_tool_use import handle as pre_tool_use_handle
 from pragma.hooks.session_start import handle as session_start_handle
@@ -22,21 +20,42 @@ runner = CliRunner()
 def _bootstrap(tmp_path: Path) -> Path:
     manifest = {
         "version": "2",
-        "project": {"name": "demo", "mode": "brownfield", "language": "python",
-                    "source_root": "src/", "tests_root": "tests/"},
-        "milestones": [{"id": "M01", "title": "T", "description": "T", "depends_on": [],
-                        "slices": [{"id": "M01.S1", "title": "T", "description": "T", "requirements": ["REQ-001"]}]}],
-        "requirements": [{
-            "id": "REQ-001", "title": "T", "description": "T",
-            "touches": ["src/demo/thing.py"],
-            "permutations": [
-                {"id": "happy", "description": "happy", "expected": "success"},
-                {"id": "sad", "description": "sad", "expected": "reject"},
-            ],
-            "milestone": "M01", "slice": "M01.S1",
-        }],
+        "project": {
+            "name": "demo",
+            "mode": "brownfield",
+            "language": "python",
+            "source_root": "src/",
+            "tests_root": "tests/",
+        },
+        "milestones": [
+            {
+                "id": "M01",
+                "title": "T",
+                "description": "T",
+                "depends_on": [],
+                "slices": [
+                    {"id": "M01.S1", "title": "T", "description": "T", "requirements": ["REQ-001"]}
+                ],
+            }
+        ],
+        "requirements": [
+            {
+                "id": "REQ-001",
+                "title": "T",
+                "description": "T",
+                "touches": ["src/demo/thing.py"],
+                "permutations": [
+                    {"id": "happy", "description": "happy", "expected": "success"},
+                    {"id": "sad", "description": "sad", "expected": "reject"},
+                ],
+                "milestone": "M01",
+                "slice": "M01.S1",
+            }
+        ],
     }
-    (tmp_path / "pragma.yaml").write_text(yaml.safe_dump(manifest, sort_keys=False), encoding="utf-8")
+    (tmp_path / "pragma.yaml").write_text(
+        yaml.safe_dump(manifest, sort_keys=False), encoding="utf-8"
+    )
     (tmp_path / "src").mkdir()
     (tmp_path / "tests").mkdir()
     (tmp_path / ".pragma").mkdir()
@@ -66,7 +85,8 @@ def test_req_004_pre_tool_use_denies_locked_src(tmp_path: Path) -> None:
         assert runner.invoke(app, ["freeze"]).exit_code == 0
         assert runner.invoke(app, ["slice", "activate", "M01.S1"]).exit_code == 0
         out = pre_tool_use_handle(
-            {"tool_name": "Edit", "tool_input": {"file_path": "src/demo/thing.py"}}, p,
+            {"tool_name": "Edit", "tool_input": {"file_path": "src/demo/thing.py"}},
+            p,
         )
         assert out["permissionDecision"] == "deny"
     finally:
@@ -81,7 +101,8 @@ def test_req_004_pre_tool_use_allows_test_files(tmp_path: Path) -> None:
         assert runner.invoke(app, ["freeze"]).exit_code == 0
         assert runner.invoke(app, ["slice", "activate", "M01.S1"]).exit_code == 0
         out = pre_tool_use_handle(
-            {"tool_name": "Write", "tool_input": {"file_path": "tests/test_x.py"}}, p,
+            {"tool_name": "Write", "tool_input": {"file_path": "tests/test_x.py"}},
+            p,
         )
         assert out["permissionDecision"] == "allow"
     finally:
@@ -105,12 +126,14 @@ def test_req_004_stop_blocks_on_verify_fail(tmp_path: Path) -> None:
     try:
         assert runner.invoke(app, ["freeze"]).exit_code == 0
         import yaml
+
         raw = yaml.safe_load((p / "pragma.yaml").read_text(encoding="utf-8"))
         raw["requirements"][0]["permutations"].append(
             {"id": "extra", "description": "drift", "expected": "success"}
         )
         (p / "pragma.yaml").write_text(
-            yaml.safe_dump(raw, sort_keys=False), encoding="utf-8",
+            yaml.safe_dump(raw, sort_keys=False),
+            encoding="utf-8",
         )
         out = stop_handle({"session_id": "x"}, p)
         assert out["decision"] == "block"

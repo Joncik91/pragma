@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
 from pragma.core.errors import StateNotFound
 from pragma.core.manifest import load_manifest, slice_requirements
@@ -8,7 +9,7 @@ from pragma.core.state import read_state
 from pragma.core.tests_discovery import expected_test_name
 
 
-def handle(event_input: dict, cwd: Path) -> dict:
+def handle(event_input: dict[str, Any], cwd: Path) -> dict[str, Any]:
     file_path = event_input.get("tool_input", {}).get("file_path", "")
     if not file_path:
         return {"permissionDecision": "allow"}

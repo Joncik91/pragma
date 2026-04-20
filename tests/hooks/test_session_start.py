@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import pytest
 from typer.testing import CliRunner
 
 from pragma.__main__ import app
@@ -18,7 +17,8 @@ def test_session_start_no_state(tmp_path: Path) -> None:
 
 
 def test_session_start_with_active_slice(
-    monkeypatch, tmp_project_v2: Path,
+    monkeypatch,
+    tmp_project_v2: Path,
 ) -> None:
     monkeypatch.chdir(tmp_project_v2)
     assert runner.invoke(app, ["freeze"]).exit_code == 0
@@ -37,22 +37,31 @@ def test_session_start_integrity_warning(tmp_path: Path) -> None:
     pragma_dir = tmp_path / ".pragma"
     pragma_dir.mkdir()
     (pragma_dir / "claude-settings.hash").write_text(
-        "sha256:" + "0" * 64 + "\n", encoding="utf-8",
+        "sha256:" + "0" * 64 + "\n",
+        encoding="utf-8",
     )
     out = handle({"session_id": "x", "source": "startup"}, tmp_path)
-    assert "tamper" in out["additionalContext"].lower() or \
-           "hash" in out["additionalContext"].lower()
+    assert (
+        "tamper" in out["additionalContext"].lower() or "hash" in out["additionalContext"].lower()
+    )
 
 
 def test_session_start_caps_additional_context_length(
-    monkeypatch, tmp_path: Path,
+    monkeypatch,
+    tmp_path: Path,
 ) -> None:
     import yaml
+
     vision = "x" * 20000
     manifest = {
         "version": "2",
-        "project": {"name": "demo", "mode": "brownfield", "language": "python",
-                    "source_root": "src/", "tests_root": "tests/"},
+        "project": {
+            "name": "demo",
+            "mode": "brownfield",
+            "language": "python",
+            "source_root": "src/",
+            "tests_root": "tests/",
+        },
         "vision": vision,
         "requirements": [],
     }

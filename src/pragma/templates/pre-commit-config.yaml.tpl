@@ -26,8 +26,8 @@ repos:
     hooks:
       - id: pip-audit
 
-  - repo: https://github.com/fpgp/deptry
-    rev: v0.22.0
+  - repo: https://github.com/fpgmaas/deptry
+    rev: 0.22.0
     hooks:
       - id: deptry
 
@@ -41,7 +41,7 @@ repos:
     hooks:
       - id: pytest
         name: pytest
-        entry: python -m pytest
+        entry: python3 -m pytest
         language: system
         pass_filenames: false
         always_run: true

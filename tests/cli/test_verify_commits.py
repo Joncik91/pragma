@@ -4,11 +4,9 @@ import json
 import subprocess
 from pathlib import Path
 
-import pytest
 from typer.testing import CliRunner
 
 from pragma.__main__ import app
-
 
 runner = CliRunner()
 
@@ -24,10 +22,16 @@ def _init_repo(tmp_path: Path) -> None:
     (tmp_path / "README.md").write_text("x", encoding="utf-8")
     _git(tmp_path, "add", "README.md")
     subprocess.run(
-        ["git", "commit", "-m",
-         "chore: seed\n\nWHY: seed\n\nWHAT: seed\n\nWHERE: README.md.\n\n"
-         "Co-Authored-By: Test <t@t.t>"],
-        cwd=str(tmp_path), check=True, capture_output=True,
+        [
+            "git",
+            "commit",
+            "-m",
+            "chore: seed\n\nWHY: seed\n\nWHAT: seed\n\nWHERE: README.md.\n\n"
+            "Co-Authored-By: Test <t@t.t>",
+        ],
+        cwd=str(tmp_path),
+        check=True,
+        capture_output=True,
     )
     _git(tmp_path, "checkout", "-b", "feature")
 
@@ -46,7 +50,9 @@ def test_verify_commits_flags_bad_shape(monkeypatch, tmp_path: Path) -> None:
     _git(tmp_path, "add", "x")
     subprocess.run(
         ["git", "commit", "-m", "just a subject"],
-        cwd=str(tmp_path), check=True, capture_output=True,
+        cwd=str(tmp_path),
+        check=True,
+        capture_output=True,
     )
     monkeypatch.chdir(tmp_path)
     r = runner.invoke(app, ["verify", "commits"])

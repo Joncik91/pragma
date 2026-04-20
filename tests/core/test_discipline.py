@@ -4,7 +4,6 @@ import textwrap
 from pathlib import Path
 
 from pragma.core.discipline import (
-    DisciplineViolation,
     check_file,
     check_source,
 )

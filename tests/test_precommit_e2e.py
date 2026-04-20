@@ -55,6 +55,26 @@ def test_precommit_blocks_commit_when_lock_is_stale(tmp_project: Path) -> None:
     run("git", "init", "-q")
     run("pragma", "init", "--brownfield", "--name", "e2e")
     run("pragma", "freeze")
+
+    # The v0.3 default battery pulls gitleaks/ruff/mypy/semgrep/pip-audit/
+    # deptry from public repos. This e2e asserts one specific invariant —
+    # that pragma verify all blocks a commit with a stale lockfile — and
+    # shouldn't depend on the sandbox's ability to reach those repos or on
+    # semgrep/deptry being runnable here. Replace the generated config with
+    # a minimal one that only runs pragma verify all locally.
+    (tmp_project / ".pre-commit-config.yaml").write_text(
+        "repos:\n"
+        "  - repo: local\n"
+        "    hooks:\n"
+        "      - id: pragma-verify-all\n"
+        "        name: pragma verify all\n"
+        "        entry: python3 -m pragma verify all\n"
+        "        language: system\n"
+        "        pass_filenames: false\n"
+        "        always_run: true\n"
+        "        stages: [pre-commit]\n",
+        encoding="utf-8",
+    )
     run("pre-commit", "install", "--install-hooks")
 
     # Baseline commit — should succeed.

@@ -3,9 +3,10 @@ from __future__ import annotations
 import subprocess
 import sys
 from pathlib import Path
+from typing import Any
 
 
-def handle(event_input: dict, cwd: Path) -> dict:
+def handle(event_input: dict[str, Any], cwd: Path) -> dict[str, Any]:
     proc = subprocess.run(
         [sys.executable, "-m", "pragma", "verify", "all"],
         cwd=str(cwd),

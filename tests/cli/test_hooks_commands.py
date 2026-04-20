@@ -3,12 +3,10 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-import pytest
 from typer.testing import CliRunner
 
 from pragma.__main__ import app
 from pragma.core.integrity import read_stored_hash
-
 
 runner = CliRunner()
 

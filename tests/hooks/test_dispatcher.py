@@ -27,7 +27,10 @@ def test_dispatch_routes_pre_tool_use(hook_input_pre_tool_use: dict) -> None:
 def test_dispatch_unknown_event() -> None:
     out = io.StringIO()
     exit_code = dispatch(
-        event="nope", stdin=io.StringIO("{}"), stdout=out, cwd=None,
+        event="nope",
+        stdin=io.StringIO("{}"),
+        stdout=out,
+        cwd=None,
     )
     assert exit_code == 1
     assert json.loads(out.getvalue())["error"] == "unknown_hook_event"
@@ -36,7 +39,10 @@ def test_dispatch_unknown_event() -> None:
 def test_dispatch_missing_stdin() -> None:
     out = io.StringIO()
     exit_code = dispatch(
-        event="session-start", stdin=io.StringIO(""), stdout=out, cwd=None,
+        event="session-start",
+        stdin=io.StringIO(""),
+        stdout=out,
+        cwd=None,
     )
     assert exit_code == 1
     assert json.loads(out.getvalue())["error"] == "hook_input_missing"
@@ -53,7 +59,8 @@ def test_dispatch_never_crashes_on_handler_exception(monkeypatch) -> None:
     exit_code = dispatch(
         event="session-start",
         stdin=io.StringIO('{"session_id":"x","source":"startup"}'),
-        stdout=out, cwd=None,
+        stdout=out,
+        cwd=None,
     )
     assert exit_code == 0
     result = json.loads(out.getvalue())

@@ -4,11 +4,9 @@ import json
 import textwrap
 from pathlib import Path
 
-import pytest
 from typer.testing import CliRunner
 
 from pragma.__main__ import app
-
 
 runner = CliRunner()
 
@@ -19,7 +17,8 @@ def test_full_hook_roundtrip(monkeypatch, tmp_project_v2: Path) -> None:
     assert runner.invoke(app, ["slice", "activate", "M01.S1"]).exit_code == 0
 
     r = runner.invoke(
-        app, ["hook", "session-start"],
+        app,
+        ["hook", "session-start"],
         input=json.dumps({"session_id": "x", "source": "startup"}),
     )
     assert r.exit_code == 0
@@ -27,21 +26,27 @@ def test_full_hook_roundtrip(monkeypatch, tmp_project_v2: Path) -> None:
     assert "LOCKED" in out["additionalContext"]
 
     r = runner.invoke(
-        app, ["hook", "pre-tool-use"],
-        input=json.dumps({
-            "tool_name": "Edit",
-            "tool_input": {"file_path": "src/demo/thing.py"},
-        }),
+        app,
+        ["hook", "pre-tool-use"],
+        input=json.dumps(
+            {
+                "tool_name": "Edit",
+                "tool_input": {"file_path": "src/demo/thing.py"},
+            }
+        ),
     )
     assert r.exit_code == 0
     assert json.loads(r.output)["permissionDecision"] == "deny"
 
     r = runner.invoke(
-        app, ["hook", "pre-tool-use"],
-        input=json.dumps({
-            "tool_name": "Write",
-            "tool_input": {"file_path": "tests/test_req_001.py"},
-        }),
+        app,
+        ["hook", "pre-tool-use"],
+        input=json.dumps(
+            {
+                "tool_name": "Write",
+                "tool_input": {"file_path": "tests/test_req_001.py"},
+            }
+        ),
     )
     assert r.exit_code == 0
     assert json.loads(r.output)["permissionDecision"] == "allow"
@@ -60,29 +65,37 @@ def test_full_hook_roundtrip(monkeypatch, tmp_project_v2: Path) -> None:
     (tmp_project_v2 / "src").mkdir(exist_ok=True)
     (tmp_project_v2 / "src" / "demo").mkdir(exist_ok=True)
     r = runner.invoke(
-        app, ["hook", "pre-tool-use"],
-        input=json.dumps({
-            "tool_name": "Edit",
-            "tool_input": {"file_path": "src/demo/thing.py"},
-        }),
+        app,
+        ["hook", "pre-tool-use"],
+        input=json.dumps(
+            {
+                "tool_name": "Edit",
+                "tool_input": {"file_path": "src/demo/thing.py"},
+            }
+        ),
     )
     assert r.exit_code == 0
     assert json.loads(r.output)["permissionDecision"] == "allow"
 
     (tmp_project_v2 / "src" / "demo" / "thing.py").write_text(
-        "def thing(x):\n    return x + 1\n", encoding="utf-8",
+        "def thing(x):\n    return x + 1\n",
+        encoding="utf-8",
     )
     r = runner.invoke(
-        app, ["hook", "post-tool-use"],
-        input=json.dumps({
-            "tool_input": {"file_path": "src/demo/thing.py"},
-        }),
+        app,
+        ["hook", "post-tool-use"],
+        input=json.dumps(
+            {
+                "tool_input": {"file_path": "src/demo/thing.py"},
+            }
+        ),
     )
     assert r.exit_code == 0
     assert json.loads(r.output).get("decision") != "block"
 
     r = runner.invoke(
-        app, ["hook", "stop"],
+        app,
+        ["hook", "stop"],
         input=json.dumps({"session_id": "x"}),
     )
     assert r.exit_code == 0

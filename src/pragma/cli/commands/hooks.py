@@ -6,7 +6,7 @@ from pathlib import Path
 import typer
 
 from pragma.core.audit import append_audit
-from pragma.core.errors import PragmaError, SettingsNotFoundError
+from pragma.core.errors import SettingsNotFoundError
 from pragma.core.integrity import (
     compute_settings_hash,
     read_stored_hash,
@@ -30,12 +30,12 @@ def seal() -> None:
     cwd = Path.cwd()
     settings = _resolve_settings(cwd)
     if not settings.exists():
-        raise typer.Exit(
-            SettingsNotFoundError(
-                message=".claude/settings.json not found.",
-                remediation="Run this from a project with a .claude directory.",
-            ).to_json()
+        err = SettingsNotFoundError(
+            message=".claude/settings.json not found.",
+            remediation="Run this from a project with a .claude directory.",
         )
+        typer.echo(err.to_json())
+        raise typer.Exit(code=1)
     hash_value = compute_settings_hash(settings)
     pragma_dir = cwd / ".pragma"
     write_stored_hash(pragma_dir, hash_value)
@@ -104,12 +104,12 @@ def show() -> None:
     settings = _resolve_settings(cwd)
     pragma_dir = cwd / ".pragma"
     if not settings.exists():
-        raise typer.Exit(
-            SettingsNotFoundError(
-                message=".claude/settings.json not found.",
-                remediation="Run this from a project with a .claude directory.",
-            ).to_json()
+        err = SettingsNotFoundError(
+            message=".claude/settings.json not found.",
+            remediation="Run this from a project with a .claude directory.",
         )
+        typer.echo(err.to_json())
+        raise typer.Exit(code=1)
     payload = json.loads(settings.read_text(encoding="utf-8"))
     stored = read_stored_hash(pragma_dir)
     if stored is None:

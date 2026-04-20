@@ -8,7 +8,6 @@ from typer.testing import CliRunner
 from pragma.__main__ import app
 from pragma.hooks.stop import handle
 
-
 runner = CliRunner()
 
 
