@@ -126,3 +126,38 @@ class CompleteTestsFailing(PragmaError):
 @dataclass(kw_only=True)
 class GateHashDrift(PragmaError):
     code: str = "gate_hash_drift"
+
+
+@dataclass(kw_only=True)
+class DisciplineViolationError(PragmaError):
+    code: str = "discipline_violation"
+
+
+@dataclass(kw_only=True)
+class CommitShapeViolationError(PragmaError):
+    code: str = "commit_shape_violation"
+
+
+@dataclass(kw_only=True)
+class IntegrityMismatchError(PragmaError):
+    code: str = "integrity_mismatch"
+
+
+@dataclass(kw_only=True)
+class SettingsNotFoundError(PragmaError):
+    code: str = "settings_not_found"
+
+
+@dataclass(kw_only=True)
+class HashNotFoundError(PragmaError):
+    code: str = "hash_not_found"
+
+
+@dataclass(kw_only=True)
+class UnknownHookEventError(PragmaError):
+    code: str = "unknown_hook_event"
+
+
+@dataclass(kw_only=True)
+class HookInputMissingError(PragmaError):
+    code: str = "hook_input_missing"

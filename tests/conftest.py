@@ -120,3 +120,32 @@ def tmp_project_v1(tmp_path: Path, v1_manifest_dict: dict) -> Path:
         yaml.safe_dump(v1_manifest_dict, sort_keys=False), encoding="utf-8"
     )
     return tmp_path
+
+
+@pytest.fixture
+def hook_input_pre_tool_use() -> dict:
+    return {
+        "session_id": "abc123",
+        "tool_name": "Edit",
+        "tool_input": {"file_path": "src/example.py", "old_string": "x", "new_string": "y"},
+    }
+
+
+@pytest.fixture
+def hook_input_session_start() -> dict:
+    return {"session_id": "abc123", "source": "startup"}
+
+
+@pytest.fixture
+def hook_input_post_tool_use() -> dict:
+    return {
+        "session_id": "abc123",
+        "tool_name": "Write",
+        "tool_input": {"file_path": "src/example.py", "content": "..."},
+        "tool_result": {"success": True},
+    }
+
+
+@pytest.fixture
+def hook_input_stop() -> dict:
+    return {"session_id": "abc123"}

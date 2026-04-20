@@ -7,6 +7,8 @@ from pathlib import Path
 
 import typer
 
+from pragma.core.commits import validate_commit_shape
+from pragma.core.discipline import check_file
 from pragma.core.errors import (
     GateHashDrift,
     ManifestHashMismatch,
@@ -15,6 +17,7 @@ from pragma.core.errors import (
     UnlockMissingTests,
     UnlockTestPassing,
 )
+from pragma.core.integrity import verify_settings_integrity
 from pragma.core.lockfile import read_lock
 from pragma.core.manifest import hash_manifest, load_manifest, slice_requirements
 from pragma.core.state import read_state
@@ -30,6 +33,38 @@ verify_app = typer.Typer(
     help="Check invariants of the Pragma project.",
     no_args_is_help=True,
 )
+
+
+def _check_discipline(cwd: Path) -> dict[str, object]:
+    from pragma.core.errors import DisciplineViolationError
+
+    try:
+        manifest = load_manifest(cwd / "pragma.yaml")
+    except PragmaError as exc:
+        raise exc
+
+    src_root = cwd / manifest.project.source_root
+    violations: list[dict[str, object]] = []
+    if src_root.exists():
+        for py in sorted(src_root.rglob("*.py")):
+            for v in check_file(py):
+                violations.append({
+                    "rule": v.rule,
+                    "path": v.path,
+                    "line": v.line,
+                    "got": v.got,
+                    "budget": v.budget,
+                    "remediation": v.remediation,
+                })
+
+    if violations:
+        raise DisciplineViolationError(
+            message=f"{len(violations)} discipline violation(s).",
+            remediation="See context.violations for per-rule remediation.",
+            context={"violations": violations},
+        )
+
+    return {"ok": True, "check": "discipline"}
 
 
 def _check_manifest(cwd: Path) -> dict[str, object]:
@@ -146,6 +181,17 @@ def verify_gate() -> None:
     cwd = Path.cwd()
     try:
         result = _check_gate(cwd)
+    except PragmaError as exc:
+        typer.echo(exc.to_json())
+        raise typer.Exit(code=1) from None
+    typer.echo(json.dumps(result, sort_keys=True, separators=(",", ":")))
+
+
+@verify_app.command(name="discipline")
+def verify_discipline() -> None:
+    cwd = Path.cwd()
+    try:
+        result = _check_discipline(cwd)
     except PragmaError as exc:
         typer.echo(exc.to_json())
         raise typer.Exit(code=1) from None
