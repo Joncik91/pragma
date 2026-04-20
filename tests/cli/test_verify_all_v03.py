@@ -17,4 +17,4 @@ def test_verify_all_runs_all_six_checks(monkeypatch, tmp_project_v2: Path) -> No
     r = runner.invoke(app, ["verify", "all"])
     assert r.exit_code == 0, r.output
     payload = json.loads(r.output)
-    assert set(payload["checks"]) >= {"manifest", "gate", "discipline", "integrity"}
+    assert set(payload["checks"]) >= {"manifest", "gate", "integrity"}

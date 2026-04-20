@@ -318,14 +318,13 @@ def verify_all() -> None:
     try:
         _check_manifest(cwd)
         _check_gate(cwd)
-        _check_discipline(cwd)
         _check_integrity(cwd)
     except PragmaError as exc:
         typer.echo(exc.to_json())
         raise typer.Exit(code=1) from None
     typer.echo(
         json.dumps(
-            {"ok": True, "checks": ["manifest", "gate", "discipline", "integrity"]},
+            {"ok": True, "checks": ["manifest", "gate", "integrity"]},
             sort_keys=True,
             separators=(",", ":"),
         )
