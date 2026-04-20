@@ -34,3 +34,8 @@ Thumbs.db
 *.swo
 .idea/
 .vscode/
+
+# Gate state is machine-local. The audit log (.pragma/audit.jsonl)
+# is evidence and stays committed; state.json drifts per session.
+.pragma/state.json
+.pragma/state.json.lock
