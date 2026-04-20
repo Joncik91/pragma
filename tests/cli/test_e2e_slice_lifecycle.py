@@ -1,15 +1,14 @@
 """End-to-end: activate -> write failing tests -> unlock -> make green -> complete."""
+
 from __future__ import annotations
 
 import json
 import textwrap
 from pathlib import Path
 
-import pytest
 from typer.testing import CliRunner
 
 from pragma.__main__ import app
-
 
 runner = CliRunner()
 

@@ -17,7 +17,7 @@ from pragma.core.errors import (
 )
 from pragma.core.gate import unlock_transition
 from pragma.core.lockfile import read_lock
-from pragma.core.manifest import load_manifest
+from pragma.core.manifest import load_manifest, slice_requirements
 from pragma.core.state import default_state, read_state, write_state
 from pragma.core.tests_discovery import (
     CollectError,
@@ -25,19 +25,6 @@ from pragma.core.tests_discovery import (
     expected_test_name,
     run_tests,
 )
-
-
-def _slice_requirements(manifest, slice_id):
-    sreqs = None
-    for m in manifest.milestones:
-        for s in m.slices:
-            if s.id == slice_id:
-                sreqs = s.requirements
-                break
-    if sreqs is None:
-        return []
-    req_ids = set(sreqs)
-    return [r for r in manifest.requirements if r.id in req_ids]
 
 
 def unlock() -> None:
@@ -64,15 +51,11 @@ def unlock() -> None:
                     context={"tests_root": str(tests_dir)},
                 )
 
-            slice_reqs = _slice_requirements(
-                manifest, state.active_slice
-            )
+            slice_reqs = slice_requirements(manifest, state.active_slice)
             expected: list[str] = []
             for req in slice_reqs:
                 for perm in req.permutations:
-                    expected.append(
-                        expected_test_name(req.id, perm.id)
-                    )
+                    expected.append(expected_test_name(req.id, perm.id))
 
             try:
                 collected = collect_tests(tests_dir)
@@ -81,8 +64,7 @@ def unlock() -> None:
                     code="unlock_collect_failed",
                     message=f"pytest could not collect tests: {exc}",
                     remediation=(
-                        "Fix the test collection error (usually an "
-                        "import error) and retry."
+                        "Fix the test collection error (usually an import error) and retry."
                     ),
                 ) from exc
 
@@ -90,9 +72,7 @@ def unlock() -> None:
             missing = [n for n in expected if n not in by_name]
             if missing:
                 raise UnlockMissingTests(
-                    message=(
-                        f"{len(missing)} required test(s) missing."
-                    ),
+                    message=(f"{len(missing)} required test(s) missing."),
                     remediation=(
                         "Add a failing test for each permutation. "
                         "Convention: "
@@ -104,15 +84,10 @@ def unlock() -> None:
 
             nodeids = [by_name[n].nodeid for n in expected]
             results = run_tests(tests_dir, nodeids)
-            passing = [
-                nid for nid, v in results.items() if v == "passed"
-            ]
+            passing = [nid for nid, v in results.items() if v == "passed"]
             if passing:
                 raise UnlockTestPassing(
-                    message=(
-                        f"{len(passing)} expected-failing test(s) "
-                        "already pass."
-                    ),
+                    message=(f"{len(passing)} expected-failing test(s) already pass."),
                     remediation=(
                         "A test in the red phase must assert something "
                         "that isn't implemented yet. If the "
@@ -124,9 +99,7 @@ def unlock() -> None:
                 )
 
         now_iso = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
-        new_state, audit_fields = unlock_transition(
-            state, now_iso=now_iso
-        )
+        new_state, audit_fields = unlock_transition(state, now_iso=now_iso)
         write_state(cwd / ".pragma", new_state)
         append_audit(
             cwd / ".pragma",

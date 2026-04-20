@@ -69,6 +69,7 @@ def test_flock_blocks_concurrent_write(tmp_path: Path, monkeypatch: pytest.Monke
     dir_ = tmp_path / ".pragma"
     dir_.mkdir()
     import fcntl
+
     lock_path = dir_ / "state.json.lock"
     lock_fd = os.open(str(lock_path), os.O_CREAT | os.O_RDWR)
     try:

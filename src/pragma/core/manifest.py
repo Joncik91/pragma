@@ -19,7 +19,28 @@ from pragma.core.errors import (
     ManifestSchemaError,
     ManifestSyntaxError,
 )
-from pragma.core.models import Manifest
+from pragma.core.models import Manifest, Requirement
+
+
+def slice_requirements(manifest: Manifest, slice_id: str) -> list[Requirement]:
+    """Return the Requirement objects that belong to ``slice_id``.
+
+    Returns an empty list if the slice is not declared. Callers that
+    need to distinguish missing-slice from empty-slice should check the
+    manifest milestones/slices tree directly.
+    """
+    sreqs: tuple[str, ...] | None = None
+    for m in manifest.milestones:
+        for s in m.slices:
+            if s.id == slice_id:
+                sreqs = s.requirements
+                break
+        if sreqs is not None:
+            break
+    if sreqs is None:
+        return []
+    req_ids = set(sreqs)
+    return [r for r in manifest.requirements if r.id in req_ids]
 
 
 def load_manifest(path: Path) -> Manifest:

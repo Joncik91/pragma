@@ -9,7 +9,6 @@ from typer.testing import CliRunner
 
 from pragma.__main__ import app
 
-
 runner = CliRunner()
 
 

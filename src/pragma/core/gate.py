@@ -58,13 +58,9 @@ def activate(
             context={"active": state.active_slice, "requested": slice_id},
         )
 
-    milestone = next(
-        m for m in manifest.milestones if m.id == milestone_id
-    )
+    milestone = next(m for m in manifest.milestones if m.id == milestone_id)
     for dep in milestone.depends_on:
-        dep_slices = next(
-            m for m in manifest.milestones if m.id == dep
-        ).slices
+        dep_slices = next(m for m in manifest.milestones if m.id == dep).slices
         for s in dep_slices:
             st = state.slices.get(s.id)
             if st is None or st.status != "shipped":
@@ -75,8 +71,7 @@ def activate(
                         f"still has unshipped slice {s.id!r}."
                     ),
                     remediation=(
-                        f"Finish {dep!r} first: activate, unlock, "
-                        f"and complete each of its slices."
+                        f"Finish {dep!r} first: activate, unlock, and complete each of its slices."
                     ),
                     context={
                         "milestone": milestone_id,
@@ -118,9 +113,7 @@ def activate(
     return new_state, audit
 
 
-def unlock_transition(
-    state: State, *, now_iso: str
-) -> tuple[State, dict[str, Any]]:
+def unlock_transition(state: State, *, now_iso: str) -> tuple[State, dict[str, Any]]:
     if state.active_slice is None:
         raise SliceNotActive(
             message="No active slice; nothing to unlock.",
@@ -129,10 +122,7 @@ def unlock_transition(
         )
     if state.gate != "LOCKED":
         raise GateWrongState(
-            message=(
-                f"unlock requires gate=LOCKED; current "
-                f"gate={state.gate}."
-            ),
+            message=(f"unlock requires gate=LOCKED; current gate={state.gate}."),
             remediation="This slice is already UNLOCKED or completed.",
             context={"gate": state.gate, "slice": state.active_slice},
         )
@@ -171,9 +161,7 @@ def unlock_transition(
     return new_state, audit
 
 
-def complete(
-    state: State, *, now_iso: str
-) -> tuple[State, dict[str, Any]]:
+def complete(state: State, *, now_iso: str) -> tuple[State, dict[str, Any]]:
     if state.active_slice is None:
         raise SliceNotActive(
             message="No active slice; nothing to complete.",
@@ -182,14 +170,8 @@ def complete(
         )
     if state.gate != "UNLOCKED":
         raise GateWrongState(
-            message=(
-                f"complete requires gate=UNLOCKED; current "
-                f"gate={state.gate}."
-            ),
-            remediation=(
-                "Run `pragma unlock` first after writing failing "
-                "tests."
-            ),
+            message=(f"complete requires gate=UNLOCKED; current gate={state.gate}."),
+            remediation=("Run `pragma unlock` first after writing failing tests."),
             context={"gate": state.gate, "slice": state.active_slice},
         )
     sid = state.active_slice
@@ -227,9 +209,7 @@ def complete(
     return new_state, audit
 
 
-def cancel(
-    state: State, *, now_iso: str
-) -> tuple[State, dict[str, Any]]:
+def cancel(state: State, *, now_iso: str) -> tuple[State, dict[str, Any]]:
     if state.active_slice is None:
         raise SliceNotActive(
             message="No active slice; nothing to cancel.",

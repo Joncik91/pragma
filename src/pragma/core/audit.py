@@ -44,9 +44,7 @@ def append_audit(
     line = json.dumps(entry, sort_keys=True, separators=(",", ":")) + "\n"
 
     path = pragma_dir / AUDIT_FILENAME
-    fd = os.open(
-        str(path), os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o644
-    )
+    fd = os.open(str(path), os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o644)
     try:
         os.write(fd, line.encode("utf-8"))
         os.fsync(fd)

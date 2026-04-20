@@ -16,8 +16,7 @@ from pragma.core.errors import (
     UnlockTestPassing,
 )
 from pragma.core.lockfile import read_lock
-from pragma.core.manifest import hash_manifest, load_manifest
-from pragma.core.models import Manifest, Requirement
+from pragma.core.manifest import hash_manifest, load_manifest, slice_requirements
 from pragma.core.state import read_state
 from pragma.core.tests_discovery import (
     CollectError,
@@ -53,19 +52,6 @@ def _check_manifest(cwd: Path) -> dict[str, object]:
     return {"ok": True, "check": "manifest", "manifest_hash": lock.manifest_hash}
 
 
-def _slice_requirements(manifest: Manifest, slice_id: str) -> list[Requirement]:
-    sreqs: tuple[str, ...] | None = None
-    for m in manifest.milestones:
-        for s in m.slices:
-            if s.id == slice_id:
-                sreqs = s.requirements
-                break
-    if sreqs is None:
-        return []
-    req_ids = set(sreqs)
-    return [r for r in manifest.requirements if r.id in req_ids]
-
-
 def _check_gate(cwd: Path) -> dict[str, object]:
     lock = read_lock(cwd / "pragma.lock.json")
     manifest = load_manifest(cwd / "pragma.yaml")
@@ -73,8 +59,10 @@ def _check_gate(cwd: Path) -> dict[str, object]:
         state = read_state(cwd / ".pragma")
     except StateNotFound:
         return {
-            "ok": True, "check": "gate",
-            "active_slice": None, "gate": None,
+            "ok": True,
+            "check": "gate",
+            "active_slice": None,
+            "gate": None,
         }
 
     if state.manifest_hash != lock.manifest_hash:
@@ -97,21 +85,13 @@ def _check_gate(cwd: Path) -> dict[str, object]:
 
     if state.active_slice is not None and state.gate == "LOCKED":
         tests_dir = cwd / manifest.project.tests_root
-        slice_reqs = _slice_requirements(manifest, state.active_slice)
-        expected = [
-            expected_test_name(r.id, p.id)
-            for r in slice_reqs
-            for p in r.permutations
-        ]
+        slice_reqs = slice_requirements(manifest, state.active_slice)
+        expected = [expected_test_name(r.id, p.id) for r in slice_reqs for p in r.permutations]
         if expected:
             if not tests_dir.exists():
                 raise UnlockMissingTests(
-                    message=(
-                        f"Tests directory {tests_dir} does not exist."
-                    ),
-                    remediation=(
-                        f"Create {tests_dir} and add failing tests."
-                    ),
+                    message=(f"Tests directory {tests_dir} does not exist."),
+                    remediation=(f"Create {tests_dir} and add failing tests."),
                     context={"tests_root": str(tests_dir)},
                 )
             try:
@@ -120,34 +100,21 @@ def _check_gate(cwd: Path) -> dict[str, object]:
                 raise PragmaError(
                     code="verify_collect_failed",
                     message=f"pytest could not collect tests: {exc}",
-                    remediation=(
-                        "Fix the test collection error and retry."
-                    ),
+                    remediation=("Fix the test collection error and retry."),
                 ) from exc
             by_name = {c.name: c for c in collected}
             missing = [n for n in expected if n not in by_name]
             if missing:
                 raise UnlockMissingTests(
-                    message=(
-                        f"{len(missing)} required test(s) missing."
-                    ),
-                    remediation=(
-                        "Add failing tests per the naming convention."
-                    ),
+                    message=(f"{len(missing)} required test(s) missing."),
+                    remediation=("Add failing tests per the naming convention."),
                     context={"missing": missing},
                 )
-            results = run_tests(
-                tests_dir, [by_name[n].nodeid for n in expected]
-            )
-            passing = [
-                nid for nid, v in results.items() if v == "passed"
-            ]
+            results = run_tests(tests_dir, [by_name[n].nodeid for n in expected])
+            passing = [nid for nid, v in results.items() if v == "passed"]
             if passing:
                 raise UnlockTestPassing(
-                    message=(
-                        f"{len(passing)} expected-failing test(s) "
-                        "already pass."
-                    ),
+                    message=(f"{len(passing)} expected-failing test(s) already pass."),
                     remediation=(
                         "Remove the premature implementation or drop "
                         "the permutation from the manifest."
@@ -197,6 +164,7 @@ def verify_all() -> None:
     typer.echo(
         json.dumps(
             {"ok": True, "checks": ["manifest", "gate"]},
-            sort_keys=True, separators=(",", ":"),
+            sort_keys=True,
+            separators=(",", ":"),
         )
     )

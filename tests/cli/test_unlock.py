@@ -4,11 +4,9 @@ import json
 import textwrap
 from pathlib import Path
 
-import pytest
 from typer.testing import CliRunner
 
 from pragma.__main__ import app
-
 
 runner = CliRunner()
 

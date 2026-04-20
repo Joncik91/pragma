@@ -40,8 +40,7 @@ def collect_tests(tests_dir: Path) -> list[CollectedTest]:
     )
     if proc.returncode not in (0, 5):
         raise CollectError(
-            f"pytest --collect-only exited {proc.returncode}: "
-            f"{proc.stdout}\n{proc.stderr}".strip()
+            f"pytest --collect-only exited {proc.returncode}: {proc.stdout}\n{proc.stderr}".strip()
         )
     out: list[CollectedTest] = []
     for line in proc.stdout.splitlines():
@@ -57,9 +56,7 @@ def collect_tests(tests_dir: Path) -> list[CollectedTest]:
 _RESULT_RE = re.compile(r"^(\S+::\S+)\s+(PASSED|FAILED|ERROR)")
 
 
-def run_tests(
-    tests_dir: Path, nodeids: list[str]
-) -> dict[str, str]:
+def run_tests(tests_dir: Path, nodeids: list[str]) -> dict[str, str]:
     if not nodeids:
         return {}
     cmd = [
@@ -74,7 +71,9 @@ def run_tests(
         "no:cacheprovider",
     ]
     proc = subprocess.run(  # noqa: S603 — controlled pytest invocation
-        cmd, capture_output=True, text=True,
+        cmd,
+        capture_output=True,
+        text=True,
         cwd=str(tests_dir.parent),
     )
     results: dict[str, str] = {}

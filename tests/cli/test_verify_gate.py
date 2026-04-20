@@ -52,9 +52,7 @@ def test_verify_gate_manifest_hash_drift(monkeypatch, tmp_project_v2: Path) -> N
     yaml_path = tmp_project_v2 / "pragma.yaml"
     yaml_data = yaml.safe_load(yaml_path.read_text(encoding="utf-8"))
     yaml_data["project"]["name"] = "drifted"
-    yaml_path.write_text(
-        yaml.safe_dump(yaml_data, sort_keys=False), encoding="utf-8"
-    )
+    yaml_path.write_text(yaml.safe_dump(yaml_data, sort_keys=False), encoding="utf-8")
     assert runner.invoke(app, ["freeze"]).exit_code == 0
     result = runner.invoke(app, ["verify", "gate"])
     assert result.exit_code == 1

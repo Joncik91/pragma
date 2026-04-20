@@ -28,7 +28,7 @@ def migrate(
     yaml_path = cwd / "pragma.yaml"
 
     if not yaml_path.exists():
-        err = ManifestNotFound(
+        err: PragmaError = ManifestNotFound(
             message=f"pragma.yaml not found at {yaml_path}",
             remediation="Run `pragma init --brownfield` first.",
             context={"path": str(yaml_path)},

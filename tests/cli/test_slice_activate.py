@@ -43,7 +43,8 @@ def test_activate_unknown_slice(monkeypatch: pytest.MonkeyPatch, tmp_project_v2:
 
 
 def test_activate_when_another_active(
-    monkeypatch: pytest.MonkeyPatch, tmp_project_v2: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_project_v2: Path,
 ) -> None:
     monkeypatch.chdir(tmp_project_v2)
     assert runner.invoke(app, ["freeze"]).exit_code == 0

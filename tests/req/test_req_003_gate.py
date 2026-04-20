@@ -4,10 +4,10 @@ These are intentionally thin wrappers over the unit tests added in
 tasks 4-14. Their purpose is to satisfy the unlock convention and
 document the manifest's claims in executable form.
 """
+
 from __future__ import annotations
 
 import json
-import textwrap
 from pathlib import Path
 
 import pytest
@@ -16,7 +16,6 @@ from typer.testing import CliRunner
 from pragma.__main__ import app
 from pragma.core.audit import read_audit
 from pragma.core.state import read_state
-
 
 runner = CliRunner()
 

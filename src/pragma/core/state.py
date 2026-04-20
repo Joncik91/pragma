@@ -67,9 +67,7 @@ class State(BaseModel):
                 raise ValueError("gate must be null when no slice is active")
             return self
         if self.active_slice not in self.slices:
-            raise ValueError(
-                f"active_slice {self.active_slice!r} not in slices map"
-            )
+            raise ValueError(f"active_slice {self.active_slice!r} not in slices map")
         active = self.slices[self.active_slice]
         if active.gate != self.gate:
             raise ValueError(
@@ -96,10 +94,7 @@ def read_state(pragma_dir: Path) -> State:
     if not path.exists():
         raise StateNotFound(
             message=f".pragma/state.json not found at {path}",
-            remediation=(
-                "Run `pragma slice activate <slice-id>` to create "
-                "initial state."
-            ),
+            remediation=("Run `pragma slice activate <slice-id>` to create initial state."),
             context={"path": str(path)},
         )
 
@@ -109,10 +104,7 @@ def read_state(pragma_dir: Path) -> State:
     except json.JSONDecodeError as exc:
         raise StateSchemaError(
             message=f".pragma/state.json is not valid JSON: {exc}",
-            remediation=(
-                "Delete the file; `pragma doctor` will recover from "
-                "audit.jsonl."
-            ),
+            remediation=("Delete the file; `pragma doctor` will recover from audit.jsonl."),
             context={"path": str(path)},
         ) from exc
 
@@ -121,12 +113,9 @@ def read_state(pragma_dir: Path) -> State:
     except ValidationError as exc:
         raise StateSchemaError(
             message=(
-                f".pragma/state.json schema invalid: "
-                f"{exc.errors(include_url=False)[0]['msg']}"
+                f".pragma/state.json schema invalid: {exc.errors(include_url=False)[0]['msg']}"
             ),
-            remediation=(
-                "Delete the file and re-run `pragma slice activate ...`."
-            ),
+            remediation=("Delete the file and re-run `pragma slice activate ...`."),
             context={"path": str(path)},
         ) from exc
 
@@ -135,15 +124,9 @@ def write_state(pragma_dir: Path, state: State) -> None:
     """Atomic, flock-guarded write of state.json."""
     pragma_dir.mkdir(parents=True, exist_ok=True)
     lock_path = pragma_dir / _LOCK_FILENAME
-    timeout = float(
-        os.environ.get(
-            "PRAGMA_STATE_FLOCK_TIMEOUT_S", _DEFAULT_FLOCK_TIMEOUT_S
-        )
-    )
+    timeout = float(os.environ.get("PRAGMA_STATE_FLOCK_TIMEOUT_S", _DEFAULT_FLOCK_TIMEOUT_S))
 
-    lock_fd = os.open(
-        str(lock_path), os.O_CREAT | os.O_RDWR, 0o600
-    )
+    lock_fd = os.open(str(lock_path), os.O_CREAT | os.O_RDWR, 0o600)
     try:
         deadline = time.monotonic() + timeout
         while True:
@@ -155,10 +138,7 @@ def write_state(pragma_dir: Path, state: State) -> None:
                     raise
                 if time.monotonic() >= deadline:
                     raise StateLocked(
-                        message=(
-                            "Another pragma process is holding the "
-                            "state lock."
-                        ),
+                        message=("Another pragma process is holding the state lock."),
                         remediation=(
                             "Wait for the other process to finish, or "
                             "remove "
@@ -169,9 +149,7 @@ def write_state(pragma_dir: Path, state: State) -> None:
                 time.sleep(0.05)
 
         payload = state.model_dump_json(indent=2) + "\n"
-        fd, tmp_name = tempfile.mkstemp(
-            prefix=f"{_STATE_FILENAME}.tmp-", dir=str(pragma_dir)
-        )
+        fd, tmp_name = tempfile.mkstemp(prefix=f"{_STATE_FILENAME}.tmp-", dir=str(pragma_dir))
         try:
             with os.fdopen(fd, "w", encoding="utf-8") as fh:
                 fh.write(payload)
