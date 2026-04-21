@@ -7,13 +7,14 @@ from pragma_sdk import trace
 
 from pragma.core.errors import StateNotFound
 from pragma.core.manifest import load_manifest, slice_requirements
+from pragma.core.models import Requirement
 from pragma.core.state import read_state
 from pragma.core.tests_discovery import expected_test_name
 
 _ALLOW = {"permissionDecision": "allow"}
 
 
-def _deny_locked(slice_id: str, reqs) -> dict[str, Any]:
+def _deny_locked(slice_id: str, reqs: list[Requirement]) -> dict[str, Any]:
     test_names = [expected_test_name(r.id, p.id) for r in reqs for p in r.permutations]
     return {
         "permissionDecision": "deny",

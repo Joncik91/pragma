@@ -5,7 +5,7 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 
 from pragma.core.manifest import slice_requirements
-from pragma.core.models import Manifest
+from pragma.core.models import Manifest, Requirement
 from pragma.core.state import State
 from pragma.core.tests_discovery import expected_test_name
 from pragma.report.models import (
@@ -120,7 +120,10 @@ def _resolve_active_slice(state: State | None, override: str | None) -> str | No
 
 
 def _build_report_requirement(
-    req, junit_results, spans_by_test, summary: dict[str, int]
+    req: Requirement,
+    junit_results: dict[str, str],
+    spans_by_test: dict[str, list[dict[str, object]]],
+    summary: dict[str, int],
 ) -> ReportRequirement:
     report_perms: list[ReportPermutation] = []
     for perm in req.permutations:

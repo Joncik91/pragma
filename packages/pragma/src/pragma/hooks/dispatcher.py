@@ -4,7 +4,7 @@ import contextlib
 import json
 from collections.abc import Callable
 from pathlib import Path
-from typing import IO, Any
+from typing import IO, Any, cast
 
 from pragma.core.audit import append_hook_crash
 from pragma.hooks import post_tool_use, pre_tool_use, session_start, stop
@@ -21,7 +21,10 @@ _HANDLER_MODULES = {
 
 
 def _get_handler(event: str) -> Callable[[dict[str, Any], Path], dict[str, Any]]:
-    return _HANDLER_MODULES[event].handle
+    return cast(
+        Callable[[dict[str, Any], Path], dict[str, Any]],
+        _HANDLER_MODULES[event].handle,
+    )
 
 
 def _safe_default(event: str, *, reason: str | None = None) -> dict[str, Any]:

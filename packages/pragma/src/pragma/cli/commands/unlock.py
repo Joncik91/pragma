@@ -20,7 +20,8 @@ from pragma.core.errors import (
 from pragma.core.gate import unlock_transition
 from pragma.core.lockfile import read_lock
 from pragma.core.manifest import load_manifest, slice_requirements
-from pragma.core.state import default_state, read_state, write_state
+from pragma.core.models import Manifest
+from pragma.core.state import State, default_state, read_state, write_state
 from pragma.core.tests_discovery import (
     CollectError,
     collect_tests,
@@ -30,7 +31,7 @@ from pragma.core.tests_discovery import (
 )
 
 
-def _assert_slice_unlock_ready(cwd: Path, manifest, state) -> None:
+def _assert_slice_unlock_ready(cwd: Path, manifest: Manifest, state: State) -> None:
     """Validate the active slice is ready to unlock: tests exist, all red.
 
     Raises UnlockMissingTests when tests_dir is missing or expected names
@@ -38,6 +39,8 @@ def _assert_slice_unlock_ready(cwd: Path, manifest, state) -> None:
     already flipped green; PragmaError(unlock_collect_failed) on collect
     errors.
     """
+    # Caller (unlock) guards state.active_slice is not None + gate == LOCKED.
+    assert state.active_slice is not None
     tests_dir = cwd / manifest.project.tests_root
     if not tests_dir.exists():
         raise UnlockMissingTests(

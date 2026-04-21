@@ -11,6 +11,7 @@ from pragma.core.audit import append_audit, read_audit
 from pragma.core.errors import StateNotFound
 from pragma.core.integrity import verify_settings_integrity
 from pragma.core.manifest import load_manifest, slice_requirements
+from pragma.core.models import Permutation, Requirement
 from pragma.core.state import State, read_state
 
 _MAX_CONTEXT = 9500
@@ -66,14 +67,14 @@ def _requirements_section(yaml_path: Path, active_slice: str) -> list[str]:
     return parts
 
 
-def _load_slice_requirements(yaml_path: Path, active_slice: str) -> list:
+def _load_slice_requirements(yaml_path: Path, active_slice: str) -> list[Requirement]:
     with contextlib.suppress(Exception):
         manifest = load_manifest(yaml_path)
         return list(slice_requirements(manifest, active_slice))
     return []
 
 
-def _format_permutations(perms) -> list[str]:
+def _format_permutations(perms: tuple[Permutation, ...] | list[Permutation]) -> list[str]:
     return [f"  - {p.id}: {p.description} (expected: {p.expected})" for p in perms]
 
 

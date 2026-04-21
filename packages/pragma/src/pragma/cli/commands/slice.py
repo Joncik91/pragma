@@ -95,8 +95,10 @@ def activate(
     )
 
 
-def _assert_active_slice_tests_green(cwd: Path, state) -> None:
+def _assert_active_slice_tests_green(cwd: Path, state: State) -> None:
     """Collect + run the active slice's expected tests; raise on red or collect fail."""
+    # Caller (complete) guards state.active_slice is not None.
+    assert state.active_slice is not None
     manifest = load_manifest(cwd / "pragma.yaml")
     tests_dir = cwd / manifest.project.tests_root
     slice_reqs = slice_requirements(manifest, state.active_slice)

@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 
 import typer
 import yaml
@@ -21,7 +22,7 @@ def _fail(err: PragmaError) -> None:
     raise typer.Exit(code=1)
 
 
-def _load_yaml_or_fail(yaml_path: Path) -> dict:
+def _load_yaml_or_fail(yaml_path: Path) -> dict[str, Any]:
     if not yaml_path.exists():
         _fail(
             ManifestNotFound(
@@ -31,7 +32,8 @@ def _load_yaml_or_fail(yaml_path: Path) -> dict:
             )
         )
     try:
-        return yaml.safe_load(yaml_path.read_text(encoding="utf-8"))
+        loaded = yaml.safe_load(yaml_path.read_text(encoding="utf-8"))
+        return loaded if isinstance(loaded, dict) else {}
     except yaml.YAMLError as exc:
         _fail(
             ManifestSchemaError(
@@ -54,8 +56,8 @@ def _emit_already_v2() -> None:
 
 
 def _upgrade_and_validate(
-    raw: dict, current_version: str | None, yaml_path: Path
-) -> tuple[dict, Manifest]:
+    raw: dict[str, Any], current_version: str | None, yaml_path: Path
+) -> tuple[dict[str, Any], Manifest]:
     try:
         upgraded = migrate_v1_to_v2(raw)
     except ValueError as exc:
@@ -80,7 +82,7 @@ def _upgrade_and_validate(
                 context={"path": str(yaml_path)},
             )
         )
-    return upgraded, manifest  # type: ignore[return-value]
+    return upgraded, manifest
 
 
 def _emit_dry_run(current_version: str | None, yaml_path: Path) -> None:
@@ -100,7 +102,9 @@ def _emit_dry_run(current_version: str | None, yaml_path: Path) -> None:
     )
 
 
-def _write_upgraded(cwd: Path, yaml_path: Path, upgraded: dict, manifest: Manifest) -> None:
+def _write_upgraded(
+    cwd: Path, yaml_path: Path, upgraded: dict[str, Any], manifest: Manifest
+) -> None:
     try:
         yaml_path.write_text(
             yaml.safe_dump(upgraded, sort_keys=False, allow_unicode=True, width=100),

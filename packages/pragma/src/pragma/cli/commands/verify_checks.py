@@ -29,8 +29,10 @@ from pragma.core.errors import (
 from pragma.core.integrity import verify_settings_integrity
 from pragma.core.lockfile import read_lock
 from pragma.core.manifest import hash_manifest, load_manifest, slice_requirements
-from pragma.core.state import read_state
+from pragma.core.models import Manifest
+from pragma.core.state import State, read_state
 from pragma.core.tests_discovery import (
+    CollectedTest,
     CollectError,
     collect_tests,
     expected_test_name,
@@ -231,7 +233,7 @@ def _check_manifest(cwd: Path) -> dict[str, object]:
     return {"ok": True, "check": "manifest", "manifest_hash": lock.manifest_hash}
 
 
-def _collect_or_raise(tests_dir: Path) -> dict:
+def _collect_or_raise(tests_dir: Path) -> dict[str, list[CollectedTest]]:
     try:
         collected = collect_tests(tests_dir)
     except CollectError as exc:
@@ -242,7 +244,9 @@ def _collect_or_raise(tests_dir: Path) -> dict:
     return group_by_name(collected)
 
 
-def _raise_if_red_tests_green(tests_dir: Path, expected: list[str], by_name: dict) -> None:
+def _raise_if_red_tests_green(
+    tests_dir: Path, expected: list[str], by_name: dict[str, list[CollectedTest]]
+) -> None:
     # BUG-006: include every parametrised variant per expected name.
     results = run_tests(tests_dir, [c.nodeid for n in expected for c in by_name[n]])
     passing = [nid for nid, v in results.items() if v == "passed"]
@@ -256,8 +260,10 @@ def _raise_if_red_tests_green(tests_dir: Path, expected: list[str], by_name: dic
         )
 
 
-def _assert_locked_slice_tests_red(cwd: Path, manifest, state) -> None:
+def _assert_locked_slice_tests_red(cwd: Path, manifest: Manifest, state: State) -> None:
     """Verify the active LOCKED slice has all expected red tests present and failing."""
+    # Caller (_check_gate) guards state.active_slice is not None + gate == LOCKED.
+    assert state.active_slice is not None
     tests_dir = cwd / manifest.project.tests_root
     slice_reqs = slice_requirements(manifest, state.active_slice)
     expected = [expected_test_name(r.id, p.id) for r in slice_reqs for p in r.permutations]

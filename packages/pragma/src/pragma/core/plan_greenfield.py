@@ -29,7 +29,7 @@ from pragma.core.errors import (
 )
 from pragma.core.lockfile import write_lock
 from pragma.core.manifest import hash_manifest, load_manifest
-from pragma.core.models import Permutation, Requirement
+from pragma.core.models import Manifest, Permutation, Requirement
 from pragma.core.state import read_state, write_state
 
 _HEADING_RE = re.compile(r"^#\s+(.+?)\s*$", re.MULTILINE)
@@ -78,7 +78,7 @@ def _read_problem_headings(cwd: Path, problem_path: Path) -> list[str]:
     return headings
 
 
-def _assert_pristine_greenfield(manifest) -> None:
+def _assert_pristine_greenfield(manifest: Manifest) -> None:
     if manifest.project.mode != "greenfield":
         raise PlanGreenfieldOnBrownfield(
             message=(

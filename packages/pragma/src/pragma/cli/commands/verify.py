@@ -101,7 +101,7 @@ def verify_message(
     from pragma.core.errors import CommitShapeViolationError
 
     if not message_file.exists():
-        err = CommitMsgNotFound(
+        err: PragmaError = CommitMsgNotFound(
             message=f"commit-msg file not found at {message_file}",
             remediation="Git normally passes .git/COMMIT_EDITMSG; don't invoke this manually.",
             context={"path": str(message_file)},

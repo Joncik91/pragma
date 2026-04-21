@@ -5,6 +5,39 @@ All notable changes to Pragma are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.3.1] — 2026-04-21
+
+**Hotfix-of-hotfix.** v1.0.3 CI failed on `mypy --strict` because the
+KI-11 refactor in v1.0.2 left ~10 extracted private helpers without
+full type annotations. Locally the pre-commit mypy hook gets SKIP'd
+(known-broken env), so the v1.0.2 gate didn't catch them; the
+pragma-sdk CI job does run mypy fresh and flagged it on v1.0.3's
+push. No functional code change, just type annotations + a couple of
+`cast` calls to align reality with the types that were already
+declared.
+
+### Fixed
+
+- **18 mypy --strict errors across 10 files** introduced by the v1.0.2
+  KI-11 function-splitting pass. All signatures of the new
+  `_assert_*` / `_check_*` / `_deny_*` / `_emit_*` helpers now carry
+  full parameter annotations (`Manifest`, `State`, `Requirement`,
+  `list[Requirement]`, `dict[str, list[CollectedTest]]` etc). The
+  dispatcher's `_get_handler` returns a properly `cast`-narrowed
+  Callable. A stale `# type: ignore[return-value]` in the migrator
+  is removed (the return value is now correctly typed and the ignore
+  was unused). One latent assignment-type mismatch in
+  `verify_message` (an `err: PragmaError` shared between two
+  subclass constructors) is annotated at the base-class level.
+
+### Meta
+
+- Keeping v1.0.3's tag + release (functional contract is unchanged);
+  v1.0.3.1 is purely the CI green-up. Pattern to fix separately:
+  the pragma-sdk CI's mypy-strict step is real gate coverage that
+  the local pragma pre-commit can't mirror today. Tracking as a KI
+  for v1.0.4+: get mypy to pass locally without SKIP.
+
 ## [1.0.3] — 2026-04-21
 
 **Same-day hotfix.** v1.0.2's CI failed on the very commit that
