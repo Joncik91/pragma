@@ -61,8 +61,13 @@ jobs:
       - name: Format check (ruff)
         run: python -m ruff format --check packages/
 
-      - name: Type check (mypy --strict)
-        run: python -m mypy packages/pragma/src/pragma packages/pragma-sdk/src/pragma_sdk
+      - name: Type check (mypy --strict, pragma dev-tool)
+        working-directory: packages/pragma
+        run: python -m mypy
+
+      - name: Type check (mypy --strict, pragma-sdk runtime)
+        working-directory: packages/pragma-sdk
+        run: python -m mypy --strict src
 
       - name: Verify Pragma's manifest, gate, discipline, integrity
         run: pragma verify all --ci
@@ -86,14 +91,24 @@ jobs:
           python -m pip install -e packages/pragma-sdk
           python -m pip install -e "packages/pragma[dev]"
 
-      - name: Run tests (populate spans + junit)
+      - name: Run tests (populate spans + junit at repo root)
         run: python -m pytest packages/pragma/tests -q
+
+      - name: Assert spans and junit landed at repo root
+        run: |
+          test -s .pragma/spans/test-run.jsonl || { echo "ERROR: spans dump missing — plugin or rootdir misconfigured"; exit 1; }
+          test -s .pragma/pytest-junit.xml || { echo "ERROR: junit xml missing — pytest config not wired"; exit 1; }
 
       - name: Generate report A
         run: pragma report --json > /tmp/a.json
 
       - name: Generate report B
         run: pragma report --json > /tmp/b.json
+
+      - name: Assert report has at least one ok permutation (dogfood)
+        run: |
+          python -c "import json, sys; d=json.load(open('/tmp/a.json')); sys.exit(0 if d['summary']['ok'] > 0 else 1)" \
+            || { echo "ERROR: report shows zero ok permutations — dogfood is not exercising @trace"; exit 1; }
 
       - name: Diff reports
         run: diff /tmp/a.json /tmp/b.json

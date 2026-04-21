@@ -60,9 +60,7 @@ def test_init_respects_existing_pyproject_pytest_config(
     assert not (tmp_path / "pytest.ini").exists()
 
 
-def test_init_respects_existing_pytest_ini(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_init_respects_existing_pytest_ini(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     (tmp_path / "pytest.ini").write_text("[pytest]\naddopts = -v\n", encoding="utf-8")
     monkeypatch.chdir(tmp_path)
     result = runner.invoke(app, ["init", "--brownfield", "--name", "test"])

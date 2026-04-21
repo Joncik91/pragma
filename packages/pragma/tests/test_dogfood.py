@@ -25,6 +25,6 @@ def test_pragma_own_manifest_is_schema_valid() -> None:
 def test_pragma_own_lock_matches_manifest_hash() -> None:
     m = load_manifest(REPO_ROOT / "pragma.yaml")
     lock = read_lock(REPO_ROOT / "pragma.lock.json")
-    assert lock.manifest_hash == hash_manifest(
-        m
-    ), "Pragma's own lock is stale — run `pragma freeze` and commit."
+    assert lock.manifest_hash == hash_manifest(m), (
+        "Pragma's own lock is stale — run `pragma freeze` and commit."
+    )

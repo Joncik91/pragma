@@ -22,15 +22,15 @@ _MOCKED_REMEDIATION = (
 )
 
 
-def _parse_spans(path: Path | None) -> dict[str, list[dict]]:
+def _parse_spans(path: Path | None) -> dict[str, list[dict[str, object]]]:
     if path is None or not path.exists():
         return {}
-    result: dict[str, list[dict]] = {}
+    result: dict[str, list[dict[str, object]]] = {}
     for line in path.read_text(encoding="utf-8").splitlines():
         if not line.strip():
             continue
         obj = json.loads(line)
-        nodeid = obj.get("test_nodeid", "")
+        nodeid = str(obj.get("test_nodeid", ""))
         test_name = nodeid.split("::")[-1] if "::" in nodeid else nodeid
         result.setdefault(test_name, []).append(obj)
     return result
@@ -61,15 +61,15 @@ def _compute_permutation_status(
     req_id: str,
     perm_id: str,
     junit_results: dict[str, str],
-    spans_by_test: dict[str, list[dict]],
+    spans_by_test: dict[str, list[dict[str, object]]],
 ) -> tuple[PermutationStatus, int, str | None]:
     test_name = expected_test_name(req_id, perm_id)
     junit_status = junit_results.get(test_name)
-    matching = [
-        s
-        for s in spans_by_test.get(test_name, [])
-        if s.get("attrs", {}).get("pragma.logic_id") == req_id
-    ]
+    matching: list[dict[str, object]] = []
+    for s in spans_by_test.get(test_name, []):
+        attrs = s.get("attrs")
+        if isinstance(attrs, dict) and attrs.get("pragma.logic_id") == req_id:
+            matching.append(s)
     span_count = len(matching)
 
     if junit_status is None:

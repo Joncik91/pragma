@@ -14,7 +14,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from pragma_sdk import set_permutation  # type: ignore[import-not-found]
+from pragma_sdk import set_permutation
 
 from pragma.core.commits import validate_commit_shape
 from pragma.narrative.adr import build_adr
@@ -101,7 +101,9 @@ def test_req_005_narrative_commit_passes_verify(tmp_path: Path) -> None:
             }
         ],
     }
-    (tmp_path / "pragma.yaml").write_text(yaml.safe_dump(manifest, sort_keys=False), encoding="utf-8")
+    (tmp_path / "pragma.yaml").write_text(
+        yaml.safe_dump(manifest, sort_keys=False), encoding="utf-8"
+    )
     (tmp_path / ".pragma").mkdir()
     with set_permutation("narrative_commit_passes_verify"):
         msg = build_commit_message(
