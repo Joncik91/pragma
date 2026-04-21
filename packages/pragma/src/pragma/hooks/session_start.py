@@ -56,17 +56,25 @@ def _vision_section(yaml_path: Path) -> list[str]:
 
 
 def _requirements_section(yaml_path: Path, active_slice: str) -> list[str]:
-    parts: list[str] = []
+    reqs = _load_slice_requirements(yaml_path, active_slice)
+    if not reqs:
+        return []
+    parts: list[str] = ["### Requirements"]
+    for req in reqs[:5]:
+        parts.append(f"- {req.id}: {req.title}")
+        parts.extend(_format_permutations(req.permutations[:5]))
+    return parts
+
+
+def _load_slice_requirements(yaml_path: Path, active_slice: str) -> list:
     with contextlib.suppress(Exception):
         manifest = load_manifest(yaml_path)
-        reqs = slice_requirements(manifest, active_slice)
-        if reqs:
-            parts.append("### Requirements")
-            for req in reqs[:5]:
-                parts.append(f"- {req.id}: {req.title}")
-                for perm in req.permutations[:5]:
-                    parts.append(f"  - {perm.id}: {perm.description} (expected: {perm.expected})")
-    return parts
+        return list(slice_requirements(manifest, active_slice))
+    return []
+
+
+def _format_permutations(perms) -> list[str]:
+    return [f"  - {p.id}: {p.description} (expected: {p.expected})" for p in perms]
 
 
 def _rules_section(state: State) -> list[str]:
