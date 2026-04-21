@@ -10,7 +10,7 @@ import typer
 from pragma_sdk import trace
 
 from pragma.core.audit import append_audit
-from pragma.core.errors import PragmaError, StateNotFound
+from pragma.core.errors import CompleteCollectFailed, PragmaError, StateNotFound
 from pragma.core.gate import activate as activate_transition
 from pragma.core.gate import cancel as cancel_transition
 from pragma.core.gate import complete as complete_transition
@@ -104,8 +104,7 @@ def _assert_active_slice_tests_green(cwd: Path, state) -> None:
     try:
         collected = collect_tests(tests_dir)
     except CollectError as exc:
-        raise PragmaError(
-            code="complete_collect_failed",
+        raise CompleteCollectFailed(
             message=f"pytest could not collect tests: {exc}",
             remediation="Fix the test collection error, then retry.",
         ) from exc

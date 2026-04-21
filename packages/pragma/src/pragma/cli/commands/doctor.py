@@ -26,6 +26,7 @@ from pragma.core.audit import append_audit
 from pragma.core.errors import (
     EmergencyUnlockRefused,
     PragmaError,
+    ReasonRequired,
     StateNotFound,
     StateSchemaError,
 )
@@ -88,8 +89,7 @@ def _classify_prior_state(pragma_dir: Path) -> _PriorGateState:
 
 
 def _reject_empty_reason() -> None:
-    err = PragmaError(
-        code="reason_required",
+    err = ReasonRequired(
         message="--emergency-unlock requires --reason <non-empty text>.",
         remediation=(
             'Re-run with --reason "<why you\'re unlocking>"; the reason '

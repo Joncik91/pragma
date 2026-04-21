@@ -21,7 +21,7 @@ from pragma.cli.commands.verify_checks import (
     _check_manifest,
 )
 from pragma.core.commits import validate_commit_shape
-from pragma.core.errors import PragmaError
+from pragma.core.errors import CommitMsgNotFound, PragmaError
 
 verify_app = typer.Typer(
     name="verify",
@@ -101,8 +101,7 @@ def verify_message(
     from pragma.core.errors import CommitShapeViolationError
 
     if not message_file.exists():
-        err = PragmaError(
-            code="commit_msg_not_found",
+        err = CommitMsgNotFound(
             message=f"commit-msg file not found at {message_file}",
             remediation="Git normally passes .git/COMMIT_EDITMSG; don't invoke this manually.",
             context={"path": str(message_file)},

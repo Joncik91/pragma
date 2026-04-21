@@ -13,6 +13,7 @@ from pragma.core.audit import append_audit
 from pragma.core.errors import (
     PragmaError,
     StateNotFound,
+    UnlockCollectFailed,
     UnlockMissingTests,
     UnlockTestPassing,
 )
@@ -53,8 +54,7 @@ def _assert_slice_unlock_ready(cwd: Path, manifest, state) -> None:
     try:
         collected = collect_tests(tests_dir)
     except CollectError as exc:
-        raise PragmaError(
-            code="unlock_collect_failed",
+        raise UnlockCollectFailed(
             message=f"pytest could not collect tests: {exc}",
             remediation="Fix the test collection error (usually an import error) and retry.",
         ) from exc

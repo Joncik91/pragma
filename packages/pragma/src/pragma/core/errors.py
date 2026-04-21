@@ -206,3 +206,45 @@ class PlanGreenfieldAlreadyPlanned(PragmaError):
 @dataclass(kw_only=True)
 class EmergencyUnlockRefused(PragmaError):
     code: str = "emergency_unlock_refused"
+
+
+@dataclass(kw_only=True)
+class CompleteCollectFailed(PragmaError):
+    """pytest --collect-only failed inside `pragma slice complete`."""
+
+    code: str = "complete_collect_failed"
+
+
+@dataclass(kw_only=True)
+class UnlockCollectFailed(PragmaError):
+    """pytest --collect-only failed inside `pragma unlock`."""
+
+    code: str = "unlock_collect_failed"
+
+
+@dataclass(kw_only=True)
+class VerifyCollectFailed(PragmaError):
+    """pytest --collect-only failed inside `pragma verify gate`."""
+
+    code: str = "verify_collect_failed"
+
+
+@dataclass(kw_only=True)
+class GitUnavailable(PragmaError):
+    """git invocation failed inside `pragma verify commits`."""
+
+    code: str = "git_unavailable"
+
+
+@dataclass(kw_only=True)
+class CommitMsgNotFound(PragmaError):
+    """commit-msg file not found on disk inside `pragma verify message`."""
+
+    code: str = "commit_msg_not_found"
+
+
+@dataclass(kw_only=True)
+class ReasonRequired(PragmaError):
+    """doctor --emergency-unlock requires a non-empty --reason."""
+
+    code: str = "reason_required"

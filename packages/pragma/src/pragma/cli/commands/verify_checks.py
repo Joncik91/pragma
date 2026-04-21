@@ -19,11 +19,12 @@ from pragma.core.discipline import check_file
 from pragma.core.errors import (
     CommitShapeViolationError,
     GateHashDrift,
+    GitUnavailable,
     ManifestHashMismatch,
-    PragmaError,
     StateNotFound,
     UnlockMissingTests,
     UnlockTestPassing,
+    VerifyCollectFailed,
 )
 from pragma.core.integrity import verify_settings_integrity
 from pragma.core.lockfile import read_lock
@@ -158,8 +159,7 @@ def _check_commits(cwd: Path, base: str = "main") -> dict[str, object]:
             check=True,
         ).stdout
     except subprocess.CalledProcessError as exc:
-        raise PragmaError(
-            code="git_unavailable",
+        raise GitUnavailable(
             message=f"git log failed: {exc.stderr}",
             remediation="Ensure this is a git repo and base exists.",
         ) from exc
@@ -205,12 +205,11 @@ def _check_manifest(cwd: Path) -> dict[str, object]:
     return {"ok": True, "check": "manifest", "manifest_hash": lock.manifest_hash}
 
 
-def _collect_or_raise(tests_dir: Path, err_code: str) -> dict:
+def _collect_or_raise(tests_dir: Path) -> dict:
     try:
         collected = collect_tests(tests_dir)
     except CollectError as exc:
-        raise PragmaError(
-            code=err_code,
+        raise VerifyCollectFailed(
             message=f"pytest could not collect tests: {exc}",
             remediation="Fix the test collection error and retry.",
         ) from exc
@@ -244,7 +243,7 @@ def _assert_locked_slice_tests_red(cwd: Path, manifest, state) -> None:
             remediation=f"Create {tests_dir} and add failing tests.",
             context={"tests_root": str(tests_dir)},
         )
-    by_name = _collect_or_raise(tests_dir, "verify_collect_failed")
+    by_name = _collect_or_raise(tests_dir)
     missing = [n for n in expected if n not in by_name]
     if missing:
         raise UnlockMissingTests(
