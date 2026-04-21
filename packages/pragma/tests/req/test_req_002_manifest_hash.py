@@ -63,6 +63,5 @@ def test_req_002_write_atomic(tmp_path: Path) -> None:
 def test_req_002_read_malformed(tmp_path: Path) -> None:
     bad = tmp_path / "pragma.lock.json"
     bad.write_text("{not valid json", encoding="utf-8")
-    with set_permutation("read_malformed"):
-        with pytest.raises(ManifestSchemaError):
-            read_lock(bad)
+    with set_permutation("read_malformed"), pytest.raises(ManifestSchemaError):
+        read_lock(bad)

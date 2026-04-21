@@ -5,7 +5,10 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from pragma_sdk import trace
 
+
+@trace("REQ-004")
 def handle(event_input: dict[str, Any], cwd: Path) -> dict[str, Any]:
     proc = subprocess.run(  # noqa: S603
         [sys.executable, "-m", "pragma", "verify", "all"],

@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Any
 
 import yaml
+from pragma_sdk import trace
 
 from pragma.core.audit import append_audit
 from pragma.core.discipline import check_file
@@ -15,6 +16,7 @@ def _load_source_root(project_dir: Path) -> str:
     return str(raw["project"]["source_root"])
 
 
+@trace("REQ-004")
 def handle(event_input: dict[str, Any], cwd: Path) -> dict[str, Any]:
     tool_input = event_input.get("tool_input", {})
     file_path = tool_input.get("file_path", "")

@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any
 
 import yaml
+from pragma_sdk import trace
 
 from pragma.core.audit import append_audit, read_audit
 from pragma.core.errors import StateNotFound
@@ -111,6 +112,7 @@ def _audit_section(pragma_dir: Path) -> list[str]:
     return []
 
 
+@trace("REQ-004")
 def handle(event_input: dict[str, Any], cwd: Path) -> dict[str, Any]:
     yaml_path = cwd / "pragma.yaml"
     pragma_dir = cwd / ".pragma"
