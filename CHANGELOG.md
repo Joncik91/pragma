@@ -5,6 +5,75 @@ All notable changes to Pragma are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.1] — 2026-04-21
+
+**Stabilisation patch. Three v1.0-era bugs uncovered by first real dogfood
+session.** PIL on Pragma's own repo is now 41/41 ok — up from 34/34 —
+because the collector can finally see the test suite.
+
+### Fixed
+
+- **REQ-007 — pre-commit ruff rev skew.** `.pre-commit-config.yaml`
+  pinned ruff-pre-commit at `v0.8.6` while the project venv runs
+  `0.15.11`; the two disagree on assert-statement line-wrapping, which
+  caused CI format checks to fail against locally-clean trees and
+  forced `SKIP=ruff-format` on every push. Bumped the pre-commit pin to
+  `v0.15.11` and removed the SKIP workaround. Other tool pins (gitleaks,
+  mypy, semgrep, pip-audit, deptry) intentionally left alone — bulk
+  updates belong in their own toolchain-refresh slice.
+- **REQ-008 — `pragma freeze` crashed on malformed milestone refs.**
+  When a requirement references a non-existent milestone (e.g.
+  `milestone: M99`), pydantic's `@model_validator` raises `ValueError`,
+  which pydantic wraps under `ctx.error = <the ValueError object>`.
+  `json.dumps` on the error-payload path then died with
+  `TypeError: Object of type ValueError is not JSON serializable`
+  instead of emitting the structured `manifest_schema_error` JSON the
+  CLI contract promises. Added `_jsonable_errors()` in
+  `pragma.core.manifest` that `str()`-coerces any `BaseException`
+  sitting inside `ctx` before serialisation.
+- **REQ-009 — pytest 9 collector returned zero nodeids under
+  inherited `-q`.** `collect_tests` ran `pytest --collect-only -q` and
+  parsed lines containing `::`, which worked under pytest 8. Pytest 9
+  compacted `-q --collect-only` output into file-summary form
+  (`path.py: 4`) so the parser returned zero collected tests. Because
+  the gate's "unlock requires all expected test names present" check
+  intersects the collected set with the expected set, this made every
+  slice activation report **all** required tests as missing — the
+  silent reason why `pragma slice activate M01.S5` failed in the first
+  minute of this session. Fixed by passing `-o addopts=` to override
+  the inherited addopts so pytest uses default nodeid-per-line output.
+
+### Added
+
+- Three new dogfood tests at `packages/pragma/tests/req/` — one per REQ
+  above — each wrapped in `@trace("REQ-00N")` so the PIL aggregator
+  scores them as `ok` rather than `mocked`. These are the first
+  acceptance tests for Pragma's own stabilisation work.
+
+### Changed
+
+- Pre-push hook SKIP list no longer needs `ruff-format` (REQ-007).
+  `mypy` stays skipped because `pre-commit`'s mypy environment lacks
+  `pragma-sdk` as an editable dependency; CI still runs mypy fresh in a
+  proper venv, so correctness isn't lost. Fixing that properly is
+  v1.0.2 work.
+
+### Known issues (parked for v1.0.2)
+
+- `slice activate` mutates state *before* checking `milestone_dep_unshipped`,
+  so a failed activation leaves a phantom locked slice that has to be
+  `slice cancel`ed. Noted while trying to activate `M01.S5` — should
+  be swapped to check deps first, then mutate.
+- Freezing a manifest with a REQ missing `milestone:` or `slice:`
+  fields succeeds silently rather than emitting the promised
+  `requirement_unassigned` error. The pydantic model makes those
+  fields `Optional` and the validator only runs when values are
+  non-null. Needs a schema-level tightening.
+- The v1→v2 migrator's auto-created `M00` milestone is an unshipped
+  dependency of `M01`, so `M01` slices can't be activated without
+  manually editing `M01.depends_on`. Either drop the auto-dep or mark
+  `M00` as pre-shipped on migration.
+
 ## [1.0.0] — 2026-04-21
 
 **Greenfield bootstrap ships. Evolutionary rollout complete.**

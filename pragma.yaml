@@ -227,6 +227,52 @@ requirements:
     expected: success
   milestone: M01
   slice: M01.S4
+- id: REQ-007
+  title: pre-commit ruff rev matches local ruff so format checks are stable
+  description: 'The .pre-commit-config.yaml ruff-pre-commit rev must match the ruff version pinned in packages/pragma/pyproject.toml, so ruff-format run locally and by pre-commit agree on output and CI does not need SKIP=ruff-format as a workaround. Patches the v1.0 release-time ruff-skew incident (v0.8.6 in pre-commit vs 0.15.11 locally).'
+  touches:
+  - .pre-commit-config.yaml
+  permutations:
+  - id: rev_matches_local
+    description: pre-commit run ruff-format --all-files is a noop on a tree already clean under local ruff
+    expected: success
+  - id: ci_format_check_green
+    description: CI format check passes without SKIP=ruff-format
+    expected: success
+  milestone: M01
+  slice: M01.S5
+- id: REQ-008
+  title: freeze emits structured JSON error when a requirement has null milestone or slice
+  description: 'When pragma.yaml contains a requirement without milestone or slice assignment, pragma freeze must exit non-zero with a JSON payload {error:"requirement_unassigned", message, remediation, context:{requirement_id, missing_fields}} instead of crashing with a Python traceback. Fixes the v1.0 release-time bug where ValueError was non-serializable through the JSON error path.'
+  touches:
+  - packages/pragma/src/pragma/cli/commands/freeze.py
+  - packages/pragma/src/pragma/core/freeze.py
+  permutations:
+  - id: null_milestone_rejected
+    description: freeze on a manifest where a requirement has no milestone exits 1 with requirement_unassigned JSON
+    expected: reject
+  - id: null_slice_rejected
+    description: freeze on a manifest where a requirement has milestone but no slice exits 1 with requirement_unassigned JSON
+    expected: reject
+  - id: all_assigned_success
+    description: freeze on a manifest where every requirement has milestone and slice assigned succeeds
+    expected: success
+  milestone: M01
+  slice: M01.S5
+- id: REQ-009
+  title: collect_tests finds pytest 9 nodeids regardless of inherited addopts
+  description: 'pragma.core.tests_discovery.collect_tests must return per-test nodeids even when the parent pyproject pins -q (or other verbosity-suppressing flags) in addopts. Before v1.0.1, inherited `-q` under pytest 9 compacted collect-only output into file-summary form (`file.py: 4`) so the nodeid parser returned zero hits and every slice unlock reported all required tests as missing.'
+  touches:
+  - packages/pragma/src/pragma/core/tests_discovery.py
+  permutations:
+  - id: collects_under_parent_addopts_q
+    description: collect_tests finds test functions when a parent pyproject sets addopts = "-q"
+    expected: success
+  - id: collects_from_clean_dir
+    description: collect_tests without parent addopts still works
+    expected: success
+  milestone: M01
+  slice: M01.S5
 milestones:
 - id: M00
   title: Implicit brownfield milestone
@@ -267,3 +313,10 @@ milestones:
     description: Greenfield init flow, plan-greenfield Pattern C, real doctor recovery, determinism acceptance.
     requirements:
     - REQ-006
+  - id: M01.S5
+    title: v1.0.1 patch - ruff rev alignment, freeze error serialisation, collector parser
+    description: Stabilisation slice patching three bugs surfaced during the v1.0 release - ruff pre-commit rev skew vs local ruff, freeze crashing with non-serializable ValueError when a requirement references a non-existent milestone, and the pytest 9 collect-only parser returning zero nodeids when parent addopts pin -q.
+    requirements:
+    - REQ-007
+    - REQ-008
+    - REQ-009

@@ -10,6 +10,7 @@ from __future__ import annotations
 import hashlib
 import json
 from pathlib import Path
+from typing import Any
 
 import yaml
 from pragma_sdk import trace
@@ -83,8 +84,28 @@ def load_manifest(path: Path) -> Manifest:
         raise ManifestSchemaError(
             message=_first_error_message(exc),
             remediation=("Fix the highlighted field. See manifest schema in spec §4."),
-            context={"path": str(path), "errors": exc.errors(include_url=False)},
+            context={"path": str(path), "errors": _jsonable_errors(exc)},
         ) from exc
+
+
+def _jsonable_errors(exc: ValidationError) -> list[dict[str, Any]]:
+    """Strip non-JSON-serializable values (e.g. ValueError objects in ctx) from pydantic errors.
+
+    pydantic embeds the original exception under ``ctx.error`` when a
+    ``@model_validator`` raises ``ValueError``, which json.dumps cannot
+    encode. We render any such value via ``str()`` so the error payload
+    stays serializable and the user still sees the underlying message.
+    """
+    cleaned: list[dict[str, Any]] = []
+    for err in exc.errors(include_url=False):
+        entry = dict(err)
+        ctx = entry.get("ctx")
+        if isinstance(ctx, dict):
+            entry["ctx"] = {
+                k: (str(v) if isinstance(v, BaseException) else v) for k, v in ctx.items()
+            }
+        cleaned.append(entry)
+    return cleaned
 
 
 def canonicalise(manifest: Manifest) -> bytes:

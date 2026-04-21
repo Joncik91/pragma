@@ -31,6 +31,8 @@ def collect_tests(tests_dir: Path) -> list[CollectedTest]:
         "--collect-only",
         "-q",
         "--no-header",
+        "-o",
+        "addopts=",
     ]
     proc = subprocess.run(  # noqa: S603 — controlled pytest invocation
         cmd,

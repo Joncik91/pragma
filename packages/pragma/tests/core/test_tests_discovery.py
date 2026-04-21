@@ -78,6 +78,38 @@ def test_collect_on_empty_dir(tmp_path: Path) -> None:
     assert collect_tests(tests_dir) == []
 
 
+def test_collect_tests_ignores_parent_addopts_q(tmp_path: Path) -> None:
+    """Collector must find tests even when the parent pyproject pins -q in addopts.
+
+    pytest 9's `-q --collect-only` prints compact file summaries
+    (`path.py: 4`) instead of per-test nodeids, which makes the nodeid
+    parser return zero hits. The collector must override addopts or
+    ask pytest for nodeid-per-line output so it works regardless of
+    the user's pyproject.
+    """
+    tests_dir = _write_tests_tree(
+        tmp_path,
+        (
+            "test_req_001.py",
+            """
+            def test_req_001_a():
+                assert True
+
+            def test_req_001_b():
+                assert True
+            """,
+        ),
+    )
+    (tmp_path / "pyproject.toml").write_text(
+        '[tool.pytest.ini_options]\naddopts = "-q"\n',
+        encoding="utf-8",
+    )
+    found = collect_tests(tests_dir)
+    names = {n.name for n in found}
+    assert "test_req_001_a" in names
+    assert "test_req_001_b" in names
+
+
 def test_collect_raises_on_collect_errors(tmp_path: Path) -> None:
     tests_dir = _write_tests_tree(
         tmp_path,
