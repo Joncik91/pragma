@@ -64,6 +64,11 @@ class AlreadyInitialised(PragmaError):
 
 
 @dataclass(kw_only=True)
+class GreenfieldNonEmptySrc(PragmaError):
+    code: str = "greenfield_non_empty_src"
+
+
+@dataclass(kw_only=True)
 class DuplicateRequirementId(PragmaError):
     code: str = "duplicate_requirement_id"
 

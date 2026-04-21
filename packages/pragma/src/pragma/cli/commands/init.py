@@ -27,21 +27,49 @@ def init(
     brownfield: bool = typer.Option(
         False,
         "--brownfield",
-        help="Initialise a brownfield project (v0.1 only supports --brownfield).",
+        help="Initialise a brownfield project (in-place on an existing repo).",
+    ),
+    greenfield: bool = typer.Option(
+        False,
+        "--greenfield",
+        help="Initialise a greenfield project (fresh tree with seed manifest).",
     ),
     name: str | None = typer.Option(
         None, "--name", help="Project name. Defaults to the current directory name."
     ),
+    language: str = typer.Option(
+        "python",
+        "--language",
+        help="Target language for the seed manifest (greenfield only).",
+    ),
     force: bool = typer.Option(False, "--force", help="Overwrite existing files if present."),
 ) -> None:
     """Scaffold pragma.yaml, .pre-commit-config.yaml, PRAGMA.md, .claude/settings.json."""
-    if not brownfield:
+    if brownfield and greenfield:
+        typer.echo(
+            json.dumps(
+                {
+                    "error": "both_modes",
+                    "message": "Pass exactly one of --brownfield / --greenfield.",
+                    "remediation": "Choose --brownfield (existing repo) OR --greenfield (new).",
+                    "context": {},
+                },
+                sort_keys=True,
+                separators=(",", ":"),
+            )
+        )
+        raise typer.Exit(code=2)
+
+    if not brownfield and not greenfield:
         typer.echo(
             json.dumps(
                 {
                     "error": "mode_required",
-                    "message": "v0.1 requires --brownfield explicitly.",
-                    "remediation": "Pass --brownfield; --greenfield ships in v1.0.",
+                    "message": (
+                        "Pragma init requires an explicit mode: "
+                        "--brownfield (existing repo) or --greenfield (new)."
+                    ),
+                    "remediation": "Pass --brownfield or --greenfield.",
                     "context": {},
                 },
                 sort_keys=True,
@@ -51,6 +79,42 @@ def init(
         raise typer.Exit(code=2)
 
     cwd = Path.cwd()
+
+    if greenfield:
+        if not name:
+            typer.echo(
+                json.dumps(
+                    {
+                        "error": "name_required",
+                        "message": "--name is required for --greenfield.",
+                        "remediation": (
+                            "Pass --name <project-name>; the manifest needs an explicit name."
+                        ),
+                        "context": {},
+                    },
+                    sort_keys=True,
+                    separators=(",", ":"),
+                )
+            )
+            raise typer.Exit(code=1)
+
+        from pragma.core.greenfield import scaffold_greenfield
+
+        try:
+            created = scaffold_greenfield(cwd, name=name, language=language)
+        except PragmaError as exc:
+            typer.echo(exc.to_json())
+            raise typer.Exit(code=1) from None
+
+        typer.echo(
+            json.dumps(
+                {"ok": True, "created": sorted(created), "project_name": name},
+                sort_keys=True,
+                separators=(",", ":"),
+            )
+        )
+        return
+
     project_name = name or cwd.name
 
     try:

@@ -105,6 +105,7 @@ class Requirement(_StrictModel):
 class Manifest(_StrictModel):
     version: Literal["1", "2"]
     project: Project
+    vision: str | None = None
     milestones: tuple[Milestone, ...] = Field(default=())
     requirements: tuple[Requirement, ...] = Field(default=())
 

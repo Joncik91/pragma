@@ -88,9 +88,18 @@ def load_manifest(path: Path) -> Manifest:
 
 
 def canonicalise(manifest: Manifest) -> bytes:
-    """Canonical JSON form used as the hash input and lockfile payload."""
+    """Canonical JSON form used as the hash input and lockfile payload.
+
+    ``vision`` is an optional greenfield-seed field that did not exist in
+    the v1/early-v2 schema. We strip it from the canonical form when it is
+    absent so hashes of pre-``vision`` manifests stay byte-stable across
+    this upgrade.
+    """
+    dumped = manifest.model_dump(mode="json")
+    if dumped.get("vision") is None:
+        dumped.pop("vision", None)
     return json.dumps(
-        manifest.model_dump(mode="json"),
+        dumped,
         sort_keys=True,
         separators=(",", ":"),
         ensure_ascii=False,
