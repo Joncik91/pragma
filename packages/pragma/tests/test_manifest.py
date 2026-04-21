@@ -70,6 +70,26 @@ def test_canonicalise_produces_deterministic_bytes(
     assert canonicalise(m1) == canonicalise(m2)
 
 
+def test_canonicalise_treats_empty_vision_as_absent(
+    minimal_valid_yaml: str, tmp_project: Path
+) -> None:
+    """BUG-005: vision: "" must hash identically to the field being absent.
+
+    Without this invariant, an author who keeps the greenfield-template
+    `vision: |` block empty gets a different manifest hash than the same
+    manifest with the field stripped entirely - and users moving between
+    the two forms would see spurious pragma verify manifest failures.
+    """
+    (tmp_project / "pragma.yaml").write_text(minimal_valid_yaml)
+    m_absent = load_manifest(tmp_project / "pragma.yaml")
+
+    with_empty = minimal_valid_yaml + 'vision: ""\n'
+    (tmp_project / "pragma.yaml").write_text(with_empty)
+    m_empty = load_manifest(tmp_project / "pragma.yaml")
+
+    assert canonicalise(m_absent) == canonicalise(m_empty)
+
+
 def test_canonicalise_is_sorted_json(minimal_valid_yaml: str, tmp_project: Path) -> None:
     (tmp_project / "pragma.yaml").write_text(minimal_valid_yaml)
     m = load_manifest(tmp_project / "pragma.yaml")

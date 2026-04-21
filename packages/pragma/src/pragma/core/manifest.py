@@ -112,12 +112,15 @@ def canonicalise(manifest: Manifest) -> bytes:
     """Canonical JSON form used as the hash input and lockfile payload.
 
     ``vision`` is an optional greenfield-seed field that did not exist in
-    the v1/early-v2 schema. We strip it from the canonical form when it is
-    absent so hashes of pre-``vision`` manifests stay byte-stable across
-    this upgrade.
+    the v1/early-v2 schema. We strip it from the canonical form when it
+    is absent so hashes of pre-``vision`` manifests stay byte-stable
+    across this upgrade. BUG-005: treat empty string / missing-field the
+    same as None so an author who writes ``vision: ""`` gets the same
+    hash as one who omits the field - otherwise the two differ by one
+    JSON byte.
     """
     dumped = manifest.model_dump(mode="json")
-    if dumped.get("vision") is None:
+    if not dumped.get("vision"):
         dumped.pop("vision", None)
     return json.dumps(
         dumped,
