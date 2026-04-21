@@ -5,6 +5,23 @@ All notable changes to Pragma are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] — 2026-04-21
+
+### Added
+
+- Monorepo split: `packages/pragma-sdk/` + `packages/pragma/` with uv workspace.
+- `pragma-sdk` runtime package: `@trace` decorator, `set_permutation` context manager, pytest plugin with InMemorySpanExporter and JSONL dump to `.pragma/spans/`.
+- `pragma report --json` / `--human`: Post-Implementation Log with per-permutation status and `passed-but-mocked` heuristic. Byte-deterministic JSON output.
+- `pragma narrative commit|pr|adr|remediation`: senior-engineer artifact generators backed by Jinja templates.
+- CI matrix: sdk-isolated job, full job, report-determinism diff job.
+- REQ-005 / M01.S3 declaring the v0.4 contract, dogfooded with one @trace'd Pragma helper.
+- `logic_id_schema.md` documenting the shared `pragma.logic_id` / `pragma.permutation` OTel attribute contract.
+
+### Changed
+
+- `pragma init --brownfield` appends `.pragma/spans/` and `.pragma/pytest-junit.xml` to `.gitignore`.
+- GitHub Actions workflow split from single job into three.
+
 ## [0.3.0] — 2026-04-20
 
 Adds Claude Code hook integration and the full safety battery. An AI
