@@ -55,6 +55,7 @@ python_version = "3.11"
 strict = true
 files = ["src/pragma"]
 
-[tool.pytest.ini_options]
-testpaths = ["tests"]
-addopts = "-q --strict-markers --junit-xml=.pragma/pytest-junit.xml"
+# pytest config lives in the repo-root pyproject.toml so pytest's rootdir
+# is the repo root; this keeps spans and junit-xml at the same path
+# `pragma report` reads (cwd-relative). If you invoke pytest from inside
+# this package, pytest will still walk up to the root pyproject.toml.

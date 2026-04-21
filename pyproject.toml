@@ -1,2 +1,6 @@
 [tool.uv.workspace]
 members = ["packages/pragma-sdk", "packages/pragma"]
+
+[tool.pytest.ini_options]
+testpaths = ["packages/pragma/tests", "packages/pragma-sdk/tests"]
+addopts = "-q --strict-markers --junit-xml=.pragma/pytest-junit.xml"

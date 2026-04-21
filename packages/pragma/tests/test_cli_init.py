@@ -93,4 +93,5 @@ def test_init_prints_success_json(tmp_project: Path, monkeypatch: pytest.MonkeyP
         "PRAGMA.md",
         ".claude/settings.json",
         ".pragma/claude-settings.hash",
+        "pytest.ini",
     }

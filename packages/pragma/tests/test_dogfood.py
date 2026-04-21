@@ -7,7 +7,7 @@ from pathlib import Path
 from pragma.core.lockfile import read_lock
 from pragma.core.manifest import hash_manifest, load_manifest
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
+REPO_ROOT = Path(__file__).resolve().parents[3]
 
 
 def test_pragma_has_its_own_manifest() -> None:
