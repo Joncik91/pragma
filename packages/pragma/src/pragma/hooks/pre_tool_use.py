@@ -10,66 +10,64 @@ from pragma.core.manifest import load_manifest, slice_requirements
 from pragma.core.state import read_state
 from pragma.core.tests_discovery import expected_test_name
 
+_ALLOW = {"permissionDecision": "allow"}
+
+
+def _deny_locked(slice_id: str, reqs) -> dict[str, Any]:
+    test_names = [expected_test_name(r.id, p.id) for r in reqs for p in r.permutations]
+    return {
+        "permissionDecision": "deny",
+        "permissionDecisionReason": f"Gate is LOCKED for slice {slice_id}",
+        "remediation": (
+            f"Slice {slice_id} is LOCKED. "
+            "Write passing tests first, then run `pragma unlock`. "
+            f"Expected tests: {', '.join(test_names)}"
+        ),
+    }
+
+
+def _deny_not_in_touches(file_path: str, slice_id: str, all_touches: set[str]) -> dict[str, Any]:
+    return {
+        "permissionDecision": "deny",
+        "permissionDecisionReason": f"File not in touches for slice {slice_id}",
+        "remediation": (
+            f"File {file_path} is not in the touches list for active slice "
+            f"{slice_id}. Allowed files: {', '.join(sorted(all_touches))}"
+        ),
+    }
+
+
+def _is_in_touches(cwd: Path, file_path: str, touches: set[str]) -> bool:
+    resolved = str((cwd / file_path).resolve())
+    return any(
+        resolved == str((cwd / t).resolve()) or resolved.startswith(str((cwd / t).resolve()))
+        for t in touches
+    )
+
 
 @trace("REQ-004")
 def handle(event_input: dict[str, Any], cwd: Path) -> dict[str, Any]:
     file_path = event_input.get("tool_input", {}).get("file_path", "")
     if not file_path:
-        return {"permissionDecision": "allow"}
-
-    pragma_dir = cwd / ".pragma"
+        return _ALLOW
 
     try:
-        state = read_state(pragma_dir)
+        state = read_state(cwd / ".pragma")
     except StateNotFound:
-        return {"permissionDecision": "allow"}
-
+        return _ALLOW
     if state.active_slice is None:
-        return {"permissionDecision": "allow"}
+        return _ALLOW
 
-    manifest_path = cwd / "pragma.yaml"
-    manifest = load_manifest(manifest_path)
+    manifest = load_manifest(cwd / "pragma.yaml")
     source_root = manifest.project.source_root.rstrip("/")
     if not file_path.startswith(source_root + "/") and file_path != source_root:
-        return {"permissionDecision": "allow"}
+        return _ALLOW
 
     reqs = slice_requirements(manifest, state.active_slice)
-
     if state.gate == "LOCKED":
-        test_names = []
-        for req in reqs:
-            for perm in req.permutations:
-                test_names.append(expected_test_name(req.id, perm.id))
-        remediation = (
-            f"Slice {state.active_slice} is LOCKED. "
-            f"Write passing tests first, then run `pragma unlock`. "
-            f"Expected tests: {', '.join(test_names)}"
-        )
-        return {
-            "permissionDecision": "deny",
-            "permissionDecisionReason": f"Gate is LOCKED for slice {state.active_slice}",
-            "remediation": remediation,
-        }
+        return _deny_locked(state.active_slice, reqs)
 
-    all_touches: set[str] = set()
-    for req in reqs:
-        all_touches.update(req.touches)
-
-    resolved = str((cwd / file_path).resolve())
-    allowed = any(
-        resolved == str((cwd / t).resolve()) or resolved.startswith(str((cwd / t).resolve()))
-        for t in all_touches
-    )
-
-    if not allowed:
-        remediation = (
-            f"File {file_path} is not in the touches list for active slice "
-            f"{state.active_slice}. Allowed files: {', '.join(sorted(all_touches))}"
-        )
-        return {
-            "permissionDecision": "deny",
-            "permissionDecisionReason": f"File not in touches for slice {state.active_slice}",
-            "remediation": remediation,
-        }
-
-    return {"permissionDecision": "allow"}
+    all_touches: set[str] = {t for req in reqs for t in req.touches}
+    if not _is_in_touches(cwd, file_path, all_touches):
+        return _deny_not_in_touches(file_path, state.active_slice, all_touches)
+    return _ALLOW
