@@ -1,7 +1,7 @@
 {
   "version": "1",
-  "manifest_hash": "sha256:22cb0f06abe2c847c91e9fac8f5ef02114e55296253f3f73394a7bd4caf5d95b",
-  "generated_at": "2026-04-21T11:15:17Z",
+  "manifest_hash": "sha256:a9a61c27a53d377bda3d5976a0fdcfbf245e305150a02e97b553d95ee37f5048",
+  "generated_at": "2026-04-21T12:45:46Z",
   "manifest": {
     "version": "2",
     "project": {
@@ -11,6 +11,7 @@
       "source_root": "packages/pragma/src/",
       "tests_root": "packages/pragma/tests/"
     },
+    "vision": null,
     "milestones": [
       {
         "id": "M00",
@@ -59,6 +60,14 @@
             "description": "Runtime SDK package, Post-Implementation Log, narrative artifacts.",
             "requirements": [
               "REQ-005"
+            ]
+          },
+          {
+            "id": "M01.S4",
+            "title": "v1.0 greenfield bootstrap and determinism",
+            "description": "Greenfield init flow, plan-greenfield Pattern C, real doctor recovery, determinism acceptance.",
+            "requirements": [
+              "REQ-006"
             ]
           }
         ]
@@ -317,6 +326,29 @@
         ],
         "milestone": "M01",
         "slice": "M01.S3"
+      },
+      {
+        "id": "REQ-006",
+        "title": "pragma report is byte-identical on repeat; manifest hash stable on noop freeze",
+        "description": "Pragma's deterministic contract: two consecutive pragma report --json invocations must produce byte-identical output on the same commit, and pragma freeze on an unchanged pragma.yaml must not change its manifest hash. Locks in v1.0 done criterion #5 (§7.8) as an enforced test.",
+        "touches": [
+          "packages/pragma/src/pragma/report/aggregator.py",
+          "packages/pragma/src/pragma/core/manifest.py"
+        ],
+        "permutations": [
+          {
+            "id": "report_byte_identical",
+            "description": "Two back-to-back pragma report --json invocations produce identical bytes",
+            "expected": "success"
+          },
+          {
+            "id": "hash_stable_after_noop_freeze",
+            "description": "pragma freeze on an unchanged pragma.yaml leaves manifest_hash unchanged",
+            "expected": "success"
+          }
+        ],
+        "milestone": "M01",
+        "slice": "M01.S4"
       }
     ]
   }
