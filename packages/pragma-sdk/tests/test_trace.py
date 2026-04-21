@@ -35,3 +35,47 @@ def test_trace_preserves_return_value(memory_exporter: InMemorySpanExporter) -> 
         return a + b
 
     assert add(2, 3) == 5
+
+
+def test_trace_on_generator_covers_body(memory_exporter: InMemorySpanExporter) -> None:
+    """BUG-010: @trace on a generator must span the actual execution.
+
+    Before v1.0.2 the decorator returned the generator object with the
+    span already closed, so the span existed but covered only
+    fn(*args, **kwargs) (which for generators is "build the generator
+    object and return") - no body code had run yet. Consumers that
+    never iterated the result would see an empty-body span; the PIL
+    aggregator couldn't tell such spans from real ones. The fix
+    delegates via yield from inside the span context so the span stays
+    open while the iterator is being consumed.
+    """
+
+    @trace("REQ-010")
+    def nums():
+        yield 1
+        yield 2
+        yield 3
+
+    # Exhaust the generator. The span should be open across all three
+    # yields + close cleanly after.
+    assert list(nums()) == [1, 2, 3]
+
+    spans = memory_exporter.get_finished_spans()
+    assert any(s.name == "REQ-010:nums" for s in spans), (
+        "generator body must produce a REQ-010:nums span"
+    )
+
+
+def test_trace_on_async_function(memory_exporter: InMemorySpanExporter) -> None:
+    """@trace on an async def coroutine awaits the call inside the span."""
+    import asyncio
+
+    @trace("REQ-ASYNC")
+    async def add_async(a: int, b: int) -> int:
+        return a + b
+
+    result = asyncio.run(add_async(2, 3))
+    assert result == 5
+
+    spans = memory_exporter.get_finished_spans()
+    assert any(s.name == "REQ-ASYNC:add_async" for s in spans)
