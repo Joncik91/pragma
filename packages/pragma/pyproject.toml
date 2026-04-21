@@ -4,14 +4,14 @@ build-backend = "hatchling.build"
 
 [project]
 name = "pragma"
-version = "0.4.2"
+version = "1.0.0"
 description = "Senior engineer on rails for AI-driven development"
 readme = "README.md"
 requires-python = ">=3.11"
 license = "Apache-2.0"
 authors = [{ name = "Pragma contributors" }]
 dependencies = [
-  "pragma-sdk>=0.4.0",
+  "pragma-sdk>=1.0.0",
   "typer>=0.12",
   "pydantic>=2.6",
   "pyyaml>=6.0",

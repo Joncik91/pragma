@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from pragma.core.migrate import migrate_v1_to_v2
+import pytest
+
+from pragma.core.migrate import CURRENT_SCHEMA_VERSION, migrate_to_current, migrate_v1_to_v2
 
 
 def test_migrate_bumps_version(v1_manifest_dict: dict) -> None:
@@ -52,3 +54,23 @@ def test_migrate_does_not_mutate_input(v1_manifest_dict: dict) -> None:
     snapshot = {**v1_manifest_dict, "requirements": list(v1_manifest_dict["requirements"])}
     migrate_v1_to_v2(v1_manifest_dict)
     assert v1_manifest_dict == snapshot
+
+
+def test_current_schema_version_is_v2() -> None:
+    assert CURRENT_SCHEMA_VERSION == "2"
+
+
+def test_migrate_to_current_noop_on_v2(v2_manifest_dict: dict) -> None:
+    result = migrate_to_current(v2_manifest_dict)
+    assert result is v2_manifest_dict
+
+
+def test_migrate_to_current_upgrades_v1(v1_manifest_dict: dict) -> None:
+    result = migrate_to_current(v1_manifest_dict)
+    assert result["version"] == "2"
+
+
+def test_migrate_to_current_rejects_unknown_version(v1_manifest_dict: dict) -> None:
+    v1_manifest_dict["version"] = "99"
+    with pytest.raises(ValueError, match="unknown manifest version"):
+        migrate_to_current(v1_manifest_dict)

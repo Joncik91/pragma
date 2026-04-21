@@ -1,13 +1,22 @@
-"""v0.1 -> v0.2 manifest migrator.
+"""Manifest schema migrators.
 
-Pure dict-to-dict transform. The CLI wrapper (cli/commands/migrate.py)
-handles file IO and re-freezing.
+Each migrator is a pure dict-to-dict transform. The CLI wrapper
+(``cli/commands/migrate.py``) handles file IO and re-freezing.
+
+v2 stays current at v1.0 — the milestone/slice hierarchy added in v0.2
+is what greenfield authors into place. ``migrate_to_current`` is the
+caller-facing entry point; it dispatches based on the manifest's
+``version:`` field and is a no-op on v2 input. Future schema bumps
+(v3, v4, ...) slot in a new ``migrate_vN_to_vN_plus_one`` helper and a
+new branch inside ``migrate_to_current``; callers keep the same API.
 """
 
 from __future__ import annotations
 
 import copy
 from typing import Any
+
+CURRENT_SCHEMA_VERSION = "2"
 
 _IMPLICIT_MILESTONE_ID = "M00"
 _IMPLICIT_SLICE_ID = "M00.S0"
@@ -58,3 +67,22 @@ def migrate_v1_to_v2(manifest: dict[str, Any]) -> dict[str, Any]:
         req["slice"] = _IMPLICIT_SLICE_ID
 
     return out
+
+
+def migrate_to_current(manifest: dict[str, Any]) -> dict[str, Any]:
+    """Bring ``manifest`` up to ``CURRENT_SCHEMA_VERSION``.
+
+    Dispatches based on the manifest's ``version:`` field. v1 → v2 via
+    ``migrate_v1_to_v2``; v2 is a no-op. Raises ``ValueError`` on
+    unknown versions so a stale pragma binary cannot silently misread
+    a future schema.
+    """
+    version = manifest.get("version")
+    if version == CURRENT_SCHEMA_VERSION:
+        return manifest
+    if version == "1":
+        return migrate_v1_to_v2(manifest)
+    raise ValueError(
+        f"unknown manifest version {version!r}; current schema is "
+        f"v{CURRENT_SCHEMA_VERSION}. Upgrade pragma itself if this is a newer schema."
+    )
