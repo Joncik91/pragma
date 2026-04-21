@@ -96,7 +96,26 @@ jobs:
 
       - name: Assert spans and junit landed at repo root
         run: |
-          test -s .pragma/spans/test-run.jsonl || { echo "ERROR: spans dump missing — plugin or rootdir misconfigured"; exit 1; }
+          # v1.0.2 KI-1: plugin now writes test-run-{timestamp}-{pid}-{uuid}.jsonl
+          # per session rather than a fixed test-run.jsonl. Glob-match + ensure
+          # at least one non-empty file exists.
+          shopt -s nullglob
+          spans=(.pragma/spans/*.jsonl)
+          if [ ${#spans[@]} -eq 0 ]; then
+            echo "ERROR: no span files in .pragma/spans/ — plugin or rootdir misconfigured"
+            exit 1
+          fi
+          any_nonempty=0
+          for f in "${spans[@]}"; do
+            if [ -s "$f" ]; then
+              any_nonempty=1
+              break
+            fi
+          done
+          if [ "$any_nonempty" -eq 0 ]; then
+            echo "ERROR: span files exist but are all empty — plugin emitted no spans"
+            exit 1
+          fi
           test -s .pragma/pytest-junit.xml || { echo "ERROR: junit xml missing — pytest config not wired"; exit 1; }
 
       - name: Generate report A

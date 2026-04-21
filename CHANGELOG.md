@@ -5,6 +5,26 @@ All notable changes to Pragma are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.3.2] — 2026-04-21
+
+**CI workflow catches up to v1.0.2's KI-1.** v1.0.3.1 passed mypy strict
+but failed the "report determinism check" job because `.github/
+workflows/ci.yml` still asserted the pre-KI-1 fixed filename
+`.pragma/spans/test-run.jsonl`. After KI-1, the pytest plugin writes
+per-session files like `test-run-{timestamp}-{pid}-{uuid}.jsonl` so
+the fixed-filename test always failed. Again, Pragma's local gate
+couldn't catch this (CI workflow isn't run locally); only the real
+GH Actions run did. Same meta-pattern as v1.0.3.1.
+
+### Fixed
+
+- `.github/workflows/ci.yml` — the "Assert spans and junit landed at
+  repo root" step now globs `.pragma/spans/*.jsonl` and asserts at
+  least one non-empty file exists, rather than checking the exact
+  pre-KI-1 `test-run.jsonl` path. Pairs with the KI-1 aggregator
+  back-compat shim that already handled both single-file and
+  directory inputs.
+
 ## [1.0.3.1] — 2026-04-21
 
 **Hotfix-of-hotfix.** v1.0.3 CI failed on `mypy --strict` because the
