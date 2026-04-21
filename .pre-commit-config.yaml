@@ -15,6 +15,10 @@ repos:
     hooks:
       - id: mypy
         args: [--strict]
+        additional_dependencies:
+          - opentelemetry-api>=1.30
+          - opentelemetry-sdk>=1.30
+          - pytest>=8.0
 
   - repo: https://github.com/returntocorp/semgrep
     rev: v1.99.0
