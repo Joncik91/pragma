@@ -6,8 +6,11 @@ backwards compatibility), and ADDITIONALLY appends a ``diagnostics:``
 list — one entry per detected failure mode — each with a ``remediation``
 string the user (or Claude Code) can execute verbatim.
 
-doctor always exits zero. Diagnostics are informational; the caller
-decides what to do next.
+doctor always exits zero in the standard mode. Diagnostics are
+informational; the caller decides what to do next.
+
+v1.0 also adds ``--emergency-unlock --reason "<why>"`` — the escape hatch
+for a wedged gate. See `_handle_emergency_unlock` below.
 """
 
 from __future__ import annotations
@@ -19,13 +22,141 @@ import typer
 from pragma_sdk import trace
 
 from pragma import __version__
+from pragma.core.audit import append_audit
+from pragma.core.errors import (
+    EmergencyUnlockRefused,
+    PragmaError,
+    StateNotFound,
+    StateSchemaError,
+)
+from pragma.core.manifest import hash_manifest, load_manifest
 from pragma.core.recovery import diagnose
+from pragma.core.state import default_state, read_state, write_state
+
+_FALLBACK_HASH = "sha256:" + "0" * 64
 
 
 @trace("REQ-001")
-def doctor() -> None:
+def _handle_emergency_unlock(*, cwd: Path, reason: str) -> None:
+    """Reset .pragma/state.json to neutral after logging the user's reason.
+
+    Refuses when state parses cleanly AND no slice is active — in that
+    case the repo is already in the "neutral" shape this command would
+    produce, and firing would be a no-op audit spam.
+    """
+    stripped = reason.strip()
+    if not stripped:
+        err = PragmaError(
+            code="reason_required",
+            message="--emergency-unlock requires --reason <non-empty text>.",
+            remediation=(
+                'Re-run with --reason "<why you\'re unlocking>"; the reason '
+                "is appended to .pragma/audit.jsonl for posterity."
+            ),
+            context={},
+        )
+        typer.echo(err.to_json())
+        raise typer.Exit(code=1)
+
+    pragma_dir = cwd / ".pragma"
+
+    # Attempt to read prior state. We classify into three buckets:
+    #   - already neutral (absent, or parses with active_slice None)  -> refuse
+    #   - parseable with an active slice                              -> proceed
+    #   - present but unparseable / schema-invalid                    -> proceed
+    previous_slice: str | None = None
+    previous_gate: str | None = None
+    from_state_label = "UNKNOWN"
+    already_neutral = False
+    try:
+        state = read_state(pragma_dir)
+    except StateNotFound:
+        # No state.json at all — effectively neutral.
+        already_neutral = True
+    except StateSchemaError:
+        # Present but can't be parsed — legitimate escape-hatch target.
+        pass
+    else:
+        previous_slice = state.active_slice
+        previous_gate = state.gate
+        from_state_label = state.gate if state.gate is not None else "UNKNOWN"
+        if state.active_slice is None:
+            already_neutral = True
+
+    if already_neutral:
+        err = EmergencyUnlockRefused(
+            message=(
+                "Repo is already in a neutral state — no active slice, no gate. "
+                "--emergency-unlock would be a no-op."
+            ),
+            remediation=(
+                "Repo is already in a neutral state — run "
+                "`pragma slice activate <id>` to start a slice, or inspect "
+                ".pragma/audit.jsonl for history."
+            ),
+            context={"active_slice": None, "gate": None},
+        )
+        typer.echo(err.to_json())
+        raise typer.Exit(code=1)
+
+    # Compute manifest hash, falling back to all-zero sentinel.
+    try:
+        manifest = load_manifest(cwd / "pragma.yaml")
+        manifest_hash = hash_manifest(manifest)
+    except PragmaError:
+        manifest_hash = _FALLBACK_HASH
+
+    fresh = default_state(manifest_hash=manifest_hash)
+    write_state(pragma_dir, fresh)
+
+    append_audit(
+        pragma_dir,
+        event="emergency_unlock",
+        actor="doctor",
+        slice=previous_slice,
+        from_state=from_state_label,
+        to_state=None,
+        reason=stripped,
+        context={
+            "previous_slice": previous_slice,
+            "previous_gate": previous_gate,
+        },
+    )
+
+    typer.echo(
+        json.dumps(
+            {
+                "ok": True,
+                "action": "emergency_unlock",
+                "previous_active_slice": previous_slice,
+                "reason": stripped,
+            },
+            sort_keys=True,
+            separators=(",", ":"),
+        )
+    )
+
+
+@trace("REQ-001")
+def doctor(
+    emergency_unlock: bool = typer.Option(
+        False,
+        "--emergency-unlock",
+        help="Reset gate state to neutral after logging the reason.",
+    ),
+    reason: str = typer.Option(
+        "",
+        "--reason",
+        help="Required with --emergency-unlock. Non-empty free-text.",
+    ),
+) -> None:
     """Print local install + project state as JSON, with recovery advice."""
     cwd = Path.cwd()
+
+    if emergency_unlock:
+        _handle_emergency_unlock(cwd=cwd, reason=reason)
+        return
+
     diagnostics = diagnose(cwd)
     payload: dict[str, object] = {
         "ok": True,

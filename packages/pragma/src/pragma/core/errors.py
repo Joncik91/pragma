@@ -201,3 +201,8 @@ class PlanGreenfieldOnBrownfield(PragmaError):
 @dataclass(kw_only=True)
 class PlanGreenfieldAlreadyPlanned(PragmaError):
     code: str = "plan_greenfield_already_planned"
+
+
+@dataclass(kw_only=True)
+class EmergencyUnlockRefused(PragmaError):
+    code: str = "emergency_unlock_refused"
