@@ -161,3 +161,23 @@ class UnknownHookEventError(PragmaError):
 @dataclass(kw_only=True)
 class HookInputMissingError(PragmaError):
     code: str = "hook_input_missing"
+
+
+@dataclass(kw_only=True)
+class ReportNoSpans(PragmaError):
+    code: str = "report_no_spans"
+
+
+@dataclass(kw_only=True)
+class ReportManifestDesync(PragmaError):
+    code: str = "report_manifest_desync"
+
+
+@dataclass(kw_only=True)
+class NarrativeEmptyStage(PragmaError):
+    code: str = "narrative_empty_stage"
+
+
+@dataclass(kw_only=True)
+class NarrativeNoActiveSlice(PragmaError):
+    code: str = "narrative_no_active_slice"

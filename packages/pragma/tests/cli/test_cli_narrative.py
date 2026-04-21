@@ -60,11 +60,72 @@ def test_narrative_commit_outputs_message(tmp_path) -> None:
             "feat(a): add a",
             "--cwd",
             str(tmp_path),
+            "--allow-empty",
         ],
     )
     assert result.exit_code == 0, result.output
     assert "WHY:" in result.output
     assert "Co-Authored-By:" in result.output
+
+
+def test_narrative_commit_errors_when_nothing_staged(tmp_path) -> None:
+    (tmp_path / "pragma.yaml").write_text(
+        (
+            "version: '2'\n"
+            "project:\n"
+            "  name: x\n"
+            "  mode: brownfield\n"
+            "  language: python\n"
+            "  source_root: src/\n"
+            "  tests_root: tests/\n"
+            "requirements: []\n"
+            "milestones: []\n"
+        ),
+        encoding="utf-8",
+    )
+    (tmp_path / ".pragma").mkdir()
+
+    result = runner.invoke(
+        app,
+        [
+            "narrative",
+            "commit",
+            "--subject",
+            "feat: x",
+            "--cwd",
+            str(tmp_path),
+        ],
+    )
+    assert result.exit_code == 1
+    import json
+
+    payload = json.loads(result.output)
+    assert payload["error"] == "narrative_empty_stage"
+
+
+def test_narrative_pr_requires_slice_or_active_slice(tmp_path) -> None:
+    (tmp_path / "pragma.yaml").write_text(
+        (
+            "version: '2'\n"
+            "project:\n"
+            "  name: x\n"
+            "  mode: brownfield\n"
+            "  language: python\n"
+            "  source_root: src/\n"
+            "  tests_root: tests/\n"
+            "requirements: []\n"
+            "milestones: []\n"
+        ),
+        encoding="utf-8",
+    )
+    (tmp_path / ".pragma").mkdir()
+
+    result = runner.invoke(app, ["narrative", "pr", "--cwd", str(tmp_path)])
+    assert result.exit_code == 1
+    import json
+
+    payload = json.loads(result.output)
+    assert payload["error"] == "narrative_no_active_slice"
 
 
 def test_narrative_remediation_outputs_string() -> None:
