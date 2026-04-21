@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "pragma-sdk"
-version = "0.4.0"
+version = "0.4.1"
 description = "Pragma runtime: @trace decorator, set_permutation, pytest plugin"
 readme = "README.md"
 requires-python = ">=3.11"

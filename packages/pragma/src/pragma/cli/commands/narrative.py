@@ -116,8 +116,7 @@ def cmd_pr(
         _emit_error_and_exit(
             NarrativeNoActiveSlice(
                 message=(
-                    "No active slice and no --slice override; refusing "
-                    "to dump the whole manifest."
+                    "No active slice and no --slice override; refusing to dump the whole manifest."
                 ),
                 remediation=(
                     "Activate a slice with `pragma slice activate <id>` "

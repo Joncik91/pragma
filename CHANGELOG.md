@@ -5,7 +5,52 @@ All notable changes to Pragma are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.4.0] — 2026-04-21
+## [0.4.1] — 2026-04-21
+
+v0.4 was cut but the initial tag pointed at a tree that was
+unusable from a clean clone — `pragma.narrative.commit` was left
+untracked so `pragma --help` ImportErrored on any fresh install.
+v0.4.1 is the real v0.4 release: same feature set, now actually
+shippable, with the fixes the internal code review demanded.
+
+### Fixed
+
+- `pragma.narrative.commit` module + `commit-message.tpl` + round-trip test
+  are now tracked in git (`fix(v04): ship missing narrative.commit module`).
+  The pre-tag HEAD could import-fail on clean install; this resolves it.
+- Single-source `pragma.yaml` at the repo root; the duplicate under
+  `packages/pragma/` is removed so manifest edits don't have to be
+  applied twice.
+- Pytest config moved to the repo-root `pyproject.toml` so pytest
+  rootdir equals repo root. Span dumps and JUnit XML now land where
+  `pragma report` actually reads them; the mock-detection heuristic
+  is no longer inert on real projects.
+- `pragma init --brownfield` now writes `pytest.ini` (when no
+  existing pytest config is present) with `--junit-xml=.pragma/pytest-junit.xml`.
+- REQ-005 dogfood tests renamed to `test_req_005_<permutation>` so
+  the aggregator joins emitted spans to declared permutations.
+  `pragma report --json` now shows `summary.ok = 7` for REQ-005
+  against Pragma's own repo, up from `0`.
+- Mypy `--strict` actually runs in CI now (it was silently off because
+  config lived in a sub-package pyproject). `pragma-sdk` ships a
+  `py.typed` marker so downstream strict mypy doesn't flag
+  `@pragma.trace` as untyped.
+- Report-determinism CI job asserts spans, junit and
+  `summary.ok > 0` before diffing. An empty-report green is no
+  longer possible.
+- Four spec §8.1 error classes added (`ReportNoSpans`,
+  `ReportManifestDesync`, `NarrativeEmptyStage`,
+  `NarrativeNoActiveSlice`). `narrative commit` refuses to generate
+  an empty commit message unless `--allow-empty` is passed.
+  `narrative pr` refuses to dump the whole manifest when
+  `state.active_slice` is null — pass `--slice=<id>` or activate
+  a slice.
+- `.gitignore` covers `.pragma/spans/`, `.pragma/pytest-junit.xml`,
+  and the corresponding `packages/*/.pragma/` leaks.
+
+## [0.4.0] — 2026-04-21 — YANKED
+
+Internal release; not shipped. See 0.4.1 for the real v0.4.
 
 ### Added
 
