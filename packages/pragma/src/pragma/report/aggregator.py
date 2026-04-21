@@ -91,6 +91,41 @@ def _compute_permutation_status(
     return PermutationStatus.partial, 0, None
 
 
+def _resolve_active_slice(state: State | None, override: str | None) -> str | None:
+    if override is not None:
+        return override
+    return state.active_slice if state is not None else None
+
+
+def _build_report_requirement(
+    req, junit_results, spans_by_test, summary: dict[str, int]
+) -> ReportRequirement:
+    report_perms: list[ReportPermutation] = []
+    for perm in req.permutations:
+        status, span_count, remediation = _compute_permutation_status(
+            req_id=req.id,
+            perm_id=perm.id,
+            junit_results=junit_results,
+            spans_by_test=spans_by_test,
+        )
+        report_perms.append(
+            ReportPermutation(
+                id=perm.id,
+                status=status,
+                test_nodeid=None,
+                span_count=span_count,
+                remediation=remediation,
+            )
+        )
+        summary[status.value] += 1
+        summary["total"] += 1
+    return ReportRequirement(
+        id=req.id,
+        title=req.title,
+        permutations=tuple(report_perms),
+    )
+
+
 def build_report(
     *,
     manifest: Manifest,
@@ -102,54 +137,23 @@ def build_report(
 ) -> Report:
     spans_by_test = _parse_spans(spans_jsonl)
     junit_results = _parse_junit(junit_xml)
+    active_slice = _resolve_active_slice(state, active_slice_override)
 
-    active_slice = active_slice_override
-    if active_slice is None and state is not None:
-        active_slice = state.active_slice
+    requirements = (
+        slice_requirements(manifest, active_slice)
+        if active_slice is not None
+        else list(manifest.requirements)
+    )
 
-    if active_slice is not None:
-        requirements = slice_requirements(manifest, active_slice)
-    else:
-        requirements = list(manifest.requirements)
-
-    report_reqs: list[ReportRequirement] = []
     summary = {"ok": 0, "total": 0, "partial": 0, "mocked": 0, "missing": 0, "red": 0, "skipped": 0}
-
-    for req in requirements:
-        report_perms: list[ReportPermutation] = []
-        for perm in req.permutations:
-            status, span_count, remediation = _compute_permutation_status(
-                req_id=req.id,
-                perm_id=perm.id,
-                junit_results=junit_results,
-                spans_by_test=spans_by_test,
-            )
-            report_perms.append(
-                ReportPermutation(
-                    id=perm.id,
-                    status=status,
-                    test_nodeid=None,
-                    span_count=span_count,
-                    remediation=remediation,
-                )
-            )
-            summary[status.value] += 1
-            summary["total"] += 1
-        report_reqs.append(
-            ReportRequirement(
-                id=req.id,
-                title=req.title,
-                permutations=tuple(report_perms),
-            )
-        )
-
-    gate = None
-    if state is not None:
-        gate = state.gate
+    report_reqs = [
+        _build_report_requirement(req, junit_results, spans_by_test, summary)
+        for req in requirements
+    ]
 
     return Report(
         slice=active_slice,
-        gate=gate,
+        gate=state.gate if state is not None else None,
         generated_at=commit_timestamp,
         requirements=tuple(report_reqs),
         summary=summary,
