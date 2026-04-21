@@ -10,6 +10,7 @@ from pragma.cli.commands.hook import hook
 from pragma.cli.commands.hooks import hooks_app
 from pragma.cli.commands.init import init
 from pragma.cli.commands.migrate import migrate
+from pragma.cli.commands.narrative import narrative_app
 from pragma.cli.commands.report import report
 from pragma.cli.commands.slice import slice_app
 from pragma.cli.commands.spec import spec_app
@@ -39,6 +40,7 @@ app.command(name="report")(report)
 app.add_typer(slice_app)
 app.add_typer(spec_app)
 app.add_typer(hooks_app)
+app.add_typer(narrative_app)
 app.add_typer(verify_app)
 
 
