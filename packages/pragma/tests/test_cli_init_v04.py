@@ -35,3 +35,36 @@ def test_init_gitignore_idempotent(tmp_path: Path, monkeypatch: pytest.MonkeyPat
     assert result.exit_code == 0, result.stdout
     gitignore = (tmp_path / ".gitignore").read_text(encoding="utf-8")
     assert gitignore.count(".pragma/spans/") == 1
+
+
+def test_init_writes_pytest_ini_when_no_pytest_config(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    result = runner.invoke(app, ["init", "--brownfield", "--name", "test"])
+    assert result.exit_code == 0, result.stdout
+    ini = tmp_path / "pytest.ini"
+    assert ini.exists()
+    assert "--junit-xml=.pragma/pytest-junit.xml" in ini.read_text(encoding="utf-8")
+
+
+def test_init_respects_existing_pyproject_pytest_config(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    (tmp_path / "pyproject.toml").write_text(
+        '[tool.pytest.ini_options]\naddopts = "-q"\n', encoding="utf-8"
+    )
+    monkeypatch.chdir(tmp_path)
+    result = runner.invoke(app, ["init", "--brownfield", "--name", "test"])
+    assert result.exit_code == 0, result.stdout
+    assert not (tmp_path / "pytest.ini").exists()
+
+
+def test_init_respects_existing_pytest_ini(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    (tmp_path / "pytest.ini").write_text("[pytest]\naddopts = -v\n", encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    result = runner.invoke(app, ["init", "--brownfield", "--name", "test"])
+    assert result.exit_code == 0, result.stdout
+    assert (tmp_path / "pytest.ini").read_text(encoding="utf-8") == "[pytest]\naddopts = -v\n"

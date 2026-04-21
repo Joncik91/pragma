@@ -117,4 +117,31 @@ def _scaffold(cwd: Path, *, project_name: str, force: bool) -> list[str]:
                 f.write("\n")
             f.write("\n".join(new_entries) + "\n")
 
+    if _wire_pytest_junit(cwd):
+        created.append("pytest.ini")
+
     return created
+
+
+def _wire_pytest_junit(cwd: Path) -> bool:
+    """Ensure pytest emits .pragma/pytest-junit.xml.
+
+    Returns True if this call created `pytest.ini` at the project root.
+    Leaves existing `[tool.pytest.ini_options]` in pyproject.toml or any
+    pre-existing `pytest.ini` untouched — the downstream project owns its
+    pytest config; we only scaffold when nothing is there.
+    """
+    junit_flag = "--junit-xml=.pragma/pytest-junit.xml"
+    pyproject = cwd / "pyproject.toml"
+    if pyproject.exists():
+        text = pyproject.read_text(encoding="utf-8")
+        if "[tool.pytest.ini_options]" in text:
+            return False
+    existing_ini = cwd / "pytest.ini"
+    if existing_ini.exists():
+        return False
+    existing_ini.write_text(
+        f"[pytest]\naddopts = -q --strict-markers {junit_flag}\n",
+        encoding="utf-8",
+    )
+    return True

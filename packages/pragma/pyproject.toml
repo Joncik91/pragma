@@ -57,4 +57,4 @@ files = ["src/pragma"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-q --strict-markers"
+addopts = "-q --strict-markers --junit-xml=.pragma/pytest-junit.xml"
