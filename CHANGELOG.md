@@ -5,6 +5,35 @@ All notable changes to Pragma are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.2] — 2026-04-21
+
+Dogfood polish + commit-shape enforcement.
+
+### Added
+
+- `pragma verify message <file>` subcommand — validates one draft
+  commit message against the canonical shape (subject ≤72 chars,
+  body with WHY: paragraph, Co-Authored-By: trailer). Strips git
+  comment lines so it composes with the `commit-msg` hook.
+- Pre-commit template now wires `pragma-verify-commit-msg` at the
+  `commit-msg` stage and `pragma-verify-commits-pre-push` at the
+  `pre-push` stage. Both active on Pragma's own repo — the
+  commit-shape rule is now enforced automatically, not just
+  declared.
+- `@pragma_sdk.trace` now on 18 Pragma helpers across REQ-001..REQ-004
+  so `pragma report` shows 32/32 ok permutations against Pragma's
+  own repo (up from 7/32 at v0.4.1 ship).
+
+### Changed
+
+- Pragma's own `.pre-commit-config.yaml` pytest hook scoped to the
+  two package test subtrees instead of running pytest from repo
+  root — avoids the known ImportPathMismatchError between the two
+  `conftest.py` files.
+- `PRAGMA.md` template + Pragma's own PRAGMA.md now document the
+  commit-message shape rule and the "plan task titles ≤72 chars"
+  planning guardrail.
+
 ## [0.4.1] — 2026-04-21
 
 v0.4 was cut but the initial tag pointed at a tree that was

@@ -53,3 +53,33 @@ a strict state machine:
 
 At any point, `pragma slice status` shows the current slice and gate
 state. `pragma slice cancel` aborts the active slice.
+
+## Commit message shape (v0.3+)
+
+Every commit's message must carry:
+
+- **Subject line ≤ 72 characters.** Anything longer is truncated in
+  `git log --oneline` and on GitHub's PR list.
+- **Body** separated by a blank line, with at least:
+  - a `WHY:` paragraph explaining motivation,
+  - a `Co-Authored-By:` trailer (when AI-assisted).
+
+`pragma verify message` runs automatically at the `commit-msg` stage
+via pre-commit — if the draft fails shape, the commit is rejected
+before it lands. `pragma verify commits` runs at `pre-push` against
+`origin/main` to block force-pushing a broken range.
+
+**Planning note.** When writing an implementation plan, keep each
+task's subject short enough that it can be copied verbatim into a
+commit subject. If your task heading is 84 characters, the commit
+for that task will fail the hook. Budget the title to ≤72 chars
+(conventional-commits prefix included) and put the longer rationale
+in the task body.
+
+## Post-Implementation Log (v0.4+)
+
+After a slice ships, `pragma report --human` produces a plain-English
+summary of which declared permutations were genuinely exercised
+(spans observed), which passed but might be mocked, and which were
+never run. Read it before merging. `pragma report --json` is the
+deterministic machine form.
