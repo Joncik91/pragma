@@ -24,7 +24,7 @@ def test_doctor_prints_version_and_cwd(tmp_project: Path, monkeypatch: pytest.Mo
     assert result.exit_code == 0
     parsed = json.loads(result.stdout)
     assert parsed["ok"] is True
-    assert parsed["pragma_version"] == "1.0.1"
+    assert parsed["pragma_version"] == "1.0.2"
     assert Path(parsed["cwd"]) == tmp_project.resolve()
     assert parsed["manifest_exists"] is False
     assert parsed["lock_exists"] is False

@@ -5,6 +5,133 @@ All notable changes to Pragma are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.2] — 2026-04-21
+
+**The "stop leaking insider knowledge" release.** v1.0.1 published seven
+known issues in its changelog; a Phase-1 bug-hunt turned up eleven more
+in an explicit "find what isn't in that list yet" pass, and a pre-release
+greenfield smoke test caught a twentieth at the doorstep. All are fixed
+or honestly deferred. 37 commits; every fix ships with a regression test.
+`pragma verify all` is now the real umbrella — manifest, gate, integrity,
+discipline, commits — rather than three of five. Pragma's own source
+passes its own discipline check cleanly for the first time since the
+check existed.
+
+### Fixed
+
+**PIL accuracy (KI-1, BUG-007, BUG-010).** Spans are per-session files
+under `.pragma/spans/` instead of a single overwritten `test-run.jsonl`,
+so PIL survives multi-suite projects (pragma + pragma-sdk, pre-commit
+pytest + CI pytest). The aggregator now requires `pragma.permutation` to
+match, not just `pragma.logic_id` — a span carrying `permutation="none"`
+no longer false-positives a declared permutation as `ok`. `@trace` on
+generator, async, and async-generator functions wraps the actual
+execution instead of object construction, so PIL sees real work.
+
+**Gate + slice lifecycle (BUG-011, KI-5, KI-3, BUG-012).** `slice
+activate --force` now cancels the prior active slice (with
+`completed_at=now`) rather than orphaning it as forever-`in_progress`.
+`slice cancel` erases never-unlocked slices from `state.slices` so a
+subsequent manifest edit doesn't trigger spurious `gate_hash_drift`;
+slices that did reach UNLOCKED stay as real history. The `M01.depends_on:
+[M00]` phantom dependency on the migrator's implicit backfill milestone
+is gone, and the migrator's source carries an explicit invariant comment
+to stop the next author re-introducing it. `plan-greenfield` now rebinds
+`state.manifest_hash` after refreezing, so `pragma verify all` stays
+green on the day-one greenfield flow — surfaced by the pre-release smoke
+test; without it, every new greenfield user would have hit
+`gate_hash_drift` on their first verification.
+
+**Hook dispatcher (BUG-003, BUG-001, KI-6).** Stop hook crashes now fail
+to `{"continue": false, "stopReason": ...}` so the turn ends cleanly with
+a visible reason rather than silently pretending the gate check passed.
+PreToolUse / PostToolUse / SessionStart still fail open (allow edits when
+the hook breaks) because a DoSed editing turn is worse than a missed
+check there. `post_tool_use` degrades gracefully when `pragma.yaml` is
+missing or malformed — previously logged a spurious `hook_crash` audit
+entry on every first-use. Hook crash forensics now route to
+`.pragma/hook-crash.jsonl` (gitignored) instead of the committed
+`audit.jsonl`, so a buggy hook or a test run can't pollute real gate
+history.
+
+**`verify all` completeness (BUG-009).** `verify all` was the umbrella
+the Stop hook invoked to decide whether a turn could end, but it only
+ran `manifest`, `gate`, `integrity`. Now it runs all five:
+`["manifest","gate","integrity","discipline","commits"]`. The `--ci`
+flag stays as an accepted no-op so existing CI configs keep working.
+The commits check skips gracefully on non-git scaffolds (fresh
+`pragma init` under test fixtures) rather than erroring on
+`git_unavailable`.
+
+**Discipline debt (KI-11).** Enabling discipline in `verify all`
+surfaced 36 pre-existing violations in Pragma's own source — 17 commits
+cleared them across 13 files. Key per-file splits: doctor's emergency
+unlock into phases, verify.py into `verify.py` (CLI shell) + new
+`verify_checks.py` (check logic), gate.activate into
+locate/check/build, pytest-plugin-aware collector, plan-greenfield into
+read/validate/build/rewrite phases, init's mode-validation ladder. The
+discipline checker itself also held itself to its own budget for the
+first time. Acknowledged `TODO(owner)` markers no longer trip the
+`todo_sentinel` rule — `plan-greenfield` writes `TODO(pragma): …`
+placeholders by design and they're no longer cause for failure.
+
+**Manifest + error-payload contract (REQ-006, KI-2, BUG-005, BUG-004,
+BUG-006, BUG-008).** `pragma freeze` on an unchanged `pragma.yaml` is
+now truly idempotent at the lockfile-bytes level, not just
+manifest-hash-level — `write_lock` short-circuits when the existing
+lockfile already records the same hash. v2 manifests with requirements
+but no milestones now fail validation instead of silently hashing. A
+`vision: ""` string hashes identically to the field being absent. Six
+ad-hoc `PragmaError(code="...")` call sites promoted to typed
+subclasses (`CompleteCollectFailed`, `UnlockCollectFailed`,
+`VerifyCollectFailed`, `GitUnavailable`, `CommitMsgNotFound`,
+`ReasonRequired`) so the public error contract lives in one file.
+Parametrised tests now participate in gate decisions fully — the
+consumer pattern `{c.name: c for c in collected}` that silently kept
+only the last variant has been replaced by a `group_by_name` helper.
+`verify commits` surfaces `commits_checked` and `range` so vacuous
+runs (empty range, fallback-to-HEAD on a missing `--base`) are visible.
+
+### Changed
+
+- Default `.pre-commit-config.yaml` scaffolded by `pragma init`
+  (**KI-7**) now ships only hooks that work out-of-the-box: gitleaks,
+  ruff, pip-audit, pre-commit-hooks. `mypy`, `semgrep`, and `deptry`
+  move into commented-out opt-in blocks with per-hook explanations of
+  what each requires to work. Users get a first commit that succeeds
+  without `SKIP=` gymnastics.
+- Ruff pre-commit pin bumped from `v0.8.6` to `v0.15.11` in the
+  scaffolded template so new projects inherit the v1.0.1 skew fix.
+- Dispatcher uses `_get_handler(event)` on-call rather than a pre-bound
+  `_HANDLERS` dict, so monkeypatching a hook module's `handle` actually
+  reaches the dispatch code — fixed a silent false-positive in an
+  existing crash-recovery test.
+
+### Added
+
+- `pragma.core.tests_discovery.group_by_name` — parametrise-aware
+  grouping of collected tests by base name.
+- `pragma.core.audit.append_hook_crash` + `HOOK_CRASH_FILENAME`
+  constant.
+- Three new `@trace` variants (async, generator, async-generator) in
+  `pragma_sdk.trace`.
+- Six new typed `PragmaError` subclasses covering every previously
+  ad-hoc error path.
+
+### Known issues (parked for v1.0.3)
+
+- **KI-12** — 14 legacy REQ-003 / REQ-004 test bodies don't wrap their
+  work with `set_permutation`, so BUG-007's stricter aggregator scores
+  them `mocked` rather than `ok`. PIL on Pragma's own repo is 28/42 ok
+  + 14/42 mocked. Each test needs a small `_assert_*` helper decorated
+  `@trace(req_id)` called inside `with set_permutation(perm_id)` — see
+  `test_req_006_determinism.py` for the canonical template. Mechanical
+  but voluminous.
+- **Span-file pruning** — `.pragma/spans/*.jsonl` accumulates
+  per-session files indefinitely. Spans are gitignored so no history
+  pollution, but disk use grows without bound. Needs a `pragma doctor
+  --prune-spans` or similar. Not a v1.0.2 blocker.
+
 ## [1.0.1] — 2026-04-21
 
 **Stabilisation patch. Three v1.0-era bugs uncovered by first real dogfood
