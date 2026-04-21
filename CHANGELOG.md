@@ -110,6 +110,16 @@ reading this changelog.
   dependency of `M01`, so `M01` slices can't be activated without
   manually editing `M01.depends_on`. Either drop the auto-dep or mark
   `M00` as pre-shipped on migration.
+- `pragma freeze` is not idempotent at the lockfile-bytes level: the
+  `generated_at` timestamp is rewritten on every call even when the
+  manifest hash is unchanged, so back-to-back `freeze`s produce
+  diff-noisy lockfiles. REQ-006's acceptance test covers *hash
+  stability* and *`pragma report` byte equality*, but not *lockfile
+  byte equality* — so the test passes while the user-visible
+  behaviour fails. Fix: either skip the file write when the hash
+  matches the existing lock's hash, or move `generated_at` out of
+  the lockfile into a sibling metadata file; strengthen REQ-006's
+  test to assert lockfile-byte stability.
 
 **Safety battery template**
 
