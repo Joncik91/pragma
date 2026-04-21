@@ -245,6 +245,21 @@ def complete(state: State, *, now_iso: str) -> tuple[State, dict[str, Any]]:
 
 
 def cancel(state: State, *, now_iso: str) -> tuple[State, dict[str, Any]]:
+    """Cancel the active slice.
+
+    KI-5: slices that never reached UNLOCKED have no useful history
+    (the user activated by mistake, changed their mind, or the
+    transition failed halfway). Those are erased from state.slices
+    entirely so a subsequent ``pragma freeze`` on a slightly-edited
+    manifest does not cause gate_hash_drift against a stale slice
+    record that the state machine can't move forward or clean up.
+
+    Slices that did reach UNLOCKED at some point are genuine history:
+    they stay in state.slices with status=cancelled for downstream
+    narrative / doctor audit. The distinction is ``unlocked_at`` -
+    non-None means the gate observed the slice pass the red-tests
+    check, so the record is worth keeping.
+    """
     if state.active_slice is None:
         raise SliceNotActive(
             message="No active slice; nothing to cancel.",
@@ -254,13 +269,17 @@ def cancel(state: State, *, now_iso: str) -> tuple[State, dict[str, Any]]:
     sid = state.active_slice
     old = state.slices[sid]
     new_slices = dict(state.slices)
-    new_slices[sid] = SliceState(
-        status="cancelled",
-        gate=None,
-        activated_at=old.activated_at,
-        unlocked_at=old.unlocked_at,
-        completed_at=old.completed_at,
-    )
+    if old.unlocked_at is None:
+        # Never reached UNLOCKED. Erase rather than mark cancelled.
+        del new_slices[sid]
+    else:
+        new_slices[sid] = SliceState(
+            status="cancelled",
+            gate=None,
+            activated_at=old.activated_at,
+            unlocked_at=old.unlocked_at,
+            completed_at=old.completed_at,
+        )
     new_state = State(
         version=1,
         active_slice=None,

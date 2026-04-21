@@ -225,7 +225,16 @@ def test_cancel_requires_active() -> None:
         )
 
 
-def test_cancel_marks_cancelled() -> None:
+def test_cancel_erases_never_unlocked_slice() -> None:
+    """Cancelling a slice that never reached UNLOCKED removes it from state (KI-5).
+
+    Before v1.0.2, cancel marked the slice cancelled and left it in
+    state.slices. A subsequent pragma freeze on an edited manifest
+    then produced gate_hash_drift because the slice record was
+    pinned to the old manifest_hash but nothing could transition it
+    further. Erasing never-unlocked slices keeps the state machine
+    coherent; slices that did reach UNLOCKED stay as real history.
+    """
     state = State(
         version=1,
         active_slice="M01.S1",
@@ -243,6 +252,32 @@ def test_cancel_marks_cancelled() -> None:
         last_transition=None,
     )
     new_state, audit = cancel(state, now_iso="2026-04-20T14:32:00Z")
+    assert "M01.S1" not in new_state.slices
+    assert new_state.active_slice is None
+    assert new_state.gate is None
+    assert audit["event"] == "slice_cancelled"
+
+
+def test_cancel_keeps_unlocked_slice_as_cancelled() -> None:
+    """Cancel of an UNLOCKED slice keeps the record with status=cancelled (KI-5)."""
+    state = State(
+        version=1,
+        active_slice="M01.S1",
+        gate="UNLOCKED",
+        manifest_hash="sha256:" + "a" * 64,
+        slices={
+            "M01.S1": SliceState(
+                status="in_progress",
+                gate="UNLOCKED",
+                activated_at="2026-04-20T14:30:00Z",
+                unlocked_at="2026-04-20T14:31:00Z",
+                completed_at=None,
+            )
+        },
+        last_transition=None,
+    )
+    new_state, audit = cancel(state, now_iso="2026-04-20T14:32:00Z")
     assert new_state.slices["M01.S1"].status == "cancelled"
+    assert new_state.slices["M01.S1"].unlocked_at == "2026-04-20T14:31:00Z"
     assert new_state.active_slice is None
     assert audit["event"] == "slice_cancelled"
