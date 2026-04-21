@@ -86,6 +86,46 @@ def test_activate_rejects_when_milestone_dep_unshipped(v2_manifest_dict: dict) -
         )
 
 
+def test_activate_force_cancels_prior_active_slice(v2_manifest_dict: dict) -> None:
+    """--force must cancel the prior in-progress slice, not orphan it (BUG-011).
+
+    Before v1.0.2, activating slice B with force=True while slice A was
+    active left slice A as in_progress forever in state.slices. That
+    breaks every downstream check that enumerates slice statuses (e.g.
+    milestone_dep_unshipped). --force should mark the prior slice
+    cancelled with completed_at=now so the state machine stays coherent.
+    """
+    # Two slices in the same milestone so no dep check gets in the way.
+    v2_manifest_dict["milestones"][0]["slices"].append(
+        {"id": "M01.S2", "title": "b", "description": "c", "requirements": []}
+    )
+    manifest = Manifest.model_validate(v2_manifest_dict)
+
+    state_a, _ = activate(
+        state=_state_with_no_active(hash_="sha256:" + "a" * 64),
+        manifest=manifest,
+        slice_id="M01.S1",
+        now_iso="2026-04-20T14:30:00Z",
+    )
+    assert state_a.slices["M01.S1"].status == "in_progress"
+
+    state_b, audit_b = activate(
+        state=state_a,
+        manifest=manifest,
+        slice_id="M01.S2",
+        now_iso="2026-04-20T15:00:00Z",
+        force=True,
+    )
+    # New slice is in_progress and active.
+    assert state_b.active_slice == "M01.S2"
+    assert state_b.slices["M01.S2"].status == "in_progress"
+    # Prior slice is cancelled (not still in_progress).
+    assert state_b.slices["M01.S1"].status == "cancelled"
+    assert state_b.slices["M01.S1"].completed_at == "2026-04-20T15:00:00Z"
+    # Audit reason flags the force-switch for post-hoc narrative.
+    assert "force-switched" in audit_b["reason"]
+
+
 def test_unlock_transition_flips_gate() -> None:
     state = State(
         version=1,

@@ -75,8 +75,25 @@ def _check_milestone_deps_shipped(
                 )
 
 
-def _build_activated_state(state: State, slice_id: str, now_iso: str) -> State:
+def _build_activated_state(
+    state: State, slice_id: str, now_iso: str, *, force_prior: str | None = None
+) -> State:
+    """Construct the post-activation State.
+
+    If ``force_prior`` is set, mark that prior slice as ``cancelled``
+    in the new ``slices`` map so it does not linger as in-progress
+    after a ``--force`` switch (BUG-011).
+    """
     new_slices = dict(state.slices)
+    if force_prior is not None and force_prior in new_slices:
+        prior = new_slices[force_prior]
+        new_slices[force_prior] = SliceState(
+            status="cancelled",
+            gate=None,
+            activated_at=prior.activated_at,
+            unlocked_at=prior.unlocked_at,
+            completed_at=now_iso,
+        )
     new_slices[slice_id] = SliceState(
         status="in_progress",
         gate="LOCKED",
@@ -113,13 +130,20 @@ def activate(
     if state.active_slice is not None and not force:
         _reject_already_active(state.active_slice, slice_id)
     _check_milestone_deps_shipped(state, manifest, milestone_id, slice_id)
-    new_state = _build_activated_state(state, slice_id, now_iso)
+    # BUG-011: --force must cancel the prior active slice rather than
+    # leaving it in_progress-forever in state.slices.
+    force_prior = state.active_slice if (force and state.active_slice is not None) else None
+    new_state = _build_activated_state(state, slice_id, now_iso, force_prior=force_prior)
     audit = {
         "event": "slice_activated",
         "slice": slice_id,
         "from_state": None,
         "to_state": "LOCKED",
-        "reason": f"pragma slice activate {slice_id}",
+        "reason": (
+            f"pragma slice activate {slice_id} (force-switched from {force_prior!r})"
+            if force_prior is not None
+            else f"pragma slice activate {slice_id}"
+        ),
     }
     return new_state, audit
 
