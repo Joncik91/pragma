@@ -114,9 +114,9 @@ def test_emergency_unlock_refuses_healthy_repo(tmp_path: Path) -> None:
         "--reason",
         "unnecessary but still",
     )
-    assert (
-        result.returncode == 1
-    ), f"rc={result.returncode} stderr={result.stderr!r} stdout={result.stdout!r}"
+    assert result.returncode == 1, (
+        f"rc={result.returncode} stderr={result.stderr!r} stdout={result.stdout!r}"
+    )
     payload = json.loads(result.stdout)
     assert payload["error"] == "emergency_unlock_refused"
     assert payload["context"]["active_slice"] is None
