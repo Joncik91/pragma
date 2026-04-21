@@ -152,6 +152,7 @@ def verify_all(
         _check_manifest(cwd)
         _check_gate(cwd)
         _check_integrity(cwd)
+        _check_discipline(cwd)
         _check_commits(cwd)
     except PragmaError as exc:
         typer.echo(exc.to_json())
@@ -160,7 +161,7 @@ def verify_all(
         json.dumps(
             {
                 "ok": True,
-                "checks": ["manifest", "gate", "integrity", "commits"],
+                "checks": ["manifest", "gate", "integrity", "discipline", "commits"],
             },
             sort_keys=True,
             separators=(",", ":"),
