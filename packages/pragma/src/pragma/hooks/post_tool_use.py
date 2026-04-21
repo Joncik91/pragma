@@ -10,10 +10,25 @@ from pragma.core.audit import append_audit
 from pragma.core.discipline import check_file
 
 
-def _load_source_root(project_dir: Path) -> str:
+def _load_source_root(project_dir: Path) -> str | None:
+    """Best-effort read of project.source_root from pragma.yaml.
+
+    Returns None if the manifest is absent, unreadable, not valid YAML,
+    or missing the expected keys. The hook then degrades to "allow,
+    no discipline check" rather than raising through the dispatcher
+    (which would log a spurious hook_crash audit entry). Only the
+    specific read-path exceptions are caught; any other surprise still
+    bubbles.
+    """
     manifest_path = project_dir / "pragma.yaml"
-    raw = yaml.safe_load(manifest_path.read_text(encoding="utf-8"))
-    return str(raw["project"]["source_root"])
+    try:
+        raw = yaml.safe_load(manifest_path.read_text(encoding="utf-8"))
+    except (OSError, yaml.YAMLError):
+        return None
+    try:
+        return str(raw["project"]["source_root"])
+    except (TypeError, KeyError):
+        return None
 
 
 @trace("REQ-004")
@@ -24,7 +39,11 @@ def handle(event_input: dict[str, Any], cwd: Path) -> dict[str, Any]:
     if not file_path.endswith(".py"):
         return {"continue": True}
 
-    source_root = _load_source_root(cwd).rstrip("/") + "/"
+    source_root_raw = _load_source_root(cwd)
+    if source_root_raw is None:
+        # No manifest (or unreadable) - nothing to check against.
+        return {"continue": True}
+    source_root = source_root_raw.rstrip("/") + "/"
 
     if not file_path.startswith(source_root) and not file_path.lstrip("./").startswith(source_root):
         return {"continue": True}

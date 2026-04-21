@@ -26,6 +26,34 @@ def _project(tmp_path: Path) -> Path:
     return tmp_path
 
 
+def test_allow_when_manifest_missing(tmp_path: Path) -> None:
+    """BUG-001: hook must degrade gracefully when pragma.yaml is absent.
+
+    Before v1.0.2, _load_source_root raised FileNotFoundError if the
+    hook fired in a repo without a manifest (e.g. during initial
+    scaffolding). The dispatcher's broad except logged a spurious
+    hook_crash audit entry and allowed the write anyway - a noisy
+    false positive. The hook should simply degrade to "allow, nothing
+    to check" cleanly.
+    """
+    # No pragma.yaml created.
+    out = handle(
+        {"tool_input": {"file_path": "src/anywhere.py"}},
+        tmp_path,
+    )
+    assert out == {"continue": True}
+
+
+def test_allow_when_manifest_malformed(tmp_path: Path) -> None:
+    """Same degrade path when the manifest exists but is not valid YAML."""
+    (tmp_path / "pragma.yaml").write_text("project: [unclosed", encoding="utf-8")
+    out = handle(
+        {"tool_input": {"file_path": "src/anywhere.py"}},
+        tmp_path,
+    )
+    assert out == {"continue": True}
+
+
 def test_allow_clean_file(tmp_path: Path) -> None:
     p = _project(tmp_path)
     src = p / "src" / "ok.py"
