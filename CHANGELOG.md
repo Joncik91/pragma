@@ -58,12 +58,49 @@ because the collector can finally see the test suite.
   proper venv, so correctness isn't lost. Fixing that properly is
   v1.0.2 work.
 
-### Known issues (parked for v1.0.2)
+### Known issues (parked for v1.0.2 — the "insider-knowledge" slice)
 
-- `slice activate` mutates state *before* checking `milestone_dep_unshipped`,
-  so a failed activation leaves a phantom locked slice that has to be
-  `slice cancel`ed. Noted while trying to activate `M01.S5` — should
-  be swapped to check deps first, then mutate.
+v1.0.1 patches three ambient bugs but does not close the larger gap
+surfaced during this dogfood session: **several real problems still
+require tribal knowledge to work around**, which defeats the "non-
+coder trusts the commit" premise. Each item below is something a
+first-time Pragma user would hit and not know how to resolve without
+reading this changelog.
+
+**PIL aggregation**
+
+- `.pragma/spans/test-run.jsonl` is overwritten on each `pytest` run
+  (`write_text`, not append), so any project with more than one test
+  path (pragma + pragma-sdk, monorepo packages, split test targets,
+  pre-commit's pytest hook + a second CI pytest invocation) sees PIL
+  collapse to 0/N after the "wrong" suite runs last. The v1.0.1 fix
+  for this repo was to run the span-producing suite **last** — that
+  knowledge should not live in the user's head. Honest fix: append
+  mode with per-session isolation, or a persistent span store that
+  merges across runs. Aggregator then reads all files.
+
+**Slice lifecycle hygiene**
+
+- `slice activate` mutates state **before** checking
+  `milestone_dep_unshipped`, so a failed activation leaves a phantom
+  LOCKED slice that has to be `slice cancel`ed. Should be swapped to
+  check deps first, then mutate. (Noted in this session while trying
+  to activate `M01.S5`.)
+- `slice cancel` marks a never-unlocked slice as `cancelled` rather
+  than erasing it, so the next `freeze` changes the manifest hash and
+  `verify all` then errors with `gate_hash_drift`. The only clean
+  recovery is `rm .pragma/state.json`, which contradicts "state is
+  authoritative" as a user-facing promise. `doctor --emergency-unlock`
+  should handle gate-hash-drift-after-freeze, not only bricked-LOCKED.
+- `.pragma/audit.jsonl` is a tracked file, so any mistaken
+  `slice activate` before the user's first intentional slice
+  produces audit-log entries that will be committed as part of the
+  next real slice unless the user manually removes them. Fix: don't
+  log until the first intentional activation, or have `doctor`
+  detect-and-offer-to-clean cancelled-only preambles.
+
+**Freeze + migration edge cases**
+
 - Freezing a manifest with a REQ missing `milestone:` or `slice:`
   fields succeeds silently rather than emitting the promised
   `requirement_unassigned` error. The pydantic model makes those
@@ -73,6 +110,21 @@ because the collector can finally see the test suite.
   dependency of `M01`, so `M01` slices can't be activated without
   manually editing `M01.depends_on`. Either drop the auto-dep or mark
   `M00` as pre-shipped on migration.
+
+**Safety battery template**
+
+- `pragma init --brownfield` writes a `.pre-commit-config.yaml` with
+  six hooks (`mypy`, `semgrep`, `pip-audit`, `deptry`, `gitleaks`,
+  `ruff`) that do not all work out-of-the-box in common sandbox / CI
+  environments. Specifically: `mypy`'s pre-commit env lacks
+  `pragma-sdk` as an editable dep; `semgrep`'s pinned env ships a
+  `pkg_resources` import that fails on Python 3.13; `deptry`'s
+  environment doesn't install the `deptry` binary reliably. New users
+  hit cryptic failures on their first commit with no guidance on which
+  to `SKIP=` vs which is a real signal. Fix: the `pragma init` battery
+  template should only include hooks that work in the default venv/CI
+  setup, with opt-in flags for the rest — or ship a versioned
+  `.pragma/skip-known-broken.env` that pre-push sources automatically.
 
 ## [1.0.0] — 2026-04-21
 
