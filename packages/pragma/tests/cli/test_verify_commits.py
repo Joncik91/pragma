@@ -41,7 +41,28 @@ def test_verify_commits_all_conformant(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.chdir(tmp_path)
     r = runner.invoke(app, ["verify", "commits"])
     assert r.exit_code == 0, r.output
-    assert json.loads(r.output)["ok"] is True
+    payload = json.loads(r.output)
+    assert payload["ok"] is True
+    # BUG-008: success payload surfaces commits_checked + the range spec.
+    assert "commits_checked" in payload
+    assert "range" in payload
+
+
+def test_verify_commits_reports_zero_when_base_equals_head(monkeypatch, tmp_path: Path) -> None:
+    """BUG-008: when --base matches HEAD, range is empty and count is 0.
+
+    Before v1.0.2, the payload only said {ok: true, check: commits} -
+    the user couldn't tell whether 0 commits were validated (vacuous
+    success) or many. Surfacing commits_checked lets CI / doctor
+    notice vacuous runs and warn.
+    """
+    _init_repo(tmp_path)
+    monkeypatch.chdir(tmp_path)
+    r = runner.invoke(app, ["verify", "commits", "--base", "feature"])
+    assert r.exit_code == 0, r.output
+    payload = json.loads(r.output)
+    assert payload["ok"] is True
+    assert payload["commits_checked"] == 0
 
 
 def test_verify_commits_flags_bad_shape(monkeypatch, tmp_path: Path) -> None:

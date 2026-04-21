@@ -122,12 +122,15 @@ def _git_range_spec(cwd: Path, base: str) -> str:
     return f"{base}..HEAD"
 
 
-def _collect_bad_commits(commit_log: str) -> list[dict[str, object]]:
+def _partition_commits(commit_log: str) -> tuple[int, list[dict[str, object]]]:
+    """Return (total_commits_checked, bad_commits)."""
+    total = 0
     bad: list[dict[str, object]] = []
     for entry in commit_log.split("\x1e"):
         entry = entry.strip()
         if not entry:
             continue
+        total += 1
         sha, _, message = entry.partition("\x00")
         errors = validate_commit_shape(message)
         if errors:
@@ -138,7 +141,7 @@ def _collect_bad_commits(commit_log: str) -> list[dict[str, object]]:
                     "remediation": [e.remediation for e in errors],
                 }
             )
-    return bad
+    return total, bad
 
 
 def _check_commits(cwd: Path, base: str = "main") -> dict[str, object]:
@@ -159,7 +162,7 @@ def _check_commits(cwd: Path, base: str = "main") -> dict[str, object]:
             message=f"git log failed: {exc.stderr}",
             remediation="Ensure this is a git repo and base exists.",
         ) from exc
-    bad_commits = _collect_bad_commits(out)
+    total, bad_commits = _partition_commits(out)
     if bad_commits:
         raise CommitShapeViolationError(
             message=f"{len(bad_commits)} commit(s) fail shape validation.",
@@ -167,9 +170,17 @@ def _check_commits(cwd: Path, base: str = "main") -> dict[str, object]:
                 "Amend each commit body to include a WHY: line, a "
                 "Co-Authored-By: trailer, and keep the subject ≤72 chars."
             ),
-            context={"commits": bad_commits},
+            context={"commits": bad_commits, "commits_checked": total},
         )
-    return {"ok": True, "check": "commits"}
+    # BUG-008: surface commits_checked + range_spec so the user sees when
+    # --base silently contracted to HEAD (e.g. when main doesn't exist)
+    # and what range was actually validated.
+    return {
+        "ok": True,
+        "check": "commits",
+        "commits_checked": total,
+        "range": range_spec,
+    }
 
 
 @trace("REQ-001")
