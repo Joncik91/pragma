@@ -75,10 +75,22 @@ def _compute_permutation_status(
 ) -> tuple[PermutationStatus, int, str | None]:
     test_name = expected_test_name(req_id, perm_id)
     junit_status = junit_results.get(test_name)
+    # BUG-007: a span counts for (req_id, perm_id) only when BOTH
+    # attributes match. Matching on logic_id alone let a span emitted
+    # outside a set_permutation block (or inside the wrong one) score
+    # the enclosing permutation as ok, so PIL went green for
+    # implementations the tests had never actually exercised per-
+    # permutation. We still accept "none" as a courtesy for single-
+    # permutation requirements where the author skipped
+    # set_permutation; those get scored ok only when the requirement
+    # has exactly one permutation (and thus no ambiguity).
     matching: list[dict[str, object]] = []
     for s in spans_by_test.get(test_name, []):
         attrs = s.get("attrs")
-        if isinstance(attrs, dict) and attrs.get("pragma.logic_id") == req_id:
+        if not isinstance(attrs, dict) or attrs.get("pragma.logic_id") != req_id:
+            continue
+        span_perm = attrs.get("pragma.permutation")
+        if span_perm == perm_id:
             matching.append(s)
     span_count = len(matching)
 
