@@ -34,14 +34,31 @@ repos:
       - id: check-added-large-files
       - id: check-merge-conflict
 
-  # Opt-in: strict type check. Add your project's runtime deps under
-  # `additional_dependencies` so mypy can import them in its venv.
+  # Opt-in: strict type check.
+  #
+  # Two patterns — uncomment whichever suits your project:
+  #
+  # (a) mirrors-mypy with pre-commit's isolated venv (sandbox-like,
+  # needs additional_dependencies for every runtime import):
   # - repo: https://github.com/pre-commit/mirrors-mypy
   #   rev: v1.14.1
   #   hooks:
   #     - id: mypy
   #       args: [--strict]
   #       additional_dependencies: []
+  #
+  # (b) language: system against your project's .venv (mypy sees real
+  # installed packages; matches what CI does). Recommended when your
+  # own dev venv has mypy installed alongside the project:
+  # - repo: local
+  #   hooks:
+  #     - id: mypy-local
+  #       name: mypy --strict (project venv)
+  #       entry: bash -c 'PY=".venv/bin/python3"; [ -x "$PY" ] || PY=python3; exec "$PY" -m mypy --strict src/'
+  #       language: system
+  #       pass_filenames: false
+  #       always_run: true
+  #       stages: [pre-commit]
   #
   # Opt-in: semgrep rules. Requires a ruleset (see semgrep.dev).
   # Known-broken on Python 3.13 due to pkg_resources removal; re-enable

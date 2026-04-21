@@ -5,6 +5,58 @@ All notable changes to Pragma are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.4] — 2026-04-21
+
+**Release readiness.** Closing the v1.0 series with the gate gaps that
+v1.0.3 + v1.0.3.1 + v1.0.3.2 kept surfacing on CI but not locally.
+The local `pragma verify all` is now actually a mirror of what CI
+enforces: mypy runs on every commit, the version pins can't drift
+across release prep, and a `scripts/pre-release-smoke.sh` script
+exercises the full day-one user flow (including the first
+`git commit` under pre-commit on a fresh-init repo) before any tag
+is cut. After this, v1.1's TypeScript work starts on a clean base.
+
+### Added
+
+- **mypy runs in the project venv** via a new `language: system`
+  pre-commit hook (two entries, one per package). Previously
+  mypy's isolated pre-commit env couldn't import `pragma-sdk` as
+  an editable dep, so the hook got `SKIP=mypy`'d on every local
+  commit — which is why v1.0.3 shipped with 18 mypy-strict errors
+  only CI caught. The `init` scaffold template now documents both
+  patterns (isolated mirrors-mypy vs language:system local) so
+  downstream projects can pick the one that fits their setup.
+- **`scripts/pre-release-smoke.sh`** runs every release's checks:
+  pragma + pragma-sdk pytest, mypy strict on both packages,
+  `pragma verify all`, span-file glob (KI-1 layout), and a full
+  greenfield scaffold → `pre-commit install` → first
+  shape-conformant `git commit` → post-commit `verify all` cycle
+  in a tmp dir. Every bullet corresponds to a real v1.0.x bug CI
+  caught: BUG-013 (first-commit on fresh-init repo), v1.0.3.1
+  (mypy strict), v1.0.3.2 (spans-file glob). Exits 0 iff every
+  check passes.
+- **Version-pin sync test** at
+  `packages/pragma/tests/test_version_sync.py` reads the three
+  places the Pragma version is declared — `__version__` in
+  `__init__.py`, `version` in `pyproject.toml`, and the assertion
+  in `test_cli_doctor` — and fails the commit if any two disagree.
+  Guards against the class of release-prep drift where one file
+  gets bumped and another is forgotten.
+
+### Meta
+
+After v1.0.4 the local pre-commit gate runs: gitleaks, ruff-format,
+ruff-lint, mypy-pragma, mypy-pragma-sdk, pip-audit, check-added-
+large-files, check-merge-conflict, pytest, `pragma verify all`. All
+the same checks CI runs on every push. The release protocol is:
+
+1. bump versions in the three pin sites
+2. `scripts/pre-release-smoke.sh`
+3. git commit + tag + push + gh release
+
+Known issues parked for v1.1 / later: span-file pruning (`.pragma/
+spans/*.jsonl` accumulates forever; doctor should offer cleanup).
+
 ## [1.0.3.2] — 2026-04-21
 
 **CI workflow catches up to v1.0.2's KI-1.** v1.0.3.1 passed mypy strict

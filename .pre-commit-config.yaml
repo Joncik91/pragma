@@ -10,17 +10,28 @@ repos:
       - id: ruff-format
       - id: ruff
 
-  - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.14.1
+  # mypy runs against the project venv (language: system) rather than
+  # pre-commit's isolated env, because the latter can't import pragma-sdk
+  # as an installed editable package. v1.0.4 closes the class of "local
+  # pre-commit SKIP'd mypy, CI caught a type error" by actually running
+  # mypy on every commit. Matches what the CI "test + lint + types +
+  # verify" job does.
+  - repo: local
     hooks:
-      - id: mypy
-        args: [--strict]
-        additional_dependencies:
-          - opentelemetry-api>=1.30
-          - opentelemetry-sdk>=1.30
-          - pytest>=8.0
-          - jinja2>=3.1
-          - types-PyYAML>=6.0
+      - id: mypy-pragma
+        name: mypy --strict (pragma)
+        entry: bash -c 'ROOT="$(git rev-parse --show-toplevel)"; PY="$ROOT/.venv/bin/python3"; [ -x "$PY" ] || PY=python3; cd "$ROOT/packages/pragma" && exec "$PY" -m mypy --strict src/'
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-commit]
+      - id: mypy-pragma-sdk
+        name: mypy --strict (pragma-sdk)
+        entry: bash -c 'ROOT="$(git rev-parse --show-toplevel)"; PY="$ROOT/.venv/bin/python3"; [ -x "$PY" ] || PY=python3; cd "$ROOT/packages/pragma-sdk" && exec "$PY" -m mypy --strict src/'
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-commit]
 
   - repo: https://github.com/returntocorp/semgrep
     rev: v1.99.0
