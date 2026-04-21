@@ -149,3 +149,22 @@ def hook_input_post_tool_use() -> dict:
 @pytest.fixture
 def hook_input_stop() -> dict:
     return {"session_id": "abc123"}
+
+
+@pytest.fixture
+def tmp_project_with_spans(tmp_project_v2: Path) -> Path:
+    """tmp_project after init + seeded spans JSONL + JUnit XML."""
+    project = tmp_project_v2
+    (project / ".pragma" / "spans").mkdir(parents=True, exist_ok=True)
+    (project / ".pragma" / "spans" / "test-run.jsonl").write_text(
+        '{"test_nodeid":"tests/test_req.py::test_req_001_happy","span_name":"REQ-001:do_thing","attrs":{"pragma.logic_id":"REQ-001","pragma.permutation":"happy"},"status":"ok"}\n',
+        encoding="utf-8",
+    )
+    (project / ".pragma" / "pytest-junit.xml").write_text(
+        '<?xml version="1.0"?>'
+        "<testsuites><testsuite>"
+        '<testcase classname="tests.test_req" name="test_req_001_happy"/>'
+        "</testsuite></testsuites>",
+        encoding="utf-8",
+    )
+    return project
