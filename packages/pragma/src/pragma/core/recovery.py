@@ -113,6 +113,62 @@ def _audit_has_lines(audit_path: Path) -> bool:
     return any(line.strip() for line in raw.splitlines())
 
 
+def _diag_no_manifest(manifest_path: Path) -> dict[str, object]:
+    return {
+        "code": "no_manifest",
+        "severity": "fatal",
+        "message": "pragma.yaml is missing from this directory.",
+        "remediation": (
+            "Run `pragma init --brownfield` to scaffold an existing "
+            "repo, or `pragma init --greenfield --name <name>` for a "
+            "new one."
+        ),
+        "context": {"path": str(manifest_path)},
+    }
+
+
+def _diag_no_lock(lock_path: Path) -> dict[str, object]:
+    return {
+        "code": "no_lock",
+        "severity": "fatal",
+        "message": "pragma.yaml exists but pragma.lock.json is missing.",
+        "remediation": "Run `pragma freeze` to regenerate the lock file.",
+        "context": {"path": str(lock_path)},
+    }
+
+
+def _diag_lockfile_unparseable(lock_path: Path) -> dict[str, object]:
+    return {
+        "code": "lockfile_unparseable",
+        "severity": "fatal",
+        "message": "pragma.lock.json is not valid JSON or is missing `manifest_hash`.",
+        "remediation": "Run `pragma freeze` to regenerate.",
+        "context": {"path": str(lock_path)},
+    }
+
+
+def _diag_hash_mismatch(manifest_hash: str | None, lock_hash: str) -> dict[str, object]:
+    unreadable = manifest_hash is None
+    return {
+        "code": "hash_mismatch",
+        "severity": "fatal",
+        "message": (
+            "pragma.yaml could not be parsed / hashed; cannot confirm it matches pragma.lock.json."
+            if unreadable
+            else "pragma.yaml has drifted from pragma.lock.json "
+            "(canonical hash does not match the hash stored in the lock)."
+        ),
+        "remediation": (
+            "Run `pragma freeze` if the manifest edit was intentional, "
+            "otherwise `git restore pragma.yaml pragma.lock.json`."
+        ),
+        "context": {
+            "manifest_hash": "<unreadable>" if unreadable else manifest_hash,
+            "lock_manifest_hash": lock_hash,
+        },
+    }
+
+
 def _check_fatal(
     manifest_path: Path, lock_path: Path
 ) -> tuple[list[dict[str, object]], str | None]:
@@ -124,84 +180,15 @@ def _check_fatal(
     and the caller should return it directly).
     """
     if not manifest_path.exists():
-        return (
-            [
-                {
-                    "code": "no_manifest",
-                    "severity": "fatal",
-                    "message": "pragma.yaml is missing from this directory.",
-                    "remediation": (
-                        "Run `pragma init --brownfield` to scaffold an "
-                        "existing repo, or `pragma init --greenfield "
-                        "--name <name>` for a new one."
-                    ),
-                    "context": {"path": str(manifest_path)},
-                }
-            ],
-            None,
-        )
-
+        return [_diag_no_manifest(manifest_path)], None
     if not lock_path.exists():
-        return (
-            [
-                {
-                    "code": "no_lock",
-                    "severity": "fatal",
-                    "message": ("pragma.yaml exists but pragma.lock.json is missing."),
-                    "remediation": "Run `pragma freeze` to regenerate the lock file.",
-                    "context": {"path": str(lock_path)},
-                }
-            ],
-            None,
-        )
-
+        return [_diag_no_lock(lock_path)], None
     lock_hash = _manifest_hash_from_lock(lock_path)
     if lock_hash is None:
-        return (
-            [
-                {
-                    "code": "lockfile_unparseable",
-                    "severity": "fatal",
-                    "message": (
-                        "pragma.lock.json is not valid JSON or is missing `manifest_hash`."
-                    ),
-                    "remediation": "Run `pragma freeze` to regenerate.",
-                    "context": {"path": str(lock_path)},
-                }
-            ],
-            None,
-        )
-
+        return [_diag_lockfile_unparseable(lock_path)], None
     manifest_hash = _canonical_manifest_hash(manifest_path)
     if manifest_hash is None or manifest_hash != lock_hash:
-        unreadable = manifest_hash is None
-        return (
-            [
-                {
-                    "code": "hash_mismatch",
-                    "severity": "fatal",
-                    "message": (
-                        "pragma.yaml could not be parsed / hashed; cannot "
-                        "confirm it matches pragma.lock.json."
-                        if unreadable
-                        else "pragma.yaml has drifted from pragma.lock.json "
-                        "(canonical hash does not match the hash stored "
-                        "in the lock)."
-                    ),
-                    "remediation": (
-                        "Run `pragma freeze` if the manifest edit was "
-                        "intentional, otherwise `git restore pragma.yaml "
-                        "pragma.lock.json`."
-                    ),
-                    "context": {
-                        "manifest_hash": "<unreadable>" if unreadable else manifest_hash,
-                        "lock_manifest_hash": lock_hash,
-                    },
-                }
-            ],
-            None,
-        )
-
+        return [_diag_hash_mismatch(manifest_hash, lock_hash)], None
     return [], lock_hash
 
 
