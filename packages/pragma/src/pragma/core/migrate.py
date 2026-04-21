@@ -39,6 +39,13 @@ def migrate_v1_to_v2(manifest: dict[str, Any]) -> dict[str, Any]:
     requirements = out.get("requirements", [])
     req_ids = [r["id"] for r in requirements]
 
+    # KI-3: M00 is a historical wrapper for pre-v0.2 flat requirements,
+    # not a real project phase. It MUST stay depends_on: [] and callers
+    # MUST NOT add M00 as a dependency of their own milestones - doing
+    # so bricks activation of every downstream slice because the state
+    # machine can never observe M00 as "shipped" (there's no point in
+    # ceremonially activating + unlocking + completing a backfill slice
+    # to clear a synthetic dep).
     out["milestones"] = [
         {
             "id": _IMPLICIT_MILESTONE_ID,

@@ -293,8 +293,7 @@ milestones:
 - id: M01
   title: Gate and slice
   description: v0.2 gate state machine, slice lifecycle, unlock.
-  depends_on:
-  - M00
+  depends_on: []
   slices:
   - id: M01.S1
     title: Slice gate

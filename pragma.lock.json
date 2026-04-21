@@ -1,7 +1,7 @@
 {
   "version": "1",
-  "manifest_hash": "sha256:ae2013410174ffc302843bba04c96e90d0fc357ef365d1e501ab8cc4d68a74b3",
-  "generated_at": "2026-04-21T16:06:37Z",
+  "manifest_hash": "sha256:0ead10ca8d6ce0a3defccee907ed9415f3a392eaadac058d826c6d579a03c729",
+  "generated_at": "2026-04-21T17:20:34Z",
   "manifest": {
     "version": "2",
     "project": {
@@ -34,9 +34,7 @@
         "id": "M01",
         "title": "Gate and slice",
         "description": "v0.2 gate state machine, slice lifecycle, unlock.",
-        "depends_on": [
-          "M00"
-        ],
+        "depends_on": [],
         "slices": [
           {
             "id": "M01.S1",
