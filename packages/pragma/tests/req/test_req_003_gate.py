@@ -1,8 +1,10 @@
 """Dogfood: one function per REQ-003 permutation that pins v0.2 behaviour.
 
-These are intentionally thin wrappers over the unit tests added in
-tasks 4-14. Their purpose is to satisfy the unlock convention and
-document the manifest's claims in executable form.
+Each assertion is wrapped in a ``@trace("REQ-003")`` helper and the
+test body enters ``set_permutation(...)`` so PIL scores the permutation
+as ``ok`` rather than ``mocked`` (KI-12). The spans carry both
+``pragma.logic_id=REQ-003`` and ``pragma.permutation=<id>``; the v1.0.2
+aggregator requires both to match.
 """
 
 from __future__ import annotations
@@ -11,6 +13,7 @@ import json
 from pathlib import Path
 
 import pytest
+from pragma_sdk import set_permutation, trace
 from typer.testing import CliRunner
 
 from pragma.__main__ import app
@@ -28,21 +31,24 @@ def active_demo(monkeypatch: pytest.MonkeyPatch, tmp_project_v2: Path) -> Path:
     return tmp_project_v2
 
 
-def test_req_003_activate_locks(active_demo: Path) -> None:
-    state = read_state(active_demo / ".pragma")
+@trace("REQ-003")
+def _assert_activate_locks(project: Path) -> None:
+    state = read_state(project / ".pragma")
     assert state.gate == "LOCKED"
-    audit = read_audit(active_demo / ".pragma")
+    audit = read_audit(project / ".pragma")
     assert audit[-1]["event"] == "slice_activated"
 
 
-def test_req_003_unlock_requires_red_tests(active_demo: Path) -> None:
+@trace("REQ-003")
+def _assert_unlock_requires_red_tests() -> None:
     r = runner.invoke(app, ["unlock"])
     assert r.exit_code == 1
     assert json.loads(r.output)["error"] == "unlock_missing_tests"
 
 
-def test_req_003_unlock_from_locked_with_red_tests(active_demo: Path) -> None:
-    tdir = active_demo / "tests"
+@trace("REQ-003")
+def _assert_unlock_from_locked_with_red_tests(project: Path) -> None:
+    tdir = project / "tests"
     tdir.mkdir(exist_ok=True)
     (tdir / "test_req_001.py").write_text(
         "def test_req_001_happy(): assert False\ndef test_req_001_sad(): assert False\n",
@@ -51,8 +57,9 @@ def test_req_003_unlock_from_locked_with_red_tests(active_demo: Path) -> None:
     assert runner.invoke(app, ["unlock"]).exit_code == 0
 
 
-def test_req_003_complete_requires_green(active_demo: Path) -> None:
-    tdir = active_demo / "tests"
+@trace("REQ-003")
+def _assert_complete_requires_green(project: Path) -> None:
+    tdir = project / "tests"
     tdir.mkdir(exist_ok=True)
     (tdir / "test_req_001.py").write_text(
         "def test_req_001_happy(): assert False\ndef test_req_001_sad(): assert False\n",
@@ -64,8 +71,9 @@ def test_req_003_complete_requires_green(active_demo: Path) -> None:
     assert json.loads(r.output)["error"] == "complete_tests_failing"
 
 
-def test_req_003_complete_ships_when_green(active_demo: Path) -> None:
-    tdir = active_demo / "tests"
+@trace("REQ-003")
+def _assert_complete_ships_when_green(project: Path) -> None:
+    tdir = project / "tests"
     tdir.mkdir(exist_ok=True)
     (tdir / "test_req_001.py").write_text(
         "def test_req_001_happy(): assert False\ndef test_req_001_sad(): assert False\n",
@@ -80,9 +88,40 @@ def test_req_003_complete_ships_when_green(active_demo: Path) -> None:
     assert r.exit_code == 0, r.output
 
 
-def test_req_003_audit_append_only(active_demo: Path) -> None:
-    before = len(read_audit(active_demo / ".pragma"))
+@trace("REQ-003")
+def _assert_audit_append_only(project: Path) -> None:
+    before = len(read_audit(project / ".pragma"))
     assert runner.invoke(app, ["slice", "cancel"]).exit_code == 0
-    after = read_audit(active_demo / ".pragma")
+    after = read_audit(project / ".pragma")
     assert len(after) == before + 1
     assert after[-1]["event"] == "slice_cancelled"
+
+
+def test_req_003_activate_locks(active_demo: Path) -> None:
+    with set_permutation("activate_locks"):
+        _assert_activate_locks(active_demo)
+
+
+def test_req_003_unlock_requires_red_tests(active_demo: Path) -> None:
+    with set_permutation("unlock_requires_red_tests"):
+        _assert_unlock_requires_red_tests()
+
+
+def test_req_003_unlock_from_locked_with_red_tests(active_demo: Path) -> None:
+    with set_permutation("unlock_from_locked_with_red_tests"):
+        _assert_unlock_from_locked_with_red_tests(active_demo)
+
+
+def test_req_003_complete_requires_green(active_demo: Path) -> None:
+    with set_permutation("complete_requires_green"):
+        _assert_complete_requires_green(active_demo)
+
+
+def test_req_003_complete_ships_when_green(active_demo: Path) -> None:
+    with set_permutation("complete_ships_when_green"):
+        _assert_complete_ships_when_green(active_demo)
+
+
+def test_req_003_audit_append_only(active_demo: Path) -> None:
+    with set_permutation("audit_append_only"):
+        _assert_audit_append_only(active_demo)
