@@ -186,3 +186,18 @@ class NarrativeEmptyStage(PragmaError):
 @dataclass(kw_only=True)
 class NarrativeNoActiveSlice(PragmaError):
     code: str = "narrative_no_active_slice"
+
+
+@dataclass(kw_only=True)
+class ProblemStatementMissing(PragmaError):
+    code: str = "problem_statement_missing"
+
+
+@dataclass(kw_only=True)
+class PlanGreenfieldOnBrownfield(PragmaError):
+    code: str = "plan_greenfield_on_brownfield"
+
+
+@dataclass(kw_only=True)
+class PlanGreenfieldAlreadyPlanned(PragmaError):
+    code: str = "plan_greenfield_already_planned"

@@ -1,0 +1,180 @@
+"""`pragma spec plan-greenfield` — Pattern C bootstrap.
+
+Parses a free-text markdown problem statement, extracts every single-``#``
+heading, and replaces the seed ``REQ-000`` under ``M01.S1`` with one
+placeholder requirement per heading. Deterministic — no LLM, no randomness,
+no wallclock in the YAML payload. Refreezes ``pragma.lock.json`` so the
+lockfile stays in sync with the rewritten manifest.
+
+The LLM (Claude Code) is expected to walk each placeholder and fill in
+real detail via Pattern A (``pragma spec add-requirement``) immediately
+after.
+"""
+
+from __future__ import annotations
+
+import re
+from datetime import UTC, datetime
+from pathlib import Path
+
+import yaml
+from pragma_sdk import trace
+
+from pragma.core.errors import (
+    PlanGreenfieldAlreadyPlanned,
+    PlanGreenfieldOnBrownfield,
+    ProblemStatementMissing,
+)
+from pragma.core.lockfile import write_lock
+from pragma.core.manifest import load_manifest
+from pragma.core.models import Permutation, Requirement
+
+_HEADING_RE = re.compile(r"^#\s+(.+?)\s*$", re.MULTILINE)
+
+
+@trace("REQ-001")
+def plan_greenfield(cwd: Path, problem_path: Path) -> list[str]:
+    """Bootstrap a greenfield manifest from a free-text problem statement.
+
+    Reads ``problem_path`` (a markdown file), extracts its top-level
+    ``# Heading`` sections, and rewrites ``cwd/pragma.yaml`` so M01.S1
+    owns one placeholder requirement per heading (REQ-001..REQ-00N),
+    replacing the seed REQ-000. Refreezes ``pragma.lock.json`` atomically.
+
+    Returns the ordered list of new requirement IDs.
+    """
+    # 1. Validate problem statement exists and has content.
+    if not problem_path.is_absolute():
+        problem_path = (cwd / problem_path).resolve()
+
+    if not problem_path.exists():
+        raise ProblemStatementMissing(
+            message=f"problem statement not found at {problem_path}",
+            remediation=(
+                "Create a markdown file with `# Heading` sections and pass "
+                "--from <path>. Each `#` heading becomes one placeholder "
+                "requirement."
+            ),
+            context={"path": str(problem_path)},
+        )
+
+    text = problem_path.read_text(encoding="utf-8")
+    if not text.strip():
+        raise ProblemStatementMissing(
+            message=f"problem statement at {problem_path} is empty",
+            remediation=(
+                "Write one `# Heading` per area of the product. Each heading "
+                "becomes one placeholder requirement under M01.S1."
+            ),
+            context={"path": str(problem_path)},
+        )
+
+    headings = [m.group(1).strip() for m in _HEADING_RE.finditer(text)]
+    headings = [h for h in headings if h]
+    if not headings:
+        raise ProblemStatementMissing(
+            message=(f"problem statement at {problem_path} contains no `# Heading` " "sections"),
+            remediation=(
+                "Add at least one `# Heading` line. plan-greenfield only "
+                "recognises single-`#` ATX headers; `##` and deeper are ignored."
+            ),
+            context={"path": str(problem_path)},
+        )
+
+    # 2. Load the current manifest. ManifestNotFound fires here if the
+    #    caller never ran `pragma init --greenfield`.
+    yaml_path = cwd / "pragma.yaml"
+    manifest = load_manifest(yaml_path)
+
+    # 3. Greenfield-only.
+    if manifest.project.mode != "greenfield":
+        raise PlanGreenfieldOnBrownfield(
+            message=(
+                "plan-greenfield only applies to greenfield projects; "
+                f"this manifest declares mode={manifest.project.mode!r}."
+            ),
+            remediation=(
+                "Use `pragma spec add-requirement` to author brownfield "
+                "requirements one at a time."
+            ),
+            context={"mode": manifest.project.mode},
+        )
+
+    # 4. Refuse to overwrite a manifest that has already been customised.
+    if not _is_pristine_seed(manifest):
+        raise PlanGreenfieldAlreadyPlanned(
+            message=(
+                "M01.S1 has already been planned (it does not contain exactly "
+                "[REQ-000]); refusing to overwrite."
+            ),
+            remediation=(
+                "plan-greenfield is a one-shot bootstrap. To add more "
+                "requirements, use `pragma spec add-requirement`."
+            ),
+            context={},
+        )
+
+    # 5. Build new Requirement objects (validated via the Pydantic model).
+    new_reqs = [
+        Requirement(
+            id=f"REQ-{i:03d}",
+            title=f"TODO(pragma): {heading}",
+            description=(f"TODO(pragma): derive from '{heading}' section in problem.md."),
+            touches=("src/todo.py",),
+            permutations=(
+                Permutation(
+                    id="happy_path",
+                    description=f"TODO(pragma): specify happy path for {heading}.",
+                    expected="success",
+                ),
+            ),
+            milestone="M01",
+            slice="M01.S1",
+        )
+        for i, heading in enumerate(headings, start=1)
+    ]
+    new_ids = [r.id for r in new_reqs]
+
+    # 6. Round-trip the raw YAML: replace requirements list + slice membership,
+    #    preserving everything else.
+    raw = yaml.safe_load(yaml_path.read_text(encoding="utf-8"))
+    raw["requirements"] = [r.model_dump(mode="json") for r in new_reqs]
+    # milestones[0].slices[0].requirements = new_ids
+    raw["milestones"][0]["slices"][0]["requirements"] = list(new_ids)
+
+    yaml_text = yaml.safe_dump(
+        raw,
+        sort_keys=False,
+        allow_unicode=True,
+        default_flow_style=False,
+        width=100,
+    )
+    yaml_path.write_text(yaml_text, encoding="utf-8")
+
+    # 7. Refreeze — reload the manifest (validates the round-trip) and
+    #    rewrite pragma.lock.json atomically. Wallclock in lock-file is
+    #    acceptable; the determinism contract is on pragma.yaml + hash.
+    refreshed = load_manifest(yaml_path)
+    now_iso = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+    write_lock(cwd / "pragma.lock.json", refreshed, now_iso=now_iso)
+
+    return new_ids
+
+
+def _is_pristine_seed(manifest: object) -> bool:
+    """Return True iff M01.S1 in the manifest contains exactly ``[REQ-000]``.
+
+    Accepts the validated ``Manifest`` type; kept unannotated at the
+    parameter-level to avoid circular-import noise.
+    """
+    milestones = getattr(manifest, "milestones", ())
+    if not milestones:
+        return False
+    first = milestones[0]
+    slices = getattr(first, "slices", ())
+    if not slices:
+        return False
+    first_slice = slices[0]
+    if getattr(first_slice, "id", None) != "M01.S1":
+        return False
+    return tuple(first_slice.requirements) == ("REQ-000",)

@@ -20,6 +20,7 @@ from pragma.core.errors import (
 )
 from pragma.core.manifest import load_manifest
 from pragma.core.models import Permutation, Requirement
+from pragma.core.plan_greenfield import plan_greenfield
 
 spec_app = typer.Typer(
     name="spec",
@@ -74,6 +75,31 @@ def add_requirement(
                     "permutation_count": len(parsed_permutations),
                 },
             },
+            sort_keys=True,
+            separators=(",", ":"),
+        )
+    )
+
+
+@spec_app.command(name="plan-greenfield")
+def plan_greenfield_cmd(
+    from_: Path = typer.Option(..., "--from", help="Path to a markdown problem statement."),
+) -> None:
+    """Bootstrap a greenfield manifest from a free-text problem statement.
+
+    Parses `# Heading` sections and replaces the seed REQ-000 under M01.S1
+    with one placeholder requirement per heading. Deterministic (no LLM).
+    """
+    cwd = Path.cwd()
+    try:
+        new_ids = plan_greenfield(cwd, from_)
+    except PragmaError as exc:
+        typer.echo(exc.to_json())
+        raise typer.Exit(code=1) from None
+
+    typer.echo(
+        json.dumps(
+            {"ok": True, "wrote": "pragma.yaml", "requirements": new_ids},
             sort_keys=True,
             separators=(",", ":"),
         )
