@@ -17,7 +17,11 @@ def test_verify_all_fresh_project(monkeypatch, tmp_project_v2: Path) -> None:
     assert result.exit_code == 0, result.output
     payload = json.loads(result.output)
     assert payload["ok"] is True
-    assert payload["checks"] == ["manifest", "gate", "integrity"]
+    # v1.0.2: verify all now wires in the commits check. Discipline
+    # wiring is held back one slice — enabling it surfaced ~35 pre-
+    # existing violations in Pragma's own source that need a clean-up
+    # slice first (tracked as KI-11).
+    assert payload["checks"] == ["manifest", "gate", "integrity", "commits"]
 
 
 def test_verify_all_fails_fast_on_manifest(monkeypatch, tmp_project_v2: Path) -> None:
