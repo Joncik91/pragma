@@ -1,3 +1,16 @@
+#                              Pragma safety battery
+#
+# The hooks below ship on by default because they work reliably in the
+# default Python 3.11+ / pip venv setup and catch high-value issues
+# (secrets, lint, format, dependency CVEs, large files, merge markers).
+#
+# Commented-out entries at the bottom are OPT-IN: they are excellent
+# checks in principle but need per-project configuration or have
+# known environment-brittleness under pre-commit's isolated venv
+# (mypy needs your project's deps pinned in `additional_dependencies`;
+# semgrep's env imports pkg_resources which fails on 3.13; deptry
+# requires its binary to be present). Uncomment once you're ready to
+# configure them for your project.
 repos:
   - repo: https://github.com/gitleaks/gitleaks
     rev: v8.21.2
@@ -5,37 +18,44 @@ repos:
       - id: gitleaks
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.8.6
+    rev: v0.15.11
     hooks:
       - id: ruff-format
       - id: ruff
-
-  - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.14.1
-    hooks:
-      - id: mypy
-        args: [--strict]
-
-  - repo: https://github.com/returntocorp/semgrep
-    rev: v1.99.0
-    hooks:
-      - id: semgrep
 
   - repo: https://github.com/pypa/pip-audit
     rev: v2.8.0
     hooks:
       - id: pip-audit
 
-  - repo: https://github.com/fpgmaas/deptry
-    rev: 0.22.0
-    hooks:
-      - id: deptry
-
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v5.0.0
     hooks:
       - id: check-added-large-files
       - id: check-merge-conflict
+
+  # Opt-in: strict type check. Add your project's runtime deps under
+  # `additional_dependencies` so mypy can import them in its venv.
+  # - repo: https://github.com/pre-commit/mirrors-mypy
+  #   rev: v1.14.1
+  #   hooks:
+  #     - id: mypy
+  #       args: [--strict]
+  #       additional_dependencies: []
+  #
+  # Opt-in: semgrep rules. Requires a ruleset (see semgrep.dev).
+  # Known-broken on Python 3.13 due to pkg_resources removal; re-enable
+  # when your env pins a 3.13-compatible build.
+  # - repo: https://github.com/returntocorp/semgrep
+  #   rev: v1.99.0
+  #   hooks:
+  #     - id: semgrep
+  #
+  # Opt-in: unused / missing / transitive dep detection.
+  # - repo: https://github.com/fpgmaas/deptry
+  #   rev: 0.22.0
+  #   hooks:
+  #     - id: deptry
 
   - repo: local
     hooks:

@@ -45,11 +45,16 @@ def test_init_force_overwrites_existing_settings(
 
 
 def test_init_pre_commit_config_has_battery(monkeypatch, tmp_path: Path) -> None:
+    """KI-7: default battery contains what works OOTB; mypy/semgrep/deptry are opt-in."""
     monkeypatch.chdir(tmp_path)
     assert runner.invoke(app, ["init", "--brownfield", "--name", "d"]).exit_code == 0
     cfg = (tmp_path / ".pre-commit-config.yaml").read_text()
+    # Active, out-of-the-box hooks.
     assert "gitleaks" in cfg
     assert "ruff" in cfg
-    assert "mypy" in cfg
-    assert "semgrep" in cfg
+    assert "pip-audit" in cfg
     assert "pragma verify all" in cfg
+    # mypy / semgrep / deptry are documented-but-commented-out opt-ins.
+    assert "# - repo: https://github.com/pre-commit/mirrors-mypy" in cfg
+    assert "# - repo: https://github.com/returntocorp/semgrep" in cfg
+    assert "# - repo: https://github.com/fpgmaas/deptry" in cfg
