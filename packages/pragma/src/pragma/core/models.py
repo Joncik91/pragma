@@ -147,47 +147,60 @@ class Manifest(_StrictModel):
                         f"unknown milestone in depends_on: {dep!r} (milestone {m.id!r})"
                     )
         graph = {m.id: set(m.depends_on) for m in self.milestones}
-        WHITE, GRAY, BLACK = 0, 1, 2
-        color = dict.fromkeys(graph, WHITE)
-
-        def visit(node: str) -> None:
-            color[node] = GRAY
-            for nxt in graph[node]:
-                if color[nxt] == GRAY:
-                    raise ValueError(f"milestone dependency cycle through {node!r}")
-                if color[nxt] == WHITE:
-                    visit(nxt)
-            color[node] = BLACK
-
-        for node in graph:
-            if color[node] == WHITE:
-                visit(node)
+        _detect_milestone_cycle(graph)
         return self
 
     @model_validator(mode="after")
     def _check_requirement_references(self) -> Manifest:
-        if self.version == "1":
+        if self.version == "1" or not (self.milestones and self.requirements):
             return self
         milestone_ids = {m.id for m in self.milestones}
         slice_ids = {s.id for m in self.milestones for s in m.slices}
         slice_to_reqs: dict[str, set[str]] = {
             s.id: set(s.requirements) for m in self.milestones for s in m.slices
         }
-
-        if self.milestones and self.requirements:
-            for req in self.requirements:
-                if req.milestone is None:
-                    raise ValueError(f"{req.id}: milestone is required when milestones: is present")
-                if req.slice is None:
-                    raise ValueError(f"{req.id}: slice is required when milestones: is present")
-                if req.milestone not in milestone_ids:
-                    raise ValueError(f"{req.id}: unknown milestone {req.milestone!r}")
-                if req.slice not in slice_ids:
-                    raise ValueError(f"{req.id}: unknown slice {req.slice!r}")
-                if req.id not in slice_to_reqs.get(req.slice, set()):
-                    raise ValueError(
-                        f"{req.id}: slice/requirement mismatch — requirement "
-                        f"declares slice {req.slice!r} but "
-                        f"{req.slice!r}.requirements does not list {req.id!r}"
-                    )
+        for req in self.requirements:
+            _validate_requirement_ref(req, milestone_ids, slice_ids, slice_to_reqs)
         return self
+
+
+def _detect_milestone_cycle(graph: dict[str, set[str]]) -> None:
+    """Three-colour DFS; raises ValueError on any back-edge."""
+    WHITE, GRAY, BLACK = 0, 1, 2
+    color = dict.fromkeys(graph, WHITE)
+
+    def visit(node: str) -> None:
+        color[node] = GRAY
+        for nxt in graph[node]:
+            if color[nxt] == GRAY:
+                raise ValueError(f"milestone dependency cycle through {node!r}")
+            if color[nxt] == WHITE:
+                visit(nxt)
+        color[node] = BLACK
+
+    for node in graph:
+        if color[node] == WHITE:
+            visit(node)
+
+
+def _validate_requirement_ref(
+    req: Requirement,
+    milestone_ids: set[str],
+    slice_ids: set[str],
+    slice_to_reqs: dict[str, set[str]],
+) -> None:
+    """Check one Requirement's milestone/slice/back-reference consistency."""
+    if req.milestone is None:
+        raise ValueError(f"{req.id}: milestone is required when milestones: is present")
+    if req.slice is None:
+        raise ValueError(f"{req.id}: slice is required when milestones: is present")
+    if req.milestone not in milestone_ids:
+        raise ValueError(f"{req.id}: unknown milestone {req.milestone!r}")
+    if req.slice not in slice_ids:
+        raise ValueError(f"{req.id}: unknown slice {req.slice!r}")
+    if req.id not in slice_to_reqs.get(req.slice, set()):
+        raise ValueError(
+            f"{req.id}: slice/requirement mismatch — requirement "
+            f"declares slice {req.slice!r} but "
+            f"{req.slice!r}.requirements does not list {req.id!r}"
+        )
