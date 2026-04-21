@@ -6,7 +6,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import IO, Any
 
-from pragma.core.audit import append_audit
+from pragma.core.audit import append_hook_crash
 from pragma.hooks import post_tool_use, pre_tool_use, session_start, stop
 
 # Module references, not bound .handle attributes, so tests can
@@ -102,16 +102,14 @@ def dispatch(
     try:
         result = _get_handler(event)(event_input, effective_cwd)
     except Exception as exc:
+        # KI-6: route crash forensics to hook-crash.jsonl, not audit.jsonl.
+        # Keeps the real gate-transition log clean of noise from hook
+        # bugs / test runs that exercise crash paths.
         with contextlib.suppress(Exception):
-            append_audit(
+            append_hook_crash(
                 effective_cwd / ".pragma",
-                event="hook_crash",
-                actor="cli",
-                slice=None,
-                from_state=None,
-                to_state=None,
+                event=f"hook_crash:{event}",
                 reason=f"{type(exc).__name__}: {exc}",
-                context={"hook": event},
             )
         _write_json(
             stdout,

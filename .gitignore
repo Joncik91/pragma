@@ -52,3 +52,8 @@ packages/*/.pragma/pytest-junit.xml
 # under packages/*/; the real audit.jsonl lives at repo root only.
 packages/*/.pragma/audit.jsonl
 packages/*/.pragma/claude-settings.hash
+
+# Hook crash forensics (KI-6). Separate from the committed audit.jsonl
+# so a buggy hook or a noisy test run doesn't pollute the real gate log.
+.pragma/hook-crash.jsonl
+packages/*/.pragma/hook-crash.jsonl
