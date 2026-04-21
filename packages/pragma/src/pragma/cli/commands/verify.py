@@ -319,6 +319,48 @@ def verify_commits(
     typer.echo(json.dumps(result, sort_keys=True, separators=(",", ":")))
 
 
+@verify_app.command(name="message")
+def verify_message(
+    message_file: Path = typer.Argument(
+        ...,
+        help="Path to a commit-message file (git passes .git/COMMIT_EDITMSG).",
+    ),
+) -> None:
+    """Validate one draft commit message — wire this into the commit-msg hook."""
+    if not message_file.exists():
+        err = PragmaError(
+            code="commit_msg_not_found",
+            message=f"Commit message file not found: {message_file}",
+            remediation="Check the path; git usually passes .git/COMMIT_EDITMSG.",
+        )
+        typer.echo(err.to_json())
+        raise typer.Exit(code=1)
+
+    raw = message_file.read_text(encoding="utf-8")
+    # Strip scissors line and comment lines — git's commentChar is '#' by default.
+    cleaned = "\n".join(
+        line for line in raw.splitlines() if not line.lstrip().startswith("#")
+    ).strip()
+
+    errors = validate_commit_shape(cleaned)
+    if errors:
+        err = CommitShapeViolationError(
+            message=f"Draft commit message fails shape validation: {len(errors)} issue(s).",
+            remediation=(
+                "Keep the subject ≤72 chars, add a body separated by a blank "
+                "line, include a WHY: paragraph, and a Co-Authored-By: trailer."
+            ),
+            context={
+                "rules": [e.rule for e in errors],
+                "remediations": [e.remediation for e in errors],
+            },
+        )
+        typer.echo(err.to_json())
+        raise typer.Exit(code=1)
+
+    typer.echo(json.dumps({"ok": True, "check": "message"}, sort_keys=True, separators=(",", ":")))
+
+
 @verify_app.command(name="all")
 def verify_all(
     ci: bool = typer.Option(False, "--ci", help="CI strict mode (reserved for v0.4)."),

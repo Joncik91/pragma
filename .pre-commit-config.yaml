@@ -47,7 +47,7 @@ repos:
     hooks:
       - id: pytest
         name: pytest
-        entry: python3 -m pytest
+        entry: bash -c 'python3 -m pytest packages/pragma/tests -q && python3 -m pytest packages/pragma-sdk/tests -q'
         language: system
         pass_filenames: false
         always_run: true
@@ -61,9 +61,23 @@ repos:
         always_run: true
         stages: [pre-commit]
 
+      - id: pragma-verify-commit-msg
+        name: pragma verify message (commit-msg)
+        entry: python3 -m pragma verify message
+        language: system
+        stages: [commit-msg]
+
       - id: pragma-verify-pre-push
         name: pragma verify all (pre-push)
         entry: python3 -m pragma verify all --ci
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-push]
+
+      - id: pragma-verify-commits-pre-push
+        name: pragma verify commits (pre-push range)
+        entry: bash -c 'python3 -m pragma verify commits --base=$(git merge-base HEAD origin/main 2>/dev/null || echo HEAD~1)'
         language: system
         pass_filenames: false
         always_run: true
