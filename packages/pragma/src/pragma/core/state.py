@@ -120,6 +120,49 @@ def read_state(pragma_dir: Path) -> State:
         ) from exc
 
 
+def _acquire_flock(lock_fd: int, lock_path: Path, timeout: float) -> None:
+    """Block until the flock is exclusive or timeout elapses.
+
+    Raises StateLocked on timeout so callers see the typed error payload
+    rather than a raw OSError. Loop is lifted out of write_state() to
+    keep nesting depth within the discipline budget.
+    """
+    deadline = time.monotonic() + timeout
+    while True:
+        try:
+            fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            return
+        except OSError as exc:
+            if exc.errno not in (errno.EAGAIN, errno.EACCES):
+                raise
+            if time.monotonic() >= deadline:
+                raise StateLocked(
+                    message=("Another pragma process is holding the state lock."),
+                    remediation=(
+                        "Wait for the other process to finish, or "
+                        "remove "
+                        f"{lock_path} if you are sure none is running."
+                    ),
+                    context={"path": str(lock_path)},
+                ) from None
+            time.sleep(0.05)
+
+
+def _atomic_write_state_payload(pragma_dir: Path, payload: str) -> None:
+    """Tempfile + fsync + replace under pragma_dir's state filename."""
+    fd, tmp_name = tempfile.mkstemp(prefix=f"{_STATE_FILENAME}.tmp-", dir=str(pragma_dir))
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as fh:
+            fh.write(payload)
+            fh.flush()
+            os.fsync(fh.fileno())
+        os.replace(tmp_name, pragma_dir / _STATE_FILENAME)
+    except Exception:
+        with contextlib.suppress(OSError):
+            os.unlink(tmp_name)
+        raise
+
+
 def write_state(pragma_dir: Path, state: State) -> None:
     """Atomic, flock-guarded write of state.json."""
     pragma_dir.mkdir(parents=True, exist_ok=True)
@@ -128,38 +171,8 @@ def write_state(pragma_dir: Path, state: State) -> None:
 
     lock_fd = os.open(str(lock_path), os.O_CREAT | os.O_RDWR, 0o600)
     try:
-        deadline = time.monotonic() + timeout
-        while True:
-            try:
-                fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
-                break
-            except OSError as exc:
-                if exc.errno not in (errno.EAGAIN, errno.EACCES):
-                    raise
-                if time.monotonic() >= deadline:
-                    raise StateLocked(
-                        message=("Another pragma process is holding the state lock."),
-                        remediation=(
-                            "Wait for the other process to finish, or "
-                            "remove "
-                            f"{lock_path} if you are sure none is running."
-                        ),
-                        context={"path": str(lock_path)},
-                    ) from None
-                time.sleep(0.05)
-
-        payload = state.model_dump_json(indent=2) + "\n"
-        fd, tmp_name = tempfile.mkstemp(prefix=f"{_STATE_FILENAME}.tmp-", dir=str(pragma_dir))
-        try:
-            with os.fdopen(fd, "w", encoding="utf-8") as fh:
-                fh.write(payload)
-                fh.flush()
-                os.fsync(fh.fileno())
-            os.replace(tmp_name, pragma_dir / _STATE_FILENAME)
-        except Exception:
-            with contextlib.suppress(OSError):
-                os.unlink(tmp_name)
-            raise
+        _acquire_flock(lock_fd, lock_path, timeout)
+        _atomic_write_state_payload(pragma_dir, state.model_dump_json(indent=2) + "\n")
     finally:
         with contextlib.suppress(OSError):
             fcntl.flock(lock_fd, fcntl.LOCK_UN)
