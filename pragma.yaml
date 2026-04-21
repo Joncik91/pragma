@@ -225,6 +225,9 @@ requirements:
   - id: hash_stable_after_noop_freeze
     description: pragma freeze on an unchanged pragma.yaml leaves manifest_hash unchanged
     expected: success
+  - id: lockfile_bytes_stable_after_noop_freeze
+    description: pragma freeze on an unchanged pragma.yaml is a complete noop - pragma.lock.json bytes identical before and after
+    expected: success
   milestone: M01
   slice: M01.S4
 - id: REQ-007

@@ -66,6 +66,48 @@ def _assert_hash_stable_after_noop_freeze(tmp_path: Path) -> None:
     )
 
 
+@trace("REQ-006")
+def _assert_lockfile_bytes_stable_after_noop_freeze(tmp_path: Path) -> None:
+    import time
+
+    manifest_src = REPO_ROOT / "pragma.yaml"
+    local_manifest = tmp_path / "pragma.yaml"
+    local_manifest.write_text(manifest_src.read_text(encoding="utf-8"), encoding="utf-8")
+
+    # Seed the lockfile with one freeze, then capture its bytes.
+    subprocess.run(
+        [sys.executable, "-m", "pragma", "freeze"],
+        cwd=str(tmp_path),
+        capture_output=True,
+        check=True,
+    )
+    lock_path = tmp_path / "pragma.lock.json"
+    before_bytes = lock_path.read_bytes()
+
+    # Sleep past the second boundary so any generated_at regeneration would
+    # produce a differing ISO-8601 timestamp; this makes the test actually
+    # catch timestamp drift rather than passing because both freezes happen
+    # in the same wall-clock second.
+    time.sleep(1.1)
+
+    # Second freeze on an unchanged manifest must be a complete noop.
+    # The hash stability test above passes even if generated_at drifts;
+    # this test catches that blind spot by asserting full-bytes equality.
+    subprocess.run(
+        [sys.executable, "-m", "pragma", "freeze"],
+        cwd=str(tmp_path),
+        capture_output=True,
+        check=True,
+    )
+    after_bytes = lock_path.read_bytes()
+
+    assert before_bytes == after_bytes, (
+        "pragma freeze on an unchanged pragma.yaml must leave pragma.lock.json "
+        "byte-identical. A drift here (typically the generated_at timestamp) "
+        "produces diff noise on every freeze and is what Known Issue #8 tracks."
+    )
+
+
 def test_req_006_report_byte_identical() -> None:
     with set_permutation("report_byte_identical"):
         _assert_report_identical()
@@ -74,3 +116,8 @@ def test_req_006_report_byte_identical() -> None:
 def test_req_006_hash_stable_after_noop_freeze(tmp_path: Path) -> None:
     with set_permutation("hash_stable_after_noop_freeze"):
         _assert_hash_stable_after_noop_freeze(tmp_path)
+
+
+def test_req_006_lockfile_bytes_stable_after_noop_freeze(tmp_path: Path) -> None:
+    with set_permutation("lockfile_bytes_stable_after_noop_freeze"):
+        _assert_lockfile_bytes_stable_after_noop_freeze(tmp_path)

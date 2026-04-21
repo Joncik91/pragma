@@ -36,15 +36,35 @@ class LockFile(BaseModel):
 
 @trace("REQ-002")
 def write_lock(path: Path, manifest: Manifest, *, now_iso: str) -> None:
-    """Atomically write pragma.lock.json.
+    """Atomically write pragma.lock.json, skipping write on hash match.
 
     `now_iso` is injected rather than read from wall-clock so tests are
     deterministic and so downstream determinism guarantees (spec §7.4)
     are easy to satisfy later by passing the commit timestamp.
+
+    REQ-006 promises that freeze on an unchanged manifest is a noop at
+    the lockfile-bytes level. We enforce that here: if an existing
+    lockfile already records the same manifest_hash we'd write, we
+    leave the file untouched rather than re-emitting a fresh
+    generated_at and producing diff noise. The lockfile is the single
+    atomic output of freeze, so this is the correct place to enforce
+    idempotency.
     """
+    new_hash = hash_manifest(manifest)
+
+    # If the lockfile already exists and already records this hash,
+    # freeze is a noop - leave the file alone. Parse defensively: if
+    # the existing file is corrupt, we fall through to rewriting it.
+    if path.exists():
+        with contextlib.suppress(OSError, ValueError, ValidationError):
+            existing_raw = json.loads(path.read_text(encoding="utf-8"))
+            existing = LockFile.model_validate(existing_raw)
+            if existing.manifest_hash == new_hash:
+                return
+
     lock = LockFile(
         version="1",
-        manifest_hash=hash_manifest(manifest),
+        manifest_hash=new_hash,
         generated_at=now_iso,
         manifest=manifest,
     )

@@ -1,7 +1,7 @@
 {
   "version": "1",
-  "manifest_hash": "sha256:ff8c58d78d3626bcfc19d8991481e1aad93d8f4359dbd52406d07c7aab076f8a",
-  "generated_at": "2026-04-21T14:37:44Z",
+  "manifest_hash": "sha256:ae2013410174ffc302843bba04c96e90d0fc357ef365d1e501ab8cc4d68a74b3",
+  "generated_at": "2026-04-21T16:06:37Z",
   "manifest": {
     "version": "2",
     "project": {
@@ -354,6 +354,11 @@
           {
             "id": "hash_stable_after_noop_freeze",
             "description": "pragma freeze on an unchanged pragma.yaml leaves manifest_hash unchanged",
+            "expected": "success"
+          },
+          {
+            "id": "lockfile_bytes_stable_after_noop_freeze",
+            "description": "pragma freeze on an unchanged pragma.yaml is a complete noop - pragma.lock.json bytes identical before and after",
             "expected": "success"
           }
         ],
