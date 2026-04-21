@@ -65,6 +65,15 @@ def test_greenfield_refuses_both_modes(tmp_path: Path) -> None:
     assert "both_modes" in result.stdout
 
 
+def test_greenfield_refuses_existing_manifest(tmp_path: Path) -> None:
+    (tmp_path / "pragma.yaml").write_text("version: '2'\n", encoding="utf-8")
+
+    result = _run(tmp_path, "--greenfield", "--name", "demo", "--language", "python")
+
+    assert result.returncode != 0
+    assert "already_initialised" in result.stdout
+
+
 def test_greenfield_emits_ok_json(tmp_path: Path) -> None:
     result = _run(tmp_path, "--greenfield", "--name", "demo", "--language", "python")
 
