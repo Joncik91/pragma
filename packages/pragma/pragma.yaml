@@ -1,0 +1,182 @@
+version: '2'
+project:
+  name: pragma
+  mode: brownfield
+  language: python
+  source_root: src/
+  tests_root: tests/
+requirements:
+- id: REQ-001
+  title: CLI emits stable JSON on success and failure
+  description: Every pragma subcommand exits zero with {ok:true,...} JSON on success and non-zero with
+    {error:'code',message,remediation,context} JSON on failure, so Claude Code can branch on either path.
+  touches:
+  - src/pragma/cli/commands/init.py
+  - src/pragma/cli/commands/spec.py
+  - src/pragma/cli/commands/freeze.py
+  - src/pragma/cli/commands/verify.py
+  - src/pragma/cli/commands/doctor.py
+  permutations:
+  - id: init_success
+    description: init emits {ok:true,created:[...]}
+    expected: success
+  - id: init_duplicate
+    description: init on existing project emits already_initialised
+    expected: reject
+  - id: freeze_success
+    description: freeze writes lock with sha256 hash
+    expected: success
+  - id: freeze_missing
+    description: freeze without manifest emits manifest_not_found
+    expected: reject
+  - id: verify_success
+    description: verify manifest passes on fresh freeze
+    expected: success
+  - id: verify_mismatch
+    description: verify fails on stale lock with hash_mismatch
+    expected: reject
+  - id: doctor_always_zero
+    description: doctor always exits zero
+    expected: success
+  milestone: M00
+  slice: M00.S0
+- id: REQ-002
+  title: Manifest and lockfile round-trip deterministically
+  description: The sha256 hash of pragma.yaml is stable across loads and changes only when the canonical
+    YAML content changes. Lockfile writes are atomic (tempfile + rename) so an interrupted freeze never
+    leaves a half-written lock.
+  touches:
+  - src/pragma/core/manifest.py
+  - src/pragma/core/lockfile.py
+  permutations:
+  - id: hash_stable
+    description: hash_manifest is stable across two loads of the same yaml
+    expected: success
+  - id: hash_changes
+    description: hash_manifest changes when yaml content changes
+    expected: success
+  - id: write_atomic
+    description: write_lock leaves no .tmp files on success
+    expected: success
+  - id: read_malformed
+    description: read_lock on invalid json raises manifest_schema_error
+    expected: reject
+  milestone: M00
+  slice: M00.S0
+- id: REQ-003
+  title: Slice gate enforces test-first discipline
+  description: |
+    Once a slice is activated the gate is LOCKED. `pragma unlock` flips
+    the gate only when every permutation of every requirement in the
+    active slice has a matching failing test per the naming convention
+    `test_req_<req_id>_<permutation_id>`. `pragma slice complete`
+    requires all slice tests to be green. `audit.jsonl` records every
+    transition.
+  touches:
+  - src/pragma/core/state.py
+  - src/pragma/core/audit.py
+  - src/pragma/core/gate.py
+  - src/pragma/core/tests_discovery.py
+  - src/pragma/cli/commands/slice.py
+  - src/pragma/cli/commands/unlock.py
+  permutations:
+  - id: activate_locks
+    description: slice activate transitions inactive -> LOCKED and writes audit
+    expected: success
+  - id: unlock_requires_red_tests
+    description: unlock fails when required tests are absent or passing
+    expected: reject
+  - id: unlock_from_locked_with_red_tests
+    description: unlock succeeds when every permutation has a red test
+    expected: success
+  - id: complete_requires_green
+    description: slice complete fails if any required test is red
+    expected: reject
+  - id: complete_ships_when_green
+    description: slice complete transitions UNLOCKED -> shipped when tests pass
+    expected: success
+  - id: audit_append_only
+    description: every transition appends one line to audit.jsonl
+    expected: success
+  milestone: M01
+  slice: M01.S1
+- id: REQ-004
+  title: "Claude Code hooks and pre-commit battery enforce v0.3 contract"
+  description: |
+    SessionStart emits additionalContext with gate state (≤9500 chars).
+    PreToolUse denies src/ edits when LOCKED and denies non-touches
+    edits when UNLOCKED. PostToolUse blocks on discipline violations.
+    Stop runs `pragma verify all` and blocks on failure. `pragma hooks
+    seal/verify/show` manage the integrity hash. `pragma verify
+    discipline/commits/integrity` each have one exit code and one
+    remediation. `pragma init --brownfield` writes .claude/settings.json
+    + hash + expanded .pre-commit-config.yaml.
+  touches:
+    - src/pragma/core/discipline.py
+    - src/pragma/core/integrity.py
+    - src/pragma/core/commits.py
+    - src/pragma/hooks/session_start.py
+    - src/pragma/hooks/pre_tool_use.py
+    - src/pragma/hooks/post_tool_use.py
+    - src/pragma/hooks/stop.py
+    - src/pragma/hooks/dispatcher.py
+    - src/pragma/cli/commands/hook.py
+    - src/pragma/cli/commands/hooks.py
+    - src/pragma/cli/commands/verify.py
+    - src/pragma/cli/commands/init.py
+    - src/pragma/templates/claude-settings.json.tpl
+    - src/pragma/templates/pre-commit-config.yaml.tpl
+  permutations:
+    - id: session_start_emits_context
+      description: "SessionStart returns additionalContext with gate state"
+      expected: success
+    - id: pre_tool_use_denies_locked_src
+      description: "PreToolUse denies src/ edit when gate LOCKED"
+      expected: reject
+    - id: pre_tool_use_allows_test_files
+      description: "PreToolUse allows edits outside source_root"
+      expected: success
+    - id: post_tool_use_blocks_complexity
+      description: "PostToolUse blocks on cyclomatic complexity > 10"
+      expected: reject
+    - id: stop_blocks_on_verify_fail
+      description: "Stop blocks turn-end when verify all fails"
+      expected: reject
+    - id: hooks_seal_writes_hash
+      description: "pragma hooks seal writes .pragma/claude-settings.hash"
+      expected: success
+    - id: verify_integrity_rejects_drift
+      description: "pragma verify integrity exits 1 on hash mismatch"
+      expected: reject
+    - id: init_writes_v03_artifacts
+      description: "pragma init --brownfield writes claude settings and hash"
+      expected: success
+  milestone: M01
+  slice: M01.S2
+milestones:
+- id: M00
+  title: Implicit brownfield milestone
+  description: Auto-created by `pragma migrate` to wrap pre-v0.2 flat requirements. Safe to rename when
+    the project grows real milestones.
+  depends_on: []
+  slices:
+  - id: M00.S0
+    title: Implicit brownfield slice
+    description: Auto-created by `pragma migrate`. All pre-v0.2 requirements live here until the user
+      carves real slices.
+    requirements:
+    - REQ-001
+    - REQ-002
+- id: M01
+  title: Gate and slice
+  description: v0.2 gate state machine, slice lifecycle, unlock.
+  depends_on: [M00]
+  slices:
+  - id: M01.S1
+    title: Slice gate
+    description: activate, unlock with red tests, complete.
+    requirements: [REQ-003]
+  - id: M01.S2
+    title: "v0.3 hooks and battery"
+    description: "Claude Code hooks + safety battery + integrity seal."
+    requirements: [REQ-004]

@@ -1,0 +1,25 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "pragma-sdk"
+version = "0.4.0"
+description = "Pragma runtime: @trace decorator, set_permutation, pytest plugin"
+readme = "README.md"
+requires-python = ">=3.11"
+license = "Apache-2.0"
+authors = [{ name = "Pragma contributors" }]
+dependencies = [
+  "opentelemetry-api>=1.30",
+  "opentelemetry-sdk>=1.30",
+]
+
+[project.entry-points.pytest11]
+pragma_sdk = "pragma_sdk.pytest_plugin"
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/pragma_sdk"]

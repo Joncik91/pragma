@@ -7,7 +7,7 @@ from typing import Any
 
 
 def handle(event_input: dict[str, Any], cwd: Path) -> dict[str, Any]:
-    proc = subprocess.run(
+    proc = subprocess.run(  # noqa: S603
         [sys.executable, "-m", "pragma", "verify", "all"],
         cwd=str(cwd),
         capture_output=True,

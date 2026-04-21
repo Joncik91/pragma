@@ -38,7 +38,7 @@ def _walk_tree_violations(
 ) -> list[DisciplineViolation]:
     violations: list[DisciplineViolation] = []
     for node in ast.walk(tree):
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+        if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef):
             violations.extend(_check_function(node, path))
         elif isinstance(node, ast.ClassDef):
             violations.extend(_check_class(node, path, subclass_map))
@@ -190,7 +190,7 @@ def _is_single_method_util(node: ast.ClassDef) -> bool:
     methods = [
         n
         for n in node.body
-        if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef)) and n.name != "__init__"
+        if isinstance(n, ast.FunctionDef | ast.AsyncFunctionDef) and n.name != "__init__"
     ]
     return len(methods) == 1 and len(node.body) <= 3
 
@@ -200,21 +200,19 @@ def _cyclomatic(node: ast.AST) -> int:
     for child in ast.walk(node):
         if isinstance(
             child,
-            (
-                ast.If,
-                ast.For,
-                ast.AsyncFor,
-                ast.While,
-                ast.ExceptHandler,
-                ast.With,
-                ast.AsyncWith,
-                ast.Assert,
-            ),
+            ast.If
+            | ast.For
+            | ast.AsyncFor
+            | ast.While
+            | ast.ExceptHandler
+            | ast.With
+            | ast.AsyncWith
+            | ast.Assert,
         ):
             count += 1
         elif isinstance(child, ast.BoolOp):
             count += len(child.values) - 1
-        elif isinstance(child, (ast.ListComp, ast.SetComp, ast.DictComp, ast.GeneratorExp)):
+        elif isinstance(child, ast.ListComp | ast.SetComp | ast.DictComp | ast.GeneratorExp):
             count += 1
     return count
 
@@ -225,15 +223,7 @@ def _max_nesting_depth(node: ast.AST) -> int:
         for child in ast.iter_child_nodes(n):
             if isinstance(
                 child,
-                (
-                    ast.If,
-                    ast.For,
-                    ast.AsyncFor,
-                    ast.While,
-                    ast.With,
-                    ast.AsyncWith,
-                    ast.Try,
-                ),
+                ast.If | ast.For | ast.AsyncFor | ast.While | ast.With | ast.AsyncWith | ast.Try,
             ):
                 max_d = max(max_d, _walk(child, depth + 1))
             else:
