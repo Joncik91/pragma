@@ -15,6 +15,7 @@ import tempfile
 from pathlib import Path
 from typing import Literal
 
+from pragma_sdk import trace
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from pragma.core.errors import LockNotFound, ManifestSchemaError
@@ -33,6 +34,7 @@ class LockFile(BaseModel):
     manifest: Manifest
 
 
+@trace("REQ-002")
 def write_lock(path: Path, manifest: Manifest, *, now_iso: str) -> None:
     """Atomically write pragma.lock.json.
 
@@ -67,6 +69,7 @@ def write_lock(path: Path, manifest: Manifest, *, now_iso: str) -> None:
         raise
 
 
+@trace("REQ-002")
 def read_lock(path: Path) -> LockFile:
     """Load pragma.lock.json, returning a validated LockFile."""
     if not path.exists():

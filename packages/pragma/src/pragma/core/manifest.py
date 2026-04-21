@@ -12,6 +12,7 @@ import json
 from pathlib import Path
 
 import yaml
+from pragma_sdk import trace
 from pydantic import ValidationError
 
 from pragma.core.errors import (
@@ -96,6 +97,7 @@ def canonicalise(manifest: Manifest) -> bytes:
     ).encode("utf-8")
 
 
+@trace("REQ-002")
 def hash_manifest(manifest: Manifest) -> str:
     """Return `sha256:<hex>` over the canonical form."""
     digest = hashlib.sha256(canonicalise(manifest)).hexdigest()
