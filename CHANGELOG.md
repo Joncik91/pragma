@@ -5,6 +5,40 @@ All notable changes to Pragma are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.3] — 2026-04-21
+
+**Same-day hotfix.** v1.0.2's CI failed on the very commit that
+tagged it, because `pragma verify all` erred on a freshly-initialised
+repo that had no commits yet — the exact scenario every new user hits
+on their first `git commit`. The smoke test before v1.0.2 caught
+BUG-012 at the `pragma init` step but stopped there; it didn't
+exercise pre-commit + first commit, so BUG-013 slipped past. Also
+cleared KI-12: Pragma's PIL is now 42/42 ok (previously 28/42 ok +
+14/42 mocked because legacy REQ-003/REQ-004 tests predated the
+`set_permutation` pattern).
+
+### Fixed
+
+- **BUG-013** — `pragma verify all` on a freshly-initialised git repo
+  with no commits yet failed with `git_unavailable`. `_check_commits`
+  now probes `git rev-parse --verify HEAD` after confirming the repo
+  exists; if HEAD doesn't resolve, returns `{ok: true, check: commits,
+  skipped: "no_head"}`. Day-one flow `git init → pragma init → pragma
+  freeze → git commit` now works end-to-end. Caught by CI on v1.0.2's
+  release commit.
+- **KI-12** — Six REQ-003 + eight REQ-004 test bodies wrapped in
+  `@trace(req_id)` helpers called inside `with set_permutation(...)`
+  so PIL scores them `ok` rather than `mocked`. Pragma's own PIL is
+  now a truthful 42/42 ok.
+
+### Added
+
+- Pre-release smoke protocol now goes further than v1.0.2's: fresh
+  `git init`, scaffold, install pre-commit, and run `git commit`
+  under the scaffolded config. The v1.0.2 smoke test stopped at
+  `pragma verify all` and missed BUG-013; keeping the heavier check
+  as part of the release routine going forward.
+
 ## [1.0.2] — 2026-04-21
 
 **The "stop leaking insider knowledge" release.** v1.0.1 published seven
