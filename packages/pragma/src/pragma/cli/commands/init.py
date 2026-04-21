@@ -23,6 +23,77 @@ _FILES_TO_CREATE = {
 _SETTINGS_KEY = "claude-settings.json.tpl"
 
 
+def _emit_error_and_exit(code: str, message: str, remediation: str, exit_code: int) -> None:
+    typer.echo(
+        json.dumps(
+            {"error": code, "message": message, "remediation": remediation, "context": {}},
+            sort_keys=True,
+            separators=(",", ":"),
+        )
+    )
+    raise typer.Exit(code=exit_code)
+
+
+def _validate_init_flags(brownfield: bool, greenfield: bool) -> None:
+    if brownfield and greenfield:
+        _emit_error_and_exit(
+            code="both_modes",
+            message="Pass exactly one of --brownfield / --greenfield.",
+            remediation="Choose --brownfield (existing repo) OR --greenfield (new).",
+            exit_code=2,
+        )
+    if not brownfield and not greenfield:
+        _emit_error_and_exit(
+            code="mode_required",
+            message=(
+                "Pragma init requires an explicit mode: "
+                "--brownfield (existing repo) or --greenfield (new)."
+            ),
+            remediation="Pass --brownfield or --greenfield.",
+            exit_code=2,
+        )
+
+
+def _run_greenfield(cwd: Path, name: str | None, language: str) -> None:
+    if not name:
+        _emit_error_and_exit(
+            code="name_required",
+            message="--name is required for --greenfield.",
+            remediation=("Pass --name <project-name>; the manifest needs an explicit name."),
+            exit_code=1,
+        )
+    from pragma.core.greenfield import scaffold_greenfield
+
+    try:
+        created = scaffold_greenfield(cwd, name=name, language=language)  # type: ignore[arg-type]
+    except PragmaError as exc:
+        typer.echo(exc.to_json())
+        raise typer.Exit(code=1) from None
+    typer.echo(
+        json.dumps(
+            {"ok": True, "created": sorted(created), "project_name": name},
+            sort_keys=True,
+            separators=(",", ":"),
+        )
+    )
+
+
+def _run_brownfield(cwd: Path, name: str | None, force: bool) -> None:
+    project_name = name or cwd.name
+    try:
+        created = _scaffold(cwd, project_name=project_name, force=force)
+    except PragmaError as exc:
+        typer.echo(exc.to_json())
+        raise typer.Exit(code=1) from None
+    typer.echo(
+        json.dumps(
+            {"ok": True, "created": sorted(created), "project_name": project_name},
+            sort_keys=True,
+            separators=(",", ":"),
+        )
+    )
+
+
 def init(
     brownfield: bool = typer.Option(
         False,
@@ -45,147 +116,81 @@ def init(
     force: bool = typer.Option(False, "--force", help="Overwrite existing files if present."),
 ) -> None:
     """Scaffold pragma.yaml, .pre-commit-config.yaml, PRAGMA.md, .claude/settings.json."""
-    if brownfield and greenfield:
-        typer.echo(
-            json.dumps(
-                {
-                    "error": "both_modes",
-                    "message": "Pass exactly one of --brownfield / --greenfield.",
-                    "remediation": "Choose --brownfield (existing repo) OR --greenfield (new).",
-                    "context": {},
-                },
-                sort_keys=True,
-                separators=(",", ":"),
-            )
-        )
-        raise typer.Exit(code=2)
-
-    if not brownfield and not greenfield:
-        typer.echo(
-            json.dumps(
-                {
-                    "error": "mode_required",
-                    "message": (
-                        "Pragma init requires an explicit mode: "
-                        "--brownfield (existing repo) or --greenfield (new)."
-                    ),
-                    "remediation": "Pass --brownfield or --greenfield.",
-                    "context": {},
-                },
-                sort_keys=True,
-                separators=(",", ":"),
-            )
-        )
-        raise typer.Exit(code=2)
-
+    _validate_init_flags(brownfield, greenfield)
     cwd = Path.cwd()
-
     if greenfield:
-        if not name:
-            typer.echo(
-                json.dumps(
-                    {
-                        "error": "name_required",
-                        "message": "--name is required for --greenfield.",
-                        "remediation": (
-                            "Pass --name <project-name>; the manifest needs an explicit name."
-                        ),
-                        "context": {},
-                    },
-                    sort_keys=True,
-                    separators=(",", ":"),
-                )
-            )
-            raise typer.Exit(code=1)
-
-        from pragma.core.greenfield import scaffold_greenfield
-
-        try:
-            created = scaffold_greenfield(cwd, name=name, language=language)
-        except PragmaError as exc:
-            typer.echo(exc.to_json())
-            raise typer.Exit(code=1) from None
-
-        typer.echo(
-            json.dumps(
-                {"ok": True, "created": sorted(created), "project_name": name},
-                sort_keys=True,
-                separators=(",", ":"),
-            )
-        )
+        _run_greenfield(cwd, name, language)
         return
-
-    project_name = name or cwd.name
-
-    try:
-        created = _scaffold(cwd, project_name=project_name, force=force)
-    except PragmaError as exc:
-        typer.echo(exc.to_json())
-        raise typer.Exit(code=1) from None
-
-    typer.echo(
-        json.dumps(
-            {"ok": True, "created": sorted(created), "project_name": project_name},
-            sort_keys=True,
-            separators=(",", ":"),
-        )
-    )
+    _run_brownfield(cwd, name, force)
 
 
-@trace("REQ-001")
-def _scaffold(cwd: Path, *, project_name: str, force: bool) -> list[str]:
+def _refuse_overwrite_if_needed(cwd: Path, force: bool) -> Path:
+    """Check for existing scaffold files; raise AlreadyInitialised if any exist and --force is off.
+
+    Returns the settings-path for downstream phases to hash.
+    """
     plain_dests = {k: v for k, v in _FILES_TO_CREATE.items() if k != _SETTINGS_KEY}
     existing = [dest for dest in plain_dests.values() if (cwd / dest).exists()]
-
     settings_path = cwd / _FILES_TO_CREATE[_SETTINGS_KEY]
     if settings_path.exists() and not force:
         existing.append(str(settings_path.relative_to(cwd)))
-
     if existing and not force:
         raise AlreadyInitialised(
-            message=(f"Refusing to overwrite existing files: {', '.join(sorted(existing))}"),
+            message=f"Refusing to overwrite existing files: {', '.join(sorted(existing))}",
             remediation="Pass --force to overwrite, or remove the files manually.",
             context={"existing": sorted(existing)},
         )
+    return settings_path
 
+
+def _render_scaffold_templates(cwd: Path, project_name: str) -> list[str]:
     env = Environment(
         loader=FileSystemLoader(TEMPLATES_DIR),
         undefined=StrictUndefined,
         keep_trailing_newline=True,
         autoescape=False,  # noqa: S701 — YAML/Markdown templates, not HTML
     )
-
     created: list[str] = []
     for tpl_name, dest_name in _FILES_TO_CREATE.items():
         dest = cwd / dest_name
         dest.parent.mkdir(parents=True, exist_ok=True)
-        tpl = env.get_template(tpl_name)
-        rendered = tpl.render(project_name=project_name)
-        dest.write_text(rendered, encoding="utf-8")
+        dest.write_text(
+            env.get_template(tpl_name).render(project_name=project_name),
+            encoding="utf-8",
+        )
         created.append(dest_name)
+    return created
 
-    pragma_dir = cwd / ".pragma"
-    pragma_dir.mkdir(exist_ok=True)
-    write_stored_hash(pragma_dir, compute_settings_hash(settings_path))
-    created.append(".pragma/claude-settings.hash")
 
-    (pragma_dir / "spans").mkdir(exist_ok=True)
-
+def _append_gitignore_entries(cwd: Path) -> None:
     gitignore_path = cwd / ".gitignore"
     entries_to_add = [".pragma/spans/", ".pragma/pytest-junit.xml"]
     existing_lines: set[str] = set()
     if gitignore_path.exists():
         existing_lines = set(gitignore_path.read_text(encoding="utf-8").splitlines())
     new_entries = [e for e in entries_to_add if e not in existing_lines]
-    if new_entries:
-        with gitignore_path.open("a", encoding="utf-8") as f:
-            if existing_lines and not gitignore_path.read_text(encoding="utf-8").endswith("\n"):
-                f.write("\n")
-            f.write("\n".join(new_entries) + "\n")
+    if not new_entries:
+        return
+    with gitignore_path.open("a", encoding="utf-8") as f:
+        if existing_lines and not gitignore_path.read_text(encoding="utf-8").endswith("\n"):
+            f.write("\n")
+        f.write("\n".join(new_entries) + "\n")
 
+
+@trace("REQ-001")
+def _scaffold(cwd: Path, *, project_name: str, force: bool) -> list[str]:
+    settings_path = _refuse_overwrite_if_needed(cwd, force)
+    created = _render_scaffold_templates(cwd, project_name)
+
+    pragma_dir = cwd / ".pragma"
+    pragma_dir.mkdir(exist_ok=True)
+    write_stored_hash(pragma_dir, compute_settings_hash(settings_path))
+    created.append(".pragma/claude-settings.hash")
+    (pragma_dir / "spans").mkdir(exist_ok=True)
+
+    _append_gitignore_entries(cwd)
     if _wire_pytest_junit(cwd):
         created.append("pytest.ini")
-
     return created
 
 
