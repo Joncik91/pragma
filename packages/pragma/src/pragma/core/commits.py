@@ -3,6 +3,8 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
+from pragma_sdk import trace  # type: ignore[import-not-found]
+
 _SUBJECT_MAX = 72
 
 
@@ -12,6 +14,7 @@ class CommitShapeError:
     remediation: str
 
 
+@trace("REQ-005")  # type: ignore[misc]
 def validate_commit_shape(message: str) -> list[CommitShapeError]:
     errors: list[CommitShapeError] = []
     if not message.strip():

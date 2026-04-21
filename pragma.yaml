@@ -3,8 +3,8 @@ project:
   name: pragma
   mode: brownfield
   language: python
-  source_root: src/
-  tests_root: tests/
+  source_root: packages/pragma/src/
+  tests_root: packages/pragma/tests/
 requirements:
 - id: REQ-001
   title: CLI emits stable JSON on success and failure
@@ -153,6 +153,47 @@ requirements:
       expected: success
   milestone: M01
   slice: M01.S2
+- id: REQ-005
+  title: "Runtime SDK and PIL dogfood"
+  description: |
+    Pragma's own tests emit @pragma.trace spans and pragma report
+    surfaces them as verified permutations in the PIL.
+  touches:
+    - packages/pragma-sdk/src/pragma_sdk/trace.py
+    - packages/pragma-sdk/src/pragma_sdk/permutation.py
+    - packages/pragma-sdk/src/pragma_sdk/pytest_plugin.py
+    - packages/pragma/src/pragma/report/aggregator.py
+    - packages/pragma/src/pragma/report/formatter_md.py
+    - packages/pragma/src/pragma/narrative/commit.py
+    - packages/pragma/src/pragma/narrative/pr.py
+    - packages/pragma/src/pragma/narrative/adr.py
+    - packages/pragma/src/pragma/narrative/remediation.py
+    - packages/pragma/src/pragma/cli/commands/report.py
+    - packages/pragma/src/pragma/cli/commands/narrative.py
+  permutations:
+    - id: sdk_trace_emits_span
+      description: "@trace decorator emits OTel span with pragma.logic_id"
+      expected: success
+    - id: sdk_permutation_attaches_baggage
+      description: "set_permutation attaches and detaches baggage cleanly"
+      expected: success
+    - id: sdk_pytest_plugin_dumps_jsonl
+      description: "pytest plugin writes .pragma/spans/*.jsonl on session end"
+      expected: success
+    - id: report_aggregator_detects_mock
+      description: "Test passes without matching span -> status mocked"
+      expected: success
+    - id: report_json_deterministic
+      description: "pragma report --json output is byte-identical across runs"
+      expected: success
+    - id: narrative_commit_passes_verify
+      description: "narrative commit output passes verify commits shape check"
+      expected: success
+    - id: narrative_pr_contains_required_sections
+      description: "narrative pr includes Summary / REQs / PIL / review pointer"
+      expected: success
+  milestone: M01
+  slice: M01.S3
 milestones:
 - id: M00
   title: Implicit brownfield milestone
@@ -180,3 +221,7 @@ milestones:
     title: "v0.3 hooks and battery"
     description: "Claude Code hooks + safety battery + integrity seal."
     requirements: [REQ-004]
+  - id: M01.S3
+    title: "v0.4 SDK, PIL, narrative"
+    description: "Runtime SDK package, Post-Implementation Log, narrative artifacts."
+    requirements: [REQ-005]
