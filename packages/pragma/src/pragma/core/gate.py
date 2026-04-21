@@ -28,14 +28,7 @@ def _find_slice(manifest: Manifest, slice_id: str) -> tuple[str, str] | None:
     return None
 
 
-def activate(
-    *,
-    state: State,
-    manifest: Manifest,
-    slice_id: str,
-    now_iso: str,
-    force: bool = False,
-) -> tuple[State, dict[str, Any]]:
+def _locate_slice_or_raise(manifest: Manifest, slice_id: str) -> str:
     location = _find_slice(manifest, slice_id)
     if location is None:
         raise SliceNotFound(
@@ -46,18 +39,23 @@ def activate(
             ),
             context={"slice": slice_id},
         )
-    milestone_id, _ = location
+    return location[0]
 
-    if state.active_slice is not None and not force:
-        raise SliceAlreadyActive(
-            message=f"Slice {state.active_slice!r} is already active.",
-            remediation=(
-                "Complete it (`pragma slice complete`), cancel it "
-                "(`pragma slice cancel`), or pass --force to switch."
-            ),
-            context={"active": state.active_slice, "requested": slice_id},
-        )
 
+def _reject_already_active(active: str, requested: str) -> None:
+    raise SliceAlreadyActive(
+        message=f"Slice {active!r} is already active.",
+        remediation=(
+            "Complete it (`pragma slice complete`), cancel it "
+            "(`pragma slice cancel`), or pass --force to switch."
+        ),
+        context={"active": active, "requested": requested},
+    )
+
+
+def _check_milestone_deps_shipped(
+    state: State, manifest: Manifest, milestone_id: str, slice_id: str
+) -> None:
     milestone = next(m for m in manifest.milestones if m.id == milestone_id)
     for dep in milestone.depends_on:
         dep_slices = next(m for m in manifest.milestones if m.id == dep).slices
@@ -73,13 +71,11 @@ def activate(
                     remediation=(
                         f"Finish {dep!r} first: activate, unlock, and complete each of its slices."
                     ),
-                    context={
-                        "milestone": milestone_id,
-                        "dep": dep,
-                        "pending": s.id,
-                    },
+                    context={"milestone": milestone_id, "dep": dep, "pending": s.id},
                 )
 
+
+def _build_activated_state(state: State, slice_id: str, now_iso: str) -> State:
     new_slices = dict(state.slices)
     new_slices[slice_id] = SliceState(
         status="in_progress",
@@ -88,7 +84,7 @@ def activate(
         unlocked_at=None,
         completed_at=None,
     )
-    new_state = State(
+    return State(
         version=1,
         active_slice=slice_id,
         gate="LOCKED",
@@ -103,6 +99,21 @@ def activate(
             slice=slice_id,
         ),
     )
+
+
+def activate(
+    *,
+    state: State,
+    manifest: Manifest,
+    slice_id: str,
+    now_iso: str,
+    force: bool = False,
+) -> tuple[State, dict[str, Any]]:
+    milestone_id = _locate_slice_or_raise(manifest, slice_id)
+    if state.active_slice is not None and not force:
+        _reject_already_active(state.active_slice, slice_id)
+    _check_milestone_deps_shipped(state, manifest, milestone_id, slice_id)
+    new_state = _build_activated_state(state, slice_id, now_iso)
     audit = {
         "event": "slice_activated",
         "slice": slice_id,
