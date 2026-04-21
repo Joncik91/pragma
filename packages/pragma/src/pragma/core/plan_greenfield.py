@@ -24,10 +24,13 @@ from pragma.core.errors import (
     PlanGreenfieldAlreadyPlanned,
     PlanGreenfieldOnBrownfield,
     ProblemStatementMissing,
+    StateNotFound,
+    StateSchemaError,
 )
 from pragma.core.lockfile import write_lock
-from pragma.core.manifest import load_manifest
+from pragma.core.manifest import hash_manifest, load_manifest
 from pragma.core.models import Permutation, Requirement
+from pragma.core.state import read_state, write_state
 
 _HEADING_RE = re.compile(r"^#\s+(.+?)\s*$", re.MULTILINE)
 
@@ -158,7 +161,34 @@ def plan_greenfield(cwd: Path, problem_path: Path) -> list[str]:
     refreshed = load_manifest(yaml_path)
     now_iso = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
     write_lock(cwd / "pragma.lock.json", refreshed, now_iso=now_iso)
+    _rebind_state_to_new_hash(cwd, hash_manifest(refreshed))
     return [r.id for r in new_reqs]
+
+
+def _rebind_state_to_new_hash(cwd: Path, new_hash: str) -> None:
+    """Update .pragma/state.json to track the refrozen manifest.
+
+    BUG-012: plan-greenfield rewrites pragma.yaml and refreezes the lock
+    but used to leave state.manifest_hash pinned to the pre-plan hash.
+    `pragma init --greenfield` primed state.json with the seed-manifest
+    hash, so the very next `pragma verify all` after plan-greenfield
+    failed with gate_hash_drift - for every greenfield user, on day
+    one. Because plan-greenfield runs before any slice activation, the
+    gate is neutral and it is safe to rebind state.manifest_hash to
+    the new value without disturbing slice history.
+    """
+    pragma_dir = cwd / ".pragma"
+    try:
+        state = read_state(pragma_dir)
+    except (StateNotFound, StateSchemaError):
+        return
+    if state.active_slice is not None:
+        # Somebody activated a slice before plan-greenfield - don't
+        # silently mutate under an active gate. _assert_pristine_greenfield
+        # would have already rejected this, but guard defensively.
+        return
+    updated = state.model_copy(update={"manifest_hash": new_hash})
+    write_state(pragma_dir, updated)
 
 
 def _is_pristine_seed(manifest: object) -> bool:

@@ -86,6 +86,39 @@ def test_plan_greenfield_emits_skeleton(tmp_path: Path) -> None:
     assert "REQ-000" not in lock_text
 
 
+def test_plan_greenfield_rebinds_state_to_new_hash(tmp_path: Path) -> None:
+    """BUG-012: plan-greenfield must leave pragma verify all green.
+
+    pragma init --greenfield primes .pragma/state.json with the seed
+    manifest's hash. plan-greenfield rewrites pragma.yaml and refreezes
+    the lock - so without the state-rebind fix, the next pragma verify
+    all fires gate_hash_drift because state.manifest_hash points at the
+    pre-plan hash. This is the day-one greenfield flow; it must not
+    brick. Guard against regression by running `pragma verify all` end
+    to end after plan and asserting exit 0.
+    """
+    init_result = _run_init_greenfield(tmp_path)
+    assert init_result.returncode == 0, init_result.stdout + init_result.stderr
+
+    (tmp_path / "problem.md").write_text(
+        "# Area\nOne.\n\n# Other\nTwo.\n",
+        encoding="utf-8",
+    )
+    plan = _run_plan(tmp_path, "problem.md")
+    assert plan.returncode == 0, plan.stdout + plan.stderr
+
+    verify = subprocess.run(
+        [sys.executable, "-m", "pragma", "verify", "all"],
+        cwd=str(tmp_path),
+        capture_output=True,
+        text=True,
+    )
+    assert verify.returncode == 0, (
+        "verify all must be green immediately after "
+        f"init --greenfield + plan-greenfield; got {verify.stdout!r}"
+    )
+
+
 def test_plan_greenfield_missing_file(tmp_path: Path) -> None:
     init_result = _run_init_greenfield(tmp_path)
     assert init_result.returncode == 0, init_result.stdout + init_result.stderr
