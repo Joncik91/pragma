@@ -5,6 +5,83 @@ All notable changes to Pragma are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0] — 2026-04-21
+
+**Greenfield bootstrap ships. Evolutionary rollout complete.**
+
+v0.1 taught us the manifest was load-bearing. v0.2 taught us the gate
+could be built on top of it without AI coupling. v0.3 taught us the
+hooks + safety battery compose at one seam. v0.4 taught us PIL and
+the SDK ship together or not at all. v1.0 finishes the UX around the
+bones — `pragma init --greenfield` scaffolds a seed manifest plus a
+Claude Code primer, `pragma spec plan-greenfield` turns a markdown
+problem statement into a REQ skeleton, `pragma doctor` is now a real
+recovery tool with eight diagnostic codes and an `--emergency-unlock`
+escape hatch, and REQ-006 locks in `pragma report` byte-determinism as
+an acceptance test on Pragma itself. PIL now 34/34 ok.
+
+### Added
+
+- `pragma init --greenfield --name <name> --language python` —
+  scaffolds a seed `pragma.yaml` with M01.S1 + REQ-000 placeholders,
+  freezes the lock, primes `.pragma/state.json`, stamps the settings
+  integrity hash, writes `claude.md` as the Claude Code primer, and
+  creates empty `src/` + `tests/` trees. Refuses non-empty `src/` and
+  existing `pragma.yaml`.
+- `pragma spec plan-greenfield --from <problem.md>` — deterministic
+  Pattern C bootstrap. Parses `# Heading` sections and turns each into
+  a TODO requirement (`REQ-001..REQ-00N`) under M01.S1. No LLM calls;
+  same input → same manifest bytes. Refuses brownfield repos and
+  second runs.
+- `pragma doctor` real recovery engine. Walks the repo, classifies
+  eight failure modes (`no_manifest`, `no_lock`, `hash_mismatch`,
+  `lockfile_unparseable`, `no_pragma_dir`, `stale_state`,
+  `claude_settings_mismatch`, `audit_orphan`), emits ordered
+  `remediation:` strings. Fatal codes short-circuit; warns coexist.
+- `pragma doctor --emergency-unlock --reason "..."` — escape hatch for
+  bricked state. Resets `state.json` to neutral, appends a structured
+  audit entry with the user's reason, refuses when state is already
+  neutral.
+- REQ-006 (new M01.S4 slice) — two permutations asserting
+  `pragma report --json` byte-identical output and manifest-hash
+  stability across a noop freeze. Closes v1.0 done criterion §7.8.5.
+- `docs/usage.md`, `docs/doctor.md`, `docs/migrate.md` — first
+  user-facing documentation. Covers brownfield + greenfield flows,
+  every diagnostic code, and the schema version contract.
+- CI `greenfield-smoke` job — spins up a fresh greenfield repo on a
+  clean runner, runs init → plan-greenfield → freeze → verify →
+  doctor end-to-end. Closes v1.0 done criterion §7.8.4 (empty-to-green).
+- `migrate_to_current()` dispatcher in `core/migrate.py` with
+  `CURRENT_SCHEMA_VERSION = "2"` constant. Future schema bumps slot
+  in next to `migrate_v1_to_v2` without changing caller signatures.
+
+### Changed
+
+- `Manifest` schema now accepts an optional `vision:` field.
+  `canonicalise()` strips it when absent so pre-vision manifests keep
+  their byte-stable hash. Greenfield templates populate it with a
+  TODO placeholder paragraph.
+- `pragma doctor` payload grows a `diagnostics: [...]` list, a
+  `pragma_dir_exists` boolean, and a `claude_settings_exists` boolean.
+  All v0.1 fields (ok, pragma_version, cwd, manifest_exists,
+  lock_exists, pre_commit_config_exists) remain for
+  backward-compatibility.
+- `pragma.__version__` literal synced to package version (was frozen
+  at `0.1.0` since v0.1 — `pragma doctor`'s `pragma_version` now
+  reflects reality).
+- Packages (`pragma`, `pragma-sdk`) both bumped to 1.0.0.
+
+### Deferred to v1.1
+
+- Human-subjects validation of done criteria §7.8.1 (non-coder
+  bootstraps in < 1h) and §7.8.3 (PIL legible to 3 non-coders).
+  Tooling passes; real user studies come post-ship.
+- "Deployed artifact" half of §7.8.4 — Pragma itself doesn't publish
+  wheels or containers yet; adding that belongs with a concrete
+  distribution target.
+
+See `docs/v10-rc-evidence.md` for the full §7.8 walkthrough.
+
 ## [0.4.2] — 2026-04-21
 
 Dogfood polish + commit-shape enforcement.
