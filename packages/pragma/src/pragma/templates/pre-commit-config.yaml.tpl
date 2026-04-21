@@ -47,9 +47,12 @@ repos:
         always_run: true
         stages: [pre-commit]
 
+      # Each entry prefers the repo-local .venv/bin/python3 so `git push`
+      # from a non-activated shell still resolves pragma. Falls back to PATH
+      # python3 (pipx installs or system-wide pragma).
       - id: pragma-verify-pre-commit
         name: pragma verify all
-        entry: python3 -m pragma verify all
+        entry: bash -c 'PY=".venv/bin/python3"; [ -x "$PY" ] || PY=python3; exec "$PY" -m pragma verify all'
         language: system
         pass_filenames: false
         always_run: true
@@ -57,13 +60,13 @@ repos:
 
       - id: pragma-verify-commit-msg
         name: pragma verify message (commit-msg)
-        entry: python3 -m pragma verify message
+        entry: bash -c 'PY=".venv/bin/python3"; [ -x "$PY" ] || PY=python3; exec "$PY" -m pragma verify message "$1"' --
         language: system
         stages: [commit-msg]
 
       - id: pragma-verify-pre-push
         name: pragma verify all (pre-push)
-        entry: python3 -m pragma verify all --ci
+        entry: bash -c 'PY=".venv/bin/python3"; [ -x "$PY" ] || PY=python3; exec "$PY" -m pragma verify all --ci'
         language: system
         pass_filenames: false
         always_run: true
@@ -71,7 +74,7 @@ repos:
 
       - id: pragma-verify-commits-pre-push
         name: pragma verify commits (pre-push range)
-        entry: bash -c 'python3 -m pragma verify commits --base=$(git merge-base HEAD origin/main 2>/dev/null || echo HEAD~1)'
+        entry: bash -c 'PY=".venv/bin/python3"; [ -x "$PY" ] || PY=python3; exec "$PY" -m pragma verify commits --base=$(git merge-base HEAD origin/main 2>/dev/null || echo HEAD~1)'
         language: system
         pass_filenames: false
         always_run: true
