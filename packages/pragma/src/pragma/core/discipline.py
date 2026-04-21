@@ -22,14 +22,18 @@ class DisciplineViolation:
     remediation: str
 
 
+def _record_class_bases(node: ast.ClassDef, subclass_map: dict[str, list[str]]) -> None:
+    for base in node.bases:
+        name = _dec_name(base)
+        if name:
+            subclass_map.setdefault(name, []).append(node.name)
+
+
 def _build_subclass_map(tree: ast.AST) -> dict[str, list[str]]:
     subclass_map: dict[str, list[str]] = {}
     for node in ast.walk(tree):
         if isinstance(node, ast.ClassDef):
-            for base in node.bases:
-                name = _dec_name(base)
-                if name:
-                    subclass_map.setdefault(name, []).append(node.name)
+            _record_class_bases(node, subclass_map)
     return subclass_map
 
 
@@ -195,26 +199,32 @@ def _is_single_method_util(node: ast.ClassDef) -> bool:
     return len(methods) == 1 and len(node.body) <= 3
 
 
+_CONTROL_FLOW_TYPES = (
+    ast.If,
+    ast.For,
+    ast.AsyncFor,
+    ast.While,
+    ast.ExceptHandler,
+    ast.With,
+    ast.AsyncWith,
+    ast.Assert,
+)
+_COMPREHENSION_TYPES = (ast.ListComp, ast.SetComp, ast.DictComp, ast.GeneratorExp)
+
+
+def _cyclomatic_weight(child: ast.AST) -> int:
+    """Cyclomatic complexity contribution of a single AST node."""
+    if isinstance(child, _CONTROL_FLOW_TYPES):
+        return 1
+    if isinstance(child, ast.BoolOp):
+        return len(child.values) - 1
+    if isinstance(child, _COMPREHENSION_TYPES):
+        return 1
+    return 0
+
+
 def _cyclomatic(node: ast.AST) -> int:
-    count = 1
-    for child in ast.walk(node):
-        if isinstance(
-            child,
-            ast.If
-            | ast.For
-            | ast.AsyncFor
-            | ast.While
-            | ast.ExceptHandler
-            | ast.With
-            | ast.AsyncWith
-            | ast.Assert,
-        ):
-            count += 1
-        elif isinstance(child, ast.BoolOp):
-            count += len(child.values) - 1
-        elif isinstance(child, ast.ListComp | ast.SetComp | ast.DictComp | ast.GeneratorExp):
-            count += 1
-    return count
+    return 1 + sum(_cyclomatic_weight(c) for c in ast.walk(node))
 
 
 def _max_nesting_depth(node: ast.AST) -> int:
