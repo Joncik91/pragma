@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from pragma_sdk import set_permutation  # type: ignore[import-not-found]
-
 from pragma.core.commits import validate_commit_shape
 
 
@@ -17,8 +15,7 @@ def test_valid_commit_passes() -> None:
         "\n"
         "Co-Authored-By: Claude <noreply@anthropic.com>\n"
     )
-    with set_permutation("sdk_trace_emits_span"):
-        assert validate_commit_shape(msg) == []
+    assert validate_commit_shape(msg) == []
 
 
 def test_missing_why_flagged() -> None:
