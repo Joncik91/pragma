@@ -48,6 +48,27 @@ def test_verify_commits_all_conformant(monkeypatch, tmp_path: Path) -> None:
     assert "range" in payload
 
 
+def test_verify_commits_skips_repo_with_no_head(monkeypatch, tmp_path: Path) -> None:
+    """BUG-013: a freshly-init'd repo with no commits must not fail verify all.
+
+    Sequence that broke v1.0.2 in CI:
+    1. `git init` - repo exists, HEAD doesn't resolve yet
+    2. `pragma init` + `pragma freeze` - scaffold files
+    3. First `git commit` fires pre-commit, which calls
+       `pragma verify all`
+    4. Without this fix, _check_commits ran `git log HEAD` against a
+       no-HEAD repo and aborted with git_unavailable, bricking every
+       new user's first commit.
+    """
+    monkeypatch.chdir(tmp_path)
+    _git(tmp_path, "init", "-b", "main")
+    r = runner.invoke(app, ["verify", "commits"])
+    assert r.exit_code == 0, r.output
+    payload = json.loads(r.output)
+    assert payload["ok"] is True
+    assert payload["skipped"] == "no_head"
+
+
 def test_verify_commits_reports_zero_when_base_equals_head(monkeypatch, tmp_path: Path) -> None:
     """BUG-008: when --base matches HEAD, range is empty and count is 0.
 

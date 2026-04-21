@@ -111,6 +111,27 @@ def _is_git_repo(cwd: Path) -> bool:
     return True
 
 
+def _repo_has_head(cwd: Path) -> bool:
+    """Return True if HEAD resolves to a commit.
+
+    BUG-013: a freshly-initialised repo has no commits yet, so
+    ``git log HEAD`` fails during pre-commit's first invocation of
+    ``pragma verify all``. ``_check_commits`` needs to distinguish
+    "not a git repo" from "git repo with no history yet" so it can
+    skip gracefully in both cases.
+    """
+    try:
+        subprocess.run(  # noqa: S603
+            ["git", "rev-parse", "--verify", "HEAD"],  # noqa: S607
+            cwd=str(cwd),
+            capture_output=True,
+            check=True,
+        )
+    except subprocess.CalledProcessError:
+        return False
+    return True
+
+
 def _git_range_spec(cwd: Path, base: str) -> str:
     try:
         subprocess.run(  # noqa: S603
@@ -149,6 +170,11 @@ def _partition_commits(commit_log: str) -> tuple[int, list[dict[str, object]]]:
 def _check_commits(cwd: Path, base: str = "main") -> dict[str, object]:
     if not _is_git_repo(cwd):
         return {"ok": True, "check": "commits", "skipped": "not_a_git_repo"}
+    if not _repo_has_head(cwd):
+        # BUG-013: freshly-initialised repo, no commits yet (e.g. the
+        # first `git commit` is in progress and pre-commit is running
+        # `pragma verify all`). Nothing to validate; skip gracefully.
+        return {"ok": True, "check": "commits", "skipped": "no_head"}
     range_spec = _git_range_spec(cwd, base)
     try:
         out = subprocess.run(  # noqa: S603
