@@ -152,8 +152,28 @@ class Manifest(_StrictModel):
 
     @model_validator(mode="after")
     def _check_requirement_references(self) -> Manifest:
-        if self.version == "1" or not (self.milestones and self.requirements):
+        """Enforce requirement.milestone + requirement.slice for v2 manifests.
+
+        v1 is grandfathered (flat requirements). For v2:
+        - If there are no requirements, nothing to check.
+        - Otherwise a milestones hierarchy MUST exist and every
+          requirement MUST name a declared milestone + slice with a
+          matching back-reference.
+
+        KI-2: an earlier short-circuit returned on
+        ``not (self.milestones and self.requirements)`` which let a
+        v2 manifest with milestones=[] and non-empty requirements pass
+        silently - pragma freeze then succeeded on a half-baked
+        manifest that the gate couldn't operate on. The guard now only
+        short-circuits on the empty-requirements case.
+        """
+        if self.version == "1" or not self.requirements:
             return self
+        if not self.milestones:
+            raise ValueError(
+                "v2 manifest has requirements but no milestones; every "
+                "requirement must live inside a milestone.slice."
+            )
         milestone_ids = {m.id for m in self.milestones}
         slice_ids = {s.id for m in self.milestones for s in m.slices}
         slice_to_reqs: dict[str, set[str]] = {

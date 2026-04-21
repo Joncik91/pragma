@@ -80,3 +80,19 @@ def test_v2_requirement_must_declare_milestone_and_slice(
     del v2_manifest_dict["requirements"][0]["milestone"]
     with pytest.raises(ValidationError, match=r"milestone.*required"):
         Manifest.model_validate(v2_manifest_dict)
+
+
+def test_v2_rejects_requirements_without_any_milestones(
+    v2_manifest_dict: dict,
+) -> None:
+    """KI-2: v2 manifest with requirements but milestones=[] must fail validation.
+
+    Before v1.0.2, the requirement-reference validator short-circuited
+    on "milestones is empty OR requirements is empty". That let a
+    manifest with requirements but no milestones pass silently - pragma
+    freeze then hashed it, and the gate couldn't operate on it because
+    nothing owned the requirements.
+    """
+    v2_manifest_dict["milestones"] = []
+    with pytest.raises(ValidationError, match=r"requirements but no milestones"):
+        Manifest.model_validate(v2_manifest_dict)
