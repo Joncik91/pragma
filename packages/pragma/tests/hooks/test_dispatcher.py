@@ -65,3 +65,32 @@ def test_dispatch_never_crashes_on_handler_exception(monkeypatch) -> None:
     assert exit_code == 0
     result = json.loads(out.getvalue())
     assert result.get("continue") is True
+
+
+def test_dispatch_stop_hook_crash_fails_safe(monkeypatch) -> None:
+    """Stop-hook crashes must end the session cleanly with a visible reason.
+
+    The earlier default of {continue: true} silently swallowed the crash —
+    so a user whose stop hook had a latent bug never knew the gate check
+    didn't actually run. The correct fail-safe per Claude Code's contract
+    is {continue: false, stopReason: ...} which ends the session and
+    surfaces the reason in the UI.
+    """
+    from pragma.hooks import stop as stop_module
+
+    def boom(event_input: dict, cwd) -> dict:
+        raise RuntimeError("pragma stop bug")
+
+    monkeypatch.setattr(stop_module, "handle", boom)
+    out = io.StringIO()
+    exit_code = dispatch(
+        event="stop",
+        stdin=io.StringIO('{"session_id":"x"}'),
+        stdout=out,
+        cwd=None,
+    )
+    assert exit_code == 0
+    result = json.loads(out.getvalue())
+    assert result.get("continue") is False
+    assert "stopReason" in result
+    assert "pragma" in result["stopReason"].lower()

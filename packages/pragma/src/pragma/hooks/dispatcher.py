@@ -9,17 +9,39 @@ from typing import IO, Any
 from pragma.core.audit import append_audit
 from pragma.hooks import post_tool_use, pre_tool_use, session_start, stop
 
-_HANDLERS: dict[str, Callable[[dict[str, Any], Path], dict[str, Any]]] = {
-    "session-start": session_start.handle,
-    "pre-tool-use": pre_tool_use.handle,
-    "post-tool-use": post_tool_use.handle,
-    "stop": stop.handle,
+# Module references, not bound .handle attributes, so tests can
+# monkeypatch module.handle and dispatch will pick up the patched
+# function at call time.
+_HANDLER_MODULES = {
+    "session-start": session_start,
+    "pre-tool-use": pre_tool_use,
+    "post-tool-use": post_tool_use,
+    "stop": stop,
 }
 
 
-def _safe_default(event: str) -> dict[str, Any]:
+def _get_handler(event: str) -> Callable[[dict[str, Any], Path], dict[str, Any]]:
+    return _HANDLER_MODULES[event].handle
+
+
+def _safe_default(event: str, *, reason: str | None = None) -> dict[str, Any]:
+    """Fail-safe response when a hook's own dispatch/parse path misfires.
+
+    PreToolUse / PostToolUse fail open (permissionDecision: allow) so a
+    crashed Pragma hook never DoSes an editing turn. SessionStart is
+    advisory; {continue: true} lets the session proceed. Stop is the
+    only event where a silent {continue: true} is wrong: the user
+    would never know the gate check didn't run. For Stop we fail to
+    {continue: false, stopReason: ...} so Claude Code ends the turn
+    cleanly and the reason is surfaced in the UI.
+    """
     if event in ("pre-tool-use", "post-tool-use"):
         return {"permissionDecision": "allow"}
+    if event == "stop":
+        return {
+            "continue": False,
+            "stopReason": reason or "pragma stop hook failed; turn ended without gate check",
+        }
     return {"continue": True}
 
 
@@ -34,7 +56,8 @@ def _reject_unknown(stdout: IO[str], event: str) -> int:
             "error": "unknown_hook_event",
             "message": f"unknown event: {event!r}",
             "remediation": (
-                f"Valid events: {sorted(_HANDLERS)}. Check .claude/settings.json hook command."
+                f"Valid events: {sorted(_HANDLER_MODULES)}. "
+                "Check .claude/settings.json hook command."
             ),
             "context": {"event": event},
         },
@@ -62,7 +85,7 @@ def dispatch(
     stdout: IO[str],
     cwd: Path | None,
 ) -> int:
-    if event not in _HANDLERS:
+    if event not in _HANDLER_MODULES:
         return _reject_unknown(stdout, event)
 
     raw = stdin.read().strip()
@@ -77,7 +100,7 @@ def dispatch(
 
     effective_cwd = cwd or Path.cwd()
     try:
-        result = _HANDLERS[event](event_input, effective_cwd)
+        result = _get_handler(event)(event_input, effective_cwd)
     except Exception as exc:
         with contextlib.suppress(Exception):
             append_audit(
@@ -90,7 +113,12 @@ def dispatch(
                 reason=f"{type(exc).__name__}: {exc}",
                 context={"hook": event},
             )
-        _write_json(stdout, _safe_default(event))
+        _write_json(
+            stdout,
+            _safe_default(
+                event, reason=f"pragma {event} hook crashed: {type(exc).__name__}: {exc}"
+            ),
+        )
         return 0
 
     _write_json(stdout, result)
