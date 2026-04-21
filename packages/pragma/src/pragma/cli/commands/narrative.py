@@ -126,13 +126,13 @@ def cmd_pr(
         )
         return
 
-    spans = project_dir / ".pragma" / "spans" / "test-run.jsonl"
+    spans_dir = project_dir / ".pragma" / "spans"
     junit = project_dir / ".pragma" / "pytest-junit.xml"
 
     report = build_report(
         manifest=manifest,
         state=state,
-        spans_jsonl=spans if spans.exists() else None,
+        spans_jsonl=spans_dir if spans_dir.exists() else None,
         junit_xml=junit if junit.exists() else None,
         commit_timestamp=_commit_timestamp(project_dir),
         active_slice_override=active_slice,

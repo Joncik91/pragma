@@ -23,16 +23,26 @@ _MOCKED_REMEDIATION = (
 
 
 def _parse_spans(path: Path | None) -> dict[str, list[dict[str, object]]]:
+    """Parse span JSONL into {test_name: [span_dict, ...]}.
+
+    Accepts either a single .jsonl file (back-compat with pre-KI-1
+    fixed-filename spans) or a directory holding many per-session
+    *.jsonl files. The pytest plugin as of v1.0.2 writes one file
+    per pytest session so PIL stays correct across multi-suite
+    projects; this parser merges them transparently.
+    """
     if path is None or not path.exists():
         return {}
+    files = sorted(path.glob("*.jsonl")) if path.is_dir() else [path]
     result: dict[str, list[dict[str, object]]] = {}
-    for line in path.read_text(encoding="utf-8").splitlines():
-        if not line.strip():
-            continue
-        obj = json.loads(line)
-        nodeid = str(obj.get("test_nodeid", ""))
-        test_name = nodeid.split("::")[-1] if "::" in nodeid else nodeid
-        result.setdefault(test_name, []).append(obj)
+    for f in files:
+        for line in f.read_text(encoding="utf-8").splitlines():
+            if not line.strip():
+                continue
+            obj = json.loads(line)
+            nodeid = str(obj.get("test_nodeid", ""))
+            test_name = nodeid.split("::")[-1] if "::" in nodeid else nodeid
+            result.setdefault(test_name, []).append(obj)
     return result
 
 

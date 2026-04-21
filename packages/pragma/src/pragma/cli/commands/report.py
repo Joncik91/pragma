@@ -60,13 +60,13 @@ def report(
     except StateNotFound:
         state = None
 
-    spans = cwd / ".pragma" / "spans" / "test-run.jsonl"
+    spans_dir = cwd / ".pragma" / "spans"
     junit = cwd / ".pragma" / "pytest-junit.xml"
 
     report_obj = build_report(
         manifest=manifest,
         state=state,
-        spans_jsonl=spans if spans.exists() else None,
+        spans_jsonl=spans_dir if spans_dir.exists() else None,
         junit_xml=junit if junit.exists() else None,
         commit_timestamp=_commit_timestamp(cwd),
     )

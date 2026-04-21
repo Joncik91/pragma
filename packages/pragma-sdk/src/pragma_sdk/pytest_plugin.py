@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 import json
+import os
+import time
+import uuid
 from typing import Any
 
 import pytest
@@ -68,6 +71,19 @@ def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
         }
         lines.append(json.dumps(payload, sort_keys=True, separators=(",", ":")))
 
-    (span_dir / "test-run.jsonl").write_text(
+    (span_dir / _session_span_filename()).write_text(
         "\n".join(lines) + ("\n" if lines else ""), encoding="utf-8"
+    )
+
+
+def _session_span_filename() -> str:
+    """Per-session filename so concurrent or sequential pytest runs don't collide.
+
+    Before KI-1, every run overwrote test-run.jsonl - a second run
+    (pragma-sdk then pragma, or pre-commit then CI) wiped the first
+    run's spans and PIL collapsed to 0/N. Each session now writes to
+    its own file; aggregators glob *.jsonl in the directory.
+    """
+    return (
+        f"test-run-{int(time.time() * 1000)}-{os.getpid()}-{uuid.uuid4().hex[:8]}.jsonl"
     )
