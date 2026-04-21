@@ -110,6 +110,38 @@ def test_collect_tests_ignores_parent_addopts_q(tmp_path: Path) -> None:
     assert "test_req_001_b" in names
 
 
+def test_group_by_name_preserves_all_parametrized_variants(tmp_path: Path) -> None:
+    """BUG-006: a parametrized test must expose all variants, not just the last.
+
+    Before v1.0.2, consumer sites did {c.name: c for c in collected},
+    which overwrote parametrised variants - the gate's "all red /
+    all passing" checks only saw whichever variant pytest collected
+    last. group_by_name returns every variant under its shared name.
+    """
+    from pragma.core.tests_discovery import group_by_name
+
+    tests_dir = _write_tests_tree(
+        tmp_path,
+        (
+            "test_req_001.py",
+            """
+            import pytest
+
+            @pytest.mark.parametrize("x", [1, 2, 3])
+            def test_req_001_happy(x):
+                assert x in {1, 2, 3}
+            """,
+        ),
+    )
+    found = collect_tests(tests_dir)
+    grouped = group_by_name(found)
+    assert "test_req_001_happy" in grouped
+    assert len(grouped["test_req_001_happy"]) == 3
+    # Each entry carries a distinct nodeid (distinguished by [param]).
+    nodeids = {c.nodeid for c in grouped["test_req_001_happy"]}
+    assert len(nodeids) == 3
+
+
 def test_collect_raises_on_collect_errors(tmp_path: Path) -> None:
     tests_dir = _write_tests_tree(
         tmp_path,

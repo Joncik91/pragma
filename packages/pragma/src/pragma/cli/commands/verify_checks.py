@@ -33,6 +33,7 @@ from pragma.core.tests_discovery import (
     CollectError,
     collect_tests,
     expected_test_name,
+    group_by_name,
     run_tests,
 )
 
@@ -213,11 +214,12 @@ def _collect_or_raise(tests_dir: Path, err_code: str) -> dict:
             message=f"pytest could not collect tests: {exc}",
             remediation="Fix the test collection error and retry.",
         ) from exc
-    return {c.name: c for c in collected}
+    return group_by_name(collected)
 
 
 def _raise_if_red_tests_green(tests_dir: Path, expected: list[str], by_name: dict) -> None:
-    results = run_tests(tests_dir, [by_name[n].nodeid for n in expected])
+    # BUG-006: include every parametrised variant per expected name.
+    results = run_tests(tests_dir, [c.nodeid for n in expected for c in by_name[n]])
     passing = [nid for nid, v in results.items() if v == "passed"]
     if passing:
         raise UnlockTestPassing(

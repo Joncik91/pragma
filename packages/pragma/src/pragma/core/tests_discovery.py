@@ -55,6 +55,23 @@ def collect_tests(tests_dir: Path) -> list[CollectedTest]:
     return out
 
 
+def group_by_name(collected: list[CollectedTest]) -> dict[str, list[CollectedTest]]:
+    """Group collected tests by parametrize-stripped name.
+
+    BUG-006: a parametrized test `def test_req_001_happy(x)` appears
+    once per parameter value. The old `{c.name: c for c in collected}`
+    idiom in consumer sites kept only the last variant, which made the
+    gate's "all red-tests present / all red-tests passing" decisions
+    depend on whatever variant pytest collected last. Grouping makes
+    every variant visible so callers can iterate all nodeids for a
+    given expected name.
+    """
+    out: dict[str, list[CollectedTest]] = {}
+    for c in collected:
+        out.setdefault(c.name, []).append(c)
+    return out
+
+
 _RESULT_RE = re.compile(r"^(\S+::\S+)\s+(PASSED|FAILED|ERROR)")
 
 

@@ -24,6 +24,7 @@ from pragma.core.tests_discovery import (
     CollectError,
     collect_tests,
     expected_test_name,
+    group_by_name,
     run_tests,
 )
 
@@ -57,7 +58,7 @@ def _assert_slice_unlock_ready(cwd: Path, manifest, state) -> None:
             message=f"pytest could not collect tests: {exc}",
             remediation="Fix the test collection error (usually an import error) and retry.",
         ) from exc
-    by_name = {c.name: c for c in collected}
+    by_name = group_by_name(collected)
     missing = [n for n in expected if n not in by_name]
     if missing:
         raise UnlockMissingTests(
@@ -69,7 +70,9 @@ def _assert_slice_unlock_ready(cwd: Path, manifest, state) -> None:
             ),
             context={"missing": missing},
         )
-    nodeids = [by_name[n].nodeid for n in expected]
+    # BUG-006: include every parametrised variant so unlock's "must be red"
+    # check covers all of them, not just the one pytest collected last.
+    nodeids = [c.nodeid for n in expected for c in by_name[n]]
     results = run_tests(tests_dir, nodeids)
     passing = [nid for nid, v in results.items() if v == "passed"]
     if passing:

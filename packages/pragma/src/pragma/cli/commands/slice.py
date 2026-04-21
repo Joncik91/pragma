@@ -21,6 +21,7 @@ from pragma.core.tests_discovery import (
     CollectError,
     collect_tests,
     expected_test_name,
+    group_by_name,
     run_tests,
 )
 
@@ -108,8 +109,11 @@ def _assert_active_slice_tests_green(cwd: Path, state) -> None:
             message=f"pytest could not collect tests: {exc}",
             remediation="Fix the test collection error, then retry.",
         ) from exc
-    by_name = {c.name: c for c in collected}
-    nodeids = [by_name[n].nodeid for n in expected if n in by_name]
+    by_name = group_by_name(collected)
+    # BUG-006: include every parametrised variant of each expected name,
+    # not just one; otherwise gate completion depends on pytest's
+    # collection order.
+    nodeids = [c.nodeid for n in expected for c in by_name.get(n, [])]
     results = run_tests(tests_dir, nodeids) if nodeids else {}
     failing = [nid for nid, v in results.items() if v != "passed"]
     if failing:
