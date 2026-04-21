@@ -13,10 +13,12 @@ import json
 from pathlib import Path
 
 import typer
+from pragma_sdk import trace
 
 from pragma import __version__
 
 
+@trace("REQ-001")
 def doctor() -> None:
     """Print local install + project state as JSON."""
     cwd = Path.cwd()

@@ -7,6 +7,7 @@ import subprocess
 from pathlib import Path
 
 import typer
+from pragma_sdk import trace
 
 from pragma.core.commits import validate_commit_shape
 from pragma.core.discipline import check_file
@@ -158,6 +159,7 @@ def _check_commits(cwd: Path, base: str = "main") -> dict[str, object]:
     return {"ok": True, "check": "commits"}
 
 
+@trace("REQ-001")
 def _check_manifest(cwd: Path) -> dict[str, object]:
     manifest = load_manifest(cwd / "pragma.yaml")
     lock = read_lock(cwd / "pragma.lock.json")

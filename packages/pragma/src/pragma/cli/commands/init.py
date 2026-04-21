@@ -7,6 +7,7 @@ from pathlib import Path
 
 import typer
 from jinja2 import Environment, FileSystemLoader, StrictUndefined
+from pragma_sdk import trace
 
 from pragma.core.errors import AlreadyInitialised, PragmaError
 from pragma.core.integrity import compute_settings_hash, write_stored_hash
@@ -67,6 +68,7 @@ def init(
     )
 
 
+@trace("REQ-001")
 def _scaffold(cwd: Path, *, project_name: str, force: bool) -> list[str]:
     plain_dests = {k: v for k, v in _FILES_TO_CREATE.items() if k != _SETTINGS_KEY}
     existing = [dest for dest in plain_dests.values() if (cwd / dest).exists()]

@@ -7,12 +7,14 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 import typer
+from pragma_sdk import trace
 
 from pragma.core.errors import PragmaError
 from pragma.core.lockfile import write_lock
 from pragma.core.manifest import hash_manifest, load_manifest
 
 
+@trace("REQ-001")
 def freeze() -> None:
     """Read pragma.yaml, validate, write pragma.lock.json atomically."""
     cwd = Path.cwd()
