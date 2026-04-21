@@ -103,4 +103,18 @@ def _scaffold(cwd: Path, *, project_name: str, force: bool) -> list[str]:
     write_stored_hash(pragma_dir, compute_settings_hash(settings_path))
     created.append(".pragma/claude-settings.hash")
 
+    (pragma_dir / "spans").mkdir(exist_ok=True)
+
+    gitignore_path = cwd / ".gitignore"
+    entries_to_add = [".pragma/spans/", ".pragma/pytest-junit.xml"]
+    existing_lines: set[str] = set()
+    if gitignore_path.exists():
+        existing_lines = set(gitignore_path.read_text(encoding="utf-8").splitlines())
+    new_entries = [e for e in entries_to_add if e not in existing_lines]
+    if new_entries:
+        with gitignore_path.open("a", encoding="utf-8") as f:
+            if existing_lines and not gitignore_path.read_text(encoding="utf-8").endswith("\n"):
+                f.write("\n")
+            f.write("\n".join(new_entries) + "\n")
+
     return created
