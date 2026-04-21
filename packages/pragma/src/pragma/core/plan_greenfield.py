@@ -73,7 +73,7 @@ def plan_greenfield(cwd: Path, problem_path: Path) -> list[str]:
     headings = [h for h in headings if h]
     if not headings:
         raise ProblemStatementMissing(
-            message=(f"problem statement at {problem_path} contains no `# Heading` " "sections"),
+            message=(f"problem statement at {problem_path} contains no `# Heading` sections"),
             remediation=(
                 "Add at least one `# Heading` line. plan-greenfield only "
                 "recognises single-`#` ATX headers; `##` and deeper are ignored."
@@ -94,8 +94,7 @@ def plan_greenfield(cwd: Path, problem_path: Path) -> list[str]:
                 f"this manifest declares mode={manifest.project.mode!r}."
             ),
             remediation=(
-                "Use `pragma spec add-requirement` to author brownfield "
-                "requirements one at a time."
+                "Use `pragma spec add-requirement` to author brownfield requirements one at a time."
             ),
             context={"mode": manifest.project.mode},
         )

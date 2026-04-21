@@ -45,7 +45,7 @@ def scaffold_greenfield(cwd: Path, *, name: str, language: str) -> list[str]:
         raise GreenfieldNonEmptySrc(
             message=f"{src_dir} is not empty; greenfield requires a fresh tree.",
             remediation=(
-                "Move existing code out of src/, or run " "`pragma init --brownfield` instead."
+                "Move existing code out of src/, or run `pragma init --brownfield` instead."
             ),
             context={"path": str(src_dir)},
         )

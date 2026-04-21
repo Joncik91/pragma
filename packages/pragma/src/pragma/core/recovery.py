@@ -163,7 +163,7 @@ def _check_fatal(
                     "code": "lockfile_unparseable",
                     "severity": "fatal",
                     "message": (
-                        "pragma.lock.json is not valid JSON or is missing " "`manifest_hash`."
+                        "pragma.lock.json is not valid JSON or is missing `manifest_hash`."
                     ),
                     "remediation": "Run `pragma freeze` to regenerate.",
                     "context": {"path": str(lock_path)},
@@ -215,7 +215,7 @@ def _check_stale_state(state_path: Path, lock_hash: str) -> dict[str, object] | 
         "code": "stale_state",
         "severity": "warn",
         "message": (
-            ".pragma/state.json references a manifest_hash that no " "longer matches the lockfile."
+            ".pragma/state.json references a manifest_hash that no longer matches the lockfile."
         ),
         "remediation": (
             "Run `pragma freeze`. If the active slice should remain, "
@@ -317,12 +317,9 @@ def diagnose(cwd: Path) -> list[dict[str, object]]:
             {
                 "code": "no_pragma_dir",
                 "severity": "warn",
-                "message": (
-                    ".pragma/ directory is missing (audit log + state " "cannot be written)."
-                ),
+                "message": (".pragma/ directory is missing (audit log + state cannot be written)."),
                 "remediation": (
-                    "Run `pragma freeze` (it recreates .pragma/ alongside "
-                    "regenerating the lock)."
+                    "Run `pragma freeze` (it recreates .pragma/ alongside regenerating the lock)."
                 ),
                 "context": {"path": str(pragma_dir)},
             }
