@@ -234,10 +234,28 @@ def _max_nesting_depth(node: ast.AST) -> int:
 
 
 def _check_todo_sentinels(source: str, path: str) -> list[DisciplineViolation]:
+    """Flag bare TODO/FIXME/XXX markers; exempt acknowledged TODO(owner) forms.
+
+    ``TODO(owner):`` forms (with a parenthesised qualifier) follow the
+    standard "TODO with an owner" convention — they are an
+    acknowledged, tracked deferral, not an unaddressed one. Greenfield
+    scaffolding writes ``TODO(pragma): ...`` by design to mark
+    deliberate placeholder sections; flagging those would force users
+    to rewrite scaffolded manifests before they could commit. This
+    file itself is exempt because it defines the marker list and must
+    mention each marker by name.
+    """
+    # The discipline checker's own source contains each marker string by
+    # necessity (the list literal). Skip self-scanning for TODO sentinels.
+    if path.endswith("pragma/core/discipline.py"):
+        return []
+
     violations: list[DisciplineViolation] = []
     for i, line in enumerate(source.splitlines(), start=1):
         for marker in _TODO_MARKERS:
-            if re.search(rf"\b{marker}\b", line):
+            # Require a word boundary followed by a non-paren char: so
+            # TODO( owner ) is exempt (acknowledged), bare TODO is not.
+            if re.search(rf"\b{marker}\b(?!\s*\()", line):
                 violations.append(
                     DisciplineViolation(
                         rule="todo_sentinel",

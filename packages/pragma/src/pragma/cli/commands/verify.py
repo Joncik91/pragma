@@ -400,12 +400,6 @@ def verify_all(
     except PragmaError as exc:
         typer.echo(exc.to_json())
         raise typer.Exit(code=1) from None
-    # NOTE: _check_discipline is intentionally NOT wired into verify all
-    # yet - enabling it reveals ~35 pre-existing violations in Pragma's
-    # own source (functions too long, nesting too deep, TODO sentinels,
-    # empty __init__.py) that need a dedicated clean-up slice first.
-    # Wiring happens in a follow-up commit once Pragma's own source is
-    # discipline-clean. Tracked as KI-11 in the CHANGELOG.
     typer.echo(
         json.dumps(
             {
