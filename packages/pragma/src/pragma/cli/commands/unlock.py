@@ -7,6 +7,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 import typer
+from pragma_sdk import trace
 
 from pragma.core.audit import append_audit
 from pragma.core.errors import (
@@ -27,6 +28,7 @@ from pragma.core.tests_discovery import (
 )
 
 
+@trace("REQ-003")
 def unlock() -> None:
     cwd = Path.cwd()
     try:

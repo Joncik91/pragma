@@ -7,6 +7,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 import typer
+from pragma_sdk import trace
 
 from pragma.core.audit import append_audit
 from pragma.core.errors import PragmaError, StateNotFound
@@ -49,6 +50,7 @@ def _load_state_or_default(cwd: Path) -> tuple[State, LockFile, Path]:
 
 
 @slice_app.command(name="activate")
+@trace("REQ-003")
 def activate(
     slice_id: str = typer.Argument(..., metavar="SLICE_ID"),
     force: bool = typer.Option(
@@ -93,6 +95,7 @@ def activate(
 
 
 @slice_app.command(name="complete")
+@trace("REQ-003")
 def complete(
     skip_tests: bool = typer.Option(
         False,
@@ -165,6 +168,7 @@ def complete(
 
 
 @slice_app.command(name="cancel")
+@trace("REQ-003")
 def cancel() -> None:
     cwd = Path.cwd()
     try:

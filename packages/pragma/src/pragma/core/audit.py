@@ -14,9 +14,12 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from pragma_sdk import trace
+
 AUDIT_FILENAME = "audit.jsonl"
 
 
+@trace("REQ-003")
 def append_audit(
     pragma_dir: Path,
     *,
