@@ -8,9 +8,9 @@ specification, a test-first gate, and a plain-English report of what
 actually ran — so you can ship code an AI wrote and know what you're
 shipping.
 
-- **Current version:** v1.0.5 (2026-04-24)
+- **Current version:** v0.1.0 (2026-04-24)
 - **License:** Apache-2.0
-- **Status:** v1.0 stable. Python-only. TypeScript lands in v1.1.
+- **Status:** Alpha. Python-only. Thesis works end-to-end on a fresh greenfield; dogfood is still finding bugs. See [`CHANGELOG.md`](CHANGELOG.md) for the release cadence plan and known issues.
 
 ## What Pragma does in 30 seconds
 
@@ -116,7 +116,7 @@ See [`docs/concepts.md`](docs/concepts.md) for the full rationale.
 - Small teams adopting AI assistants where "was the AI honest?" is the review bottleneck.
 - Non-coder product owners pairing with an AI — the PIL is readable without diff-diving.
 
-Not a fit (yet) for: non-Python projects (v1.1), large teams with mature gated-merge already in place, hard-real-time or safety-critical work.
+Not a fit (yet) for: non-Python projects, large teams with mature gated-merge already in place, hard-real-time or safety-critical work, or anyone who needs stable-release guarantees — this is alpha.
 
 ## Upgrading an older manifest
 
@@ -127,15 +127,17 @@ pragma init --brownfield --force   # refresh .pre-commit-config.yaml
 
 See [`docs/migrate.md`](docs/migrate.md) for failure modes.
 
-## What's in v1.0
+## What's in v0.1
 
 - **Greenfield bootstrap** — `pragma init --greenfield` scaffolds a seed manifest + `claude.md` primer. `pragma spec plan-greenfield` turns a problem statement into REQ placeholders.
 - **Manifest + schema v2** — `pragma init --brownfield`, `pragma spec add-requirement`, `pragma freeze`, `pragma verify manifest`; dual-file integrity via SHA-256 over canonical JSON; milestones + slices hierarchy.
 - **Gate** — `pragma slice activate|complete|cancel|status`, `pragma unlock`. `.pragma/state.json` (gitignored, atomic, flock-guarded) + `.pragma/audit.jsonl` (committed, append-only, fsync'd).
 - **Verify** — `pragma verify all` runs manifest + gate + discipline + integrity + commits. Commit-msg and pre-push hooks enforce shape.
-- **Recovery** — `pragma doctor` with classifier diagnostics. `--emergency-unlock` for wedged gates, `--clean-spans` for span retention (v1.0.5).
-- **Reports** — `pragma report --json` / `--human` (PIL). `pragma narrative commit|pr|adr|remediation` composes senior-engineer copy from the active slice.
+- **Recovery** — `pragma doctor` with classifier diagnostics. `--emergency-unlock` for wedged gates, `--clean-spans` for span retention.
+- **Reports** — `pragma report --json` / `--human` (PIL). `pragma narrative commit|pr|adr|remediation` drafts copy from the active slice (prose quality is weak — BUG-026).
 - **Claude Code hooks** — SessionStart / PreToolUse / PostToolUse / Stop, sealed by hash.
+
+Known alpha bugs at v0.1.0: see [`CHANGELOG.md`](CHANGELOG.md#known-issues-at-v010).
 
 ## Contributing
 
