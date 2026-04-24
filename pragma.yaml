@@ -549,6 +549,20 @@ requirements:
     expected: success
   milestone: M01
   slice: M01.S13
+- id: REQ-025
+  title: narrative commit remembers the just-shipped slice + clean directory labels
+  description: 'BUG-027. Between `pragma slice complete` and the next `pragma slice activate`, there is no active_slice in state.json but state.slices holds the recently-shipped records. `pragma narrative commit` in this window emitted the no-slice fallback WHY ("Maintenance change outside any active slice."), which reads as amnesia. Also _summarise_files appended a "/" to every segment in its "N files across X/" output, making top-level files look like directories ("pragma.yaml/" rather than "pragma.yaml"). Fix - when active_slice is None, derive WHY from the most-recently-completed slice in state.slices; only add "/" to entries that genuinely were directories in the staged path list.'
+  touches:
+  - packages/pragma/src/pragma/narrative/commit.py
+  permutations:
+  - id: why_uses_recent_shipped_when_no_active_slice
+    description: without active_slice but with a recently-shipped slice, WHY cites the shipped slice title
+    expected: success
+  - id: summarise_does_not_add_slash_to_top_level_files
+    description: top-level files are rendered without a trailing slash in the summary
+    expected: success
+  milestone: M01
+  slice: M01.S14
 milestones:
 - id: M00
   title: Implicit brownfield milestone
@@ -642,3 +656,8 @@ milestones:
     description: 'BUG-026. `pragma narrative commit` generated a commit message whose WHAT and WHERE sections listed every staged file including .pyc, .pragma/state.json.lock, audit.jsonl, and cache directories. The WHY was either a blind first-line echo of the active requirement''s description, or the literal placeholder string "Scope unclear; filling in." when no slice was active. Fix - filter the file list (skip .pyc / __pycache__ / .pragma / audit.jsonl / state lock files), summarise WHAT by distinct top-level directory when the list is long, and derive WHY from the active slice title + declared permutation verdicts when a slice is active.'
     requirements:
     - REQ-024
+  - id: M01.S14
+    title: narrative commit cites most-recent shipped slice (BUG-027)
+    description: 'BUG-027. After `pragma slice complete`, active_slice is None by design. `pragma narrative commit` running in that window (a perfectly natural user flow: ship slice, then commit the change) emits WHY="Maintenance change outside any active slice." — factually correct but reads as amnesia when the user literally just shipped a slice seconds ago. Also, _summarise_files appended "/" to every path segment even when the segment was a single top-level file (e.g. "pragma.yaml/ (1)" instead of "pragma.yaml (1)"). Fix - (a) when active_slice is None but state.slices has a most-recently-shipped entry, cite its title/ID in WHY; (b) only append "/" to genuine directories (those that contained a slash in the original path).'
+    requirements:
+    - REQ-025

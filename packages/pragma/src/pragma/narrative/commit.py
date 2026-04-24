@@ -7,8 +7,8 @@ from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 from pragma.core.errors import StateNotFound
 from pragma.core.manifest import load_manifest, slice_requirements
-from pragma.core.models import Requirement
-from pragma.core.state import read_state
+from pragma.core.models import Manifest, Requirement
+from pragma.core.state import State, read_state
 
 _TPL_DIR = Path(__file__).parent.parent / "templates"
 
@@ -47,16 +47,18 @@ def _summarise_files(files: list[str], *, cap: int = 8) -> str:
     """Render the file list for the WHERE section.
 
     Short lists (≤ cap) go verbatim. Longer lists collapse to
-    top-level directories with counts so the reader sees *shape* not
-    *every path*.
+    distinct top-level buckets with counts so the reader sees *shape*
+    not *every path*. BUG-027 / REQ-025: top-level files (paths with
+    no '/') are rendered without a trailing slash; only real
+    directory prefixes get the "dir/" form.
     """
     if len(files) <= cap:
         return ", ".join(files)
-    by_dir: Counter[str] = Counter()
+    by_bucket: Counter[str] = Counter()
     for f in files:
-        head = f.split("/", 1)[0] if "/" in f else f
-        by_dir[head] += 1
-    parts = [f"{d}/ ({n})" for d, n in sorted(by_dir.items())]
+        head = f.split("/", 1)[0] + "/" if "/" in f else f
+        by_bucket[head] += 1
+    parts = [f"{bucket} ({n})" for bucket, n in sorted(by_bucket.items())]
     return f"{len(files)} files across " + ", ".join(parts)
 
 
@@ -73,26 +75,54 @@ def _why_from_slice(reqs: list[Requirement], slice_title: str) -> str:
     return f"{slice_title}: {perm_phrase} declared."
 
 
-def _resolve_slice_context(cwd: Path):  # type: ignore[no-untyped-def]
-    """Return (active_slice_id, reqs, slice_title) for the current state."""
+def _slice_title(manifest: Manifest, slice_id: str) -> str:
+    for m in manifest.milestones:
+        for s in m.slices:
+            if s.id == slice_id:
+                return str(s.title)
+    return ""
+
+
+def _most_recent_shipped_slice(state: State | None) -> str | None:
+    """Pick the slice with the latest completed_at among status=shipped.
+
+    BUG-027 / REQ-025: `narrative commit` run right after
+    `slice complete` would otherwise fall back to the "outside any
+    active slice" copy, ignoring the shipped record that *just*
+    landed in state.slices.
+    """
+    if state is None:
+        return None
+    best_id: str | None = None
+    best_at = ""
+    for sid, rec in state.slices.items():
+        if rec.status != "shipped":
+            continue
+        at = rec.completed_at or ""
+        if at >= best_at:
+            best_at = at
+            best_id = sid
+    return best_id
+
+
+def _resolve_slice_context(
+    cwd: Path,
+) -> tuple[str | None, list[Requirement], str, bool]:
+    """Return (slice_id_for_narrative, reqs, slice_title, is_just_shipped)."""
     manifest = load_manifest(cwd / "pragma.yaml")
     try:
         state = read_state(cwd / ".pragma")
     except StateNotFound:
         state = None
     active_slice_id = state.active_slice if state else None
-    if not active_slice_id:
-        return None, [], ""
-    reqs = list(slice_requirements(manifest, active_slice_id))
-    slice_title = ""
-    for m in manifest.milestones:
-        for s in m.slices:
-            if s.id == active_slice_id:
-                slice_title = s.title
-                break
-        if slice_title:
-            break
-    return active_slice_id, reqs, slice_title
+    if active_slice_id:
+        reqs = list(slice_requirements(manifest, active_slice_id))
+        return active_slice_id, reqs, _slice_title(manifest, active_slice_id), False
+    recent = _most_recent_shipped_slice(state)
+    if recent is not None:
+        reqs = list(slice_requirements(manifest, recent))
+        return recent, reqs, _slice_title(manifest, recent), True
+    return None, [], "", False
 
 
 def _pick_why(
@@ -101,14 +131,17 @@ def _pick_why(
     active_slice_id: str | None,
     reqs: list[Requirement],
     slice_title: str,
+    is_just_shipped: bool,
 ) -> str:
     if why_hint:
         return why_hint
     if active_slice_id and reqs:
-        return _why_from_slice(reqs, slice_title or active_slice_id)
+        base = _why_from_slice(reqs, slice_title or active_slice_id)
+        return f"Just shipped — {base}" if is_just_shipped else base
     if active_slice_id:
-        return f"Work on slice {active_slice_id}."
-    # No active slice — honest about the context, not a placeholder.
+        verb = "Just shipped slice" if is_just_shipped else "Work on slice"
+        return f"{verb} {active_slice_id}."
+    # No active slice and no shipped history — honest fallback.
     return "Maintenance change outside any active slice."
 
 
@@ -119,12 +152,13 @@ def build_commit_message(
     subject_hint: str,
     why_hint: str | None,
 ) -> str:
-    active_slice_id, reqs, slice_title = _resolve_slice_context(cwd)
+    active_slice_id, reqs, slice_title, is_just_shipped = _resolve_slice_context(cwd)
     why = _pick_why(
         why_hint=why_hint,
         active_slice_id=active_slice_id,
         reqs=reqs,
         slice_title=slice_title,
+        is_just_shipped=is_just_shipped,
     )
     filtered = [f for f in staged_files if not _is_noise(f)]
     where = _summarise_files(filtered) if filtered else "(no non-noise files staged)"
