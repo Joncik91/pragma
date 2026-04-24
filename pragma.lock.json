@@ -1,7 +1,7 @@
 {
   "version": "1",
-  "manifest_hash": "sha256:e92fb822b46c14da27b49278805f21d5f66b64cf622f6cd949a4abcc7f7b8f90",
-  "generated_at": "2026-04-24T22:33:29Z",
+  "manifest_hash": "sha256:c6ecd94f5be6eaea8d2925a78be28bc9ba67e4c0efea80d15cb38c15bfb854fb",
+  "generated_at": "2026-04-24T22:41:46Z",
   "manifest": {
     "version": "2",
     "project": {
@@ -187,6 +187,14 @@
             "description": "BUG-030. `pragma doctor` reported an audit_orphan diagnostic when audit.jsonl had any entry but state.slices was empty. Events like hooks_seal and spans_cleaned populate audit without creating slice history; a fresh sandbox that had re-sealed its hash tripped the diagnostic despite having a perfectly valid empty state. Fix - only count slice-transition events (slice_activated, slice_completed, slice_cancelled, unlocked, emergency_unlock) toward audit_orphan detection.",
             "requirements": [
               "REQ-029"
+            ]
+          },
+          {
+            "id": "M01.S19",
+            "title": "freeze rebinds neutral-state manifest_hash (BUG-032)",
+            "description": "BUG-032. `pragma freeze` updated the lockfile but never updated state.manifest_hash. On a fresh greenfield project, the user edits the seed manifest (via plan-greenfield or spec add-requirement), runs freeze to update the lock, and immediately `pragma doctor` reports `stale_state` because state.json still carries the scaffold-init hash. The user did nothing wrong; freeze is the authoritative \"lock on this manifest\" action and should carry state along with it — but only when no slice is active (a rebind mid-active-slice would hide real drift the gate needs to catch).",
+            "requirements": [
+              "REQ-030"
             ]
           }
         ]
@@ -1098,6 +1106,28 @@
         ],
         "milestone": "M01",
         "slice": "M01.S18"
+      },
+      {
+        "id": "REQ-030",
+        "title": "freeze rebinds state.manifest_hash when neutral",
+        "description": "BUG-032. pragma freeze must rebind state.manifest_hash to the new lock hash when active_slice is None. Leaves state untouched when a slice is active so mid-slice drift still surfaces in verify gate.",
+        "touches": [
+          "packages/pragma/src/pragma/cli/commands/freeze.py"
+        ],
+        "permutations": [
+          {
+            "id": "rebinds_when_neutral",
+            "description": "freeze on a greenfield with no active slice rebinds state.manifest_hash",
+            "expected": "success"
+          },
+          {
+            "id": "leaves_state_when_slice_active",
+            "description": "freeze during an active slice does not touch state.manifest_hash",
+            "expected": "success"
+          }
+        ],
+        "milestone": "M01",
+        "slice": "M01.S19"
       }
     ],
     "spans_retention": null

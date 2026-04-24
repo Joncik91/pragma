@@ -78,13 +78,18 @@ def _build_greenfield_with_refreeze(tmp_project: Path, monkeypatch: pytest.Monke
     payload = json.loads((tmp_project / "pragma.lock.json").read_text(encoding="utf-8"))
     new_hash = payload["manifest_hash"]
     assert isinstance(new_hash, str)
-    # Sanity: state.json still carries the scaffold's original hash,
-    # so any transition that only preserves state.manifest_hash will
-    # leave state stale.
+    # BUG-032 / REQ-030: freeze on a neutral project now rebinds
+    # state.manifest_hash to the new lock hash. These REQ-021 tests
+    # exist to validate that *transitions* (activate/unlock/complete)
+    # also rebind — we have to re-introduce stale state artificially
+    # so the transition-rebind path has something to measure.
+    stale_hash = "sha256:" + "0" * 64
+    state_path = tmp_project / ".pragma" / "state.json"
+    state_obj = json.loads(state_path.read_text(encoding="utf-8"))
+    state_obj["manifest_hash"] = stale_hash
+    state_path.write_text(json.dumps(state_obj), encoding="utf-8")
     scaffold_state = read_state(tmp_project / ".pragma")
-    assert scaffold_state.manifest_hash != new_hash, (
-        "test precondition: scaffold state should hold stale hash before first transition"
-    )
+    assert scaffold_state.manifest_hash != new_hash
     return new_hash
 
 
