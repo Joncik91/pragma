@@ -63,7 +63,7 @@ def activate(
 ) -> None:
     cwd = Path.cwd()
     try:
-        state, _, pragma_dir = _load_state_or_default(cwd)
+        state, lock, pragma_dir = _load_state_or_default(cwd)
         manifest = load_manifest(cwd / "pragma.yaml")
         new_state, audit_fields = activate_transition(
             state=state,
@@ -71,6 +71,7 @@ def activate(
             slice_id=slice_id,
             now_iso=_now_iso(),
             force=force,
+            manifest_hash=lock.manifest_hash,
         )
         write_state(pragma_dir, new_state)
         append_audit(
@@ -151,11 +152,15 @@ def complete(
 ) -> None:
     cwd = Path.cwd()
     try:
-        state, _, pragma_dir = _load_state_or_default(cwd)
+        state, lock, pragma_dir = _load_state_or_default(cwd)
         if not skip_tests and state.active_slice is not None:
             _assert_active_slice_tests_green(cwd, state)
 
-        new_state, audit_fields = complete_transition(state, now_iso=_now_iso())
+        new_state, audit_fields = complete_transition(
+            state,
+            now_iso=_now_iso(),
+            manifest_hash=lock.manifest_hash,
+        )
         write_state(pragma_dir, new_state)
         append_audit(
             pragma_dir,

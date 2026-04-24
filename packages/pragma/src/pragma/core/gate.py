@@ -76,14 +76,14 @@ def _check_milestone_deps_shipped(
 
 
 def _build_activated_state(
-    state: State, slice_id: str, now_iso: str, *, force_prior: str | None = None
+    state: State,
+    slice_id: str,
+    now_iso: str,
+    *,
+    force_prior: str | None = None,
+    manifest_hash: str | None = None,
 ) -> State:
-    """Construct the post-activation State.
-
-    If ``force_prior`` is set, mark that prior slice as ``cancelled``
-    in the new ``slices`` map so it does not linger as in-progress
-    after a ``--force`` switch (BUG-011).
-    """
+    """Post-activation state. Rebinds manifest_hash when given (BUG-022 / REQ-021)."""
     new_slices = dict(state.slices)
     if force_prior is not None and force_prior in new_slices:
         prior = new_slices[force_prior]
@@ -105,7 +105,7 @@ def _build_activated_state(
         version=1,
         active_slice=slice_id,
         gate="LOCKED",
-        manifest_hash=state.manifest_hash,
+        manifest_hash=manifest_hash if manifest_hash is not None else state.manifest_hash,
         slices=new_slices,
         last_transition=LastTransition(
             event="slice_activated",
@@ -125,6 +125,7 @@ def activate(
     slice_id: str,
     now_iso: str,
     force: bool = False,
+    manifest_hash: str | None = None,
 ) -> tuple[State, dict[str, Any]]:
     milestone_id = _locate_slice_or_raise(manifest, slice_id)
     if state.active_slice is not None and not force:
@@ -133,7 +134,13 @@ def activate(
     # BUG-011: --force must cancel the prior active slice rather than
     # leaving it in_progress-forever in state.slices.
     force_prior = state.active_slice if (force and state.active_slice is not None) else None
-    new_state = _build_activated_state(state, slice_id, now_iso, force_prior=force_prior)
+    new_state = _build_activated_state(
+        state,
+        slice_id,
+        now_iso,
+        force_prior=force_prior,
+        manifest_hash=manifest_hash,
+    )
     audit = {
         "event": "slice_activated",
         "slice": slice_id,
@@ -148,7 +155,13 @@ def activate(
     return new_state, audit
 
 
-def unlock_transition(state: State, *, now_iso: str) -> tuple[State, dict[str, Any]]:
+def unlock_transition(
+    state: State,
+    *,
+    now_iso: str,
+    manifest_hash: str | None = None,
+) -> tuple[State, dict[str, Any]]:
+    """Unlock. Rebinds manifest_hash when given (BUG-022 / REQ-021)."""
     if state.active_slice is None:
         raise SliceNotActive(
             message="No active slice; nothing to unlock.",
@@ -175,7 +188,7 @@ def unlock_transition(state: State, *, now_iso: str) -> tuple[State, dict[str, A
         version=1,
         active_slice=sid,
         gate="UNLOCKED",
-        manifest_hash=state.manifest_hash,
+        manifest_hash=manifest_hash if manifest_hash is not None else state.manifest_hash,
         slices=new_slices,
         last_transition=LastTransition(
             event="unlocked",
@@ -196,7 +209,13 @@ def unlock_transition(state: State, *, now_iso: str) -> tuple[State, dict[str, A
     return new_state, audit
 
 
-def complete(state: State, *, now_iso: str) -> tuple[State, dict[str, Any]]:
+def complete(
+    state: State,
+    *,
+    now_iso: str,
+    manifest_hash: str | None = None,
+) -> tuple[State, dict[str, Any]]:
+    """Complete. Rebinds manifest_hash when given (BUG-022 / REQ-021)."""
     if state.active_slice is None:
         raise SliceNotActive(
             message="No active slice; nothing to complete.",
@@ -223,7 +242,7 @@ def complete(state: State, *, now_iso: str) -> tuple[State, dict[str, Any]]:
         version=1,
         active_slice=None,
         gate=None,
-        manifest_hash=state.manifest_hash,
+        manifest_hash=manifest_hash if manifest_hash is not None else state.manifest_hash,
         slices=new_slices,
         last_transition=LastTransition(
             event="slice_completed",

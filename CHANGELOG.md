@@ -5,6 +5,44 @@ All notable changes to Pragma are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.2] — 2026-04-24
+
+**State rebinds on every transition.** Closes BUG-022. Greenfield
+scaffold writes `.pragma/state.json` with the scaffold's initial
+manifest hash. User edits the seed manifest and runs `pragma freeze`
+— lock hash changes. Before v1.1.2, `activate` / `unlock` / `complete`
+all preserved `state.manifest_hash` from the previous state, so
+after shipping every slice `state.manifest_hash` was the scaffold's
+original hash. `pragma verify gate` then failed with `gate_hash_drift`
+even though the repo was functionally neutral (active_slice=None,
+gate=None), and `doctor --emergency-unlock` refused because it saw
+state as already neutral. User had no in-tool recovery and had to
+delete `state.json` by hand.
+
+v1.0.6 (BUG-016) fixed the same problem for `cancel`. v1.1.2
+generalises: every state-writing transition now accepts an optional
+`manifest_hash` kwarg and rebinds when given. CLI sites pass
+`lock.manifest_hash` so the state always catches up.
+
+### Fixed
+
+- **BUG-022 — activate/unlock/complete preserved stale manifest_hash.**
+  Post-shipping verify gate now stays green on refrozen greenfield
+  projects. REQ-021.
+
+### Changed
+
+- `pragma.core.gate.activate`, `unlock_transition`, `complete` all
+  accept `manifest_hash: str | None = None`. Default preserves the
+  prior state's hash (backwards-compat for tests that don't care).
+- `pragma.cli.commands.slice.activate`, `slice.complete`, and
+  `unlock.unlock` thread `lock.manifest_hash` through.
+
+### Meta
+
+One REQ (REQ-021), one new slice (M01.S10), four permutations, all
+green. 391 pragma tests pass.
+
 ## [1.1.1] — 2026-04-24
 
 **Multi-slice PIL patch.** Closes BUG-021 surfaced by the v1.1.0

@@ -107,7 +107,11 @@ def unlock() -> None:
             _assert_slice_unlock_ready(cwd, manifest, state)
 
         now_iso = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
-        new_state, audit_fields = unlock_transition(state, now_iso=now_iso)
+        new_state, audit_fields = unlock_transition(
+            state,
+            now_iso=now_iso,
+            manifest_hash=lock.manifest_hash,
+        )
         write_state(cwd / ".pragma", new_state)
         append_audit(
             cwd / ".pragma",

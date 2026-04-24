@@ -1,7 +1,7 @@
 {
   "version": "1",
-  "manifest_hash": "sha256:96800ca621304f0623248d8e8a9a9da5bf7cb477ddc0ed636cea74b82b539e5f",
-  "generated_at": "2026-04-24T20:29:15Z",
+  "manifest_hash": "sha256:8948e3109f8f74b1c8383fd1e1bbfc084e3c47e31fa6e261210002a770c41c55",
+  "generated_at": "2026-04-24T20:55:09Z",
   "manifest": {
     "version": "2",
     "project": {
@@ -115,6 +115,14 @@
             "description": "Close BUG-021. `pragma slice complete` runs pytest on only the current slice's nodeids for the gate check, and the resulting junit.xml overwrites the previous slice's. After shipping N slices, `pragma report` shows only the Nth slice's tests as verified and every earlier slice's permutations as missing. Fix - after the per-slice gate run succeeds, do a second full-suite run to regenerate a complete junit.xml covering every test in the project. Also teaches the smoke script to ship two slices, not one.",
             "requirements": [
               "REQ-020"
+            ]
+          },
+          {
+            "id": "M01.S10",
+            "title": "v1.1.2 state.manifest_hash rebinds on every transition",
+            "description": "Close BUG-022. Gate-state writing transitions (activate, unlock, complete, cancel) preserved state.manifest_hash from the previous state. Cancel was fixed in v1.0.6 (BUG-016). But greenfield scaffold writes state.json with the original manifest hash, and the user's first `pragma freeze` after editing the seed manifest produces a new hash. Activate, unlock, and complete all propagate the old hash, so after shipping all slices (or cancelling the last one without re-freezing) state.manifest_hash is stale vs the lock. verify gate fails with gate_hash_drift, emergency-unlock refuses (already-neutral), user must delete state.json by hand. Fix - every transition takes an optional manifest_hash arg and rebinds when given, same pattern as cancel in v1.0.6.",
+            "requirements": [
+              "REQ-021"
             ]
           }
         ]
@@ -779,6 +787,40 @@
         ],
         "milestone": "M01",
         "slice": "M01.S9"
+      },
+      {
+        "id": "REQ-021",
+        "title": "state.manifest_hash rebinds to current lock on every transition",
+        "description": "BUG-022. Gate-state transitions (activate, unlock, complete, cancel) preserved state.manifest_hash from the previous state. After a greenfield init followed by manifest edits + freeze, state still carries the scaffold's original hash. verify gate then reports gate_hash_drift once all slices have shipped (active=None, gate=None but state.manifest_hash is the stale one). cancel was already fixed in v1.0.6 (BUG-016); v1.1.2 generalises the same pattern to activate / unlock / complete.",
+        "touches": [
+          "packages/pragma/src/pragma/core/gate.py",
+          "packages/pragma/src/pragma/cli/commands/slice.py",
+          "packages/pragma/src/pragma/cli/commands/unlock.py"
+        ],
+        "permutations": [
+          {
+            "id": "activate_rebinds_manifest_hash",
+            "description": "activate writes state.manifest_hash equal to the current lock hash",
+            "expected": "success"
+          },
+          {
+            "id": "unlock_rebinds_manifest_hash",
+            "description": "unlock writes state.manifest_hash equal to the current lock hash",
+            "expected": "success"
+          },
+          {
+            "id": "complete_rebinds_manifest_hash",
+            "description": "slice complete writes state.manifest_hash equal to the current lock hash",
+            "expected": "success"
+          },
+          {
+            "id": "verify_gate_green_after_shipping_all_slices",
+            "description": "after shipping every slice on a greenfield that was refrozen post-init, verify gate is green",
+            "expected": "success"
+          }
+        ],
+        "milestone": "M01",
+        "slice": "M01.S10"
       }
     ],
     "spans_retention": null
