@@ -531,6 +531,24 @@ requirements:
     expected: success
   milestone: M01
   slice: M01.S12
+- id: REQ-024
+  title: narrative commit filters noise and derives WHY from active slice
+  description: 'BUG-026. Commit message generation must not leak `.pyc`, `__pycache__/`, `.pragma/` cache entries, audit.jsonl, or state lock files into WHAT / WHERE. When a slice is active, WHY must describe the slice title + declared permutation verdicts, not echo the first line of a requirement description.'
+  touches:
+  - packages/pragma/src/pragma/narrative/commit.py
+  - packages/pragma/src/pragma/templates/commit-message.tpl
+  permutations:
+  - id: filters_noise_files
+    description: generated message does not include .pyc, __pycache__, .pragma/*, audit.jsonl, or state lock files in its file list
+    expected: success
+  - id: why_derived_from_active_slice
+    description: when a slice is active, WHY names the slice title and summarises permutation verdicts rather than echoing a REQ description
+    expected: success
+  - id: handles_no_active_slice
+    description: without an active slice, message still renders (fallback WHY) and commit shape stays valid
+    expected: success
+  milestone: M01
+  slice: M01.S13
 milestones:
 - id: M00
   title: Implicit brownfield milestone
@@ -619,3 +637,8 @@ milestones:
     description: 'The aggregator comment in packages/pragma/src/pragma/report/aggregator.py claimed that a requirement with exactly one permutation whose test omits `set_permutation(...)` would still score `ok`. Implementation never matched the claim; such permutations scored `mocked` because the span''s `pragma.permutation` attribute was `"none"` and the matcher required `span_perm == perm_id`. Fix - thread total-permutations-on-requirement into the matcher; when total==1, accept a span with `pragma.permutation == "none"` as matching.'
     requirements:
     - REQ-023
+  - id: M01.S13
+    title: narrative commit drops noise + summarises WHY (BUG-026)
+    description: 'BUG-026. `pragma narrative commit` generated a commit message whose WHAT and WHERE sections listed every staged file including .pyc, .pragma/state.json.lock, audit.jsonl, and cache directories. The WHY was either a blind first-line echo of the active requirement''s description, or the literal placeholder string "Scope unclear; filling in." when no slice was active. Fix - filter the file list (skip .pyc / __pycache__ / .pragma / audit.jsonl / state lock files), summarise WHAT by distinct top-level directory when the list is long, and derive WHY from the active slice title + declared permutation verdicts when a slice is active.'
+    requirements:
+    - REQ-024
