@@ -105,12 +105,40 @@ def _state_manifest_hash(state_path: Path) -> str | None:
     return value
 
 
-def _audit_has_lines(audit_path: Path) -> bool:
+_SLICE_TRANSITION_EVENTS = frozenset(
+    {
+        "slice_activated",
+        "slice_completed",
+        "slice_cancelled",
+        "unlocked",
+        "emergency_unlock",
+    }
+)
+
+
+def _audit_has_slice_transitions(audit_path: Path) -> bool:
+    """True iff audit.jsonl has at least one slice-lifecycle event.
+
+    BUG-030 / REQ-029: events like hooks_seal and spans_cleaned are
+    metadata; they populate audit.jsonl without creating slice
+    history. They must not trip audit_orphan — that diagnostic exists
+    to catch nuked slice state, not nuked metadata.
+    """
     try:
         raw = audit_path.read_text(encoding="utf-8")
     except OSError:
         return False
-    return any(line.strip() for line in raw.splitlines())
+    for line in raw.splitlines():
+        stripped = line.strip()
+        if not stripped:
+            continue
+        try:
+            obj = json.loads(stripped)
+        except json.JSONDecodeError:
+            continue
+        if obj.get("event") in _SLICE_TRANSITION_EVENTS:
+            return True
+    return False
 
 
 def _diag_no_manifest(manifest_path: Path) -> dict[str, object]:
@@ -239,7 +267,7 @@ def _check_settings_mismatch(settings_path: Path, pragma_dir: Path) -> dict[str,
 
 
 def _check_audit_orphan(audit_path: Path, state_path: Path) -> dict[str, object] | None:
-    if not _audit_has_lines(audit_path):
+    if not _audit_has_slice_transitions(audit_path):
         return None
     state_has_slices = False if not state_path.exists() else _state_has_slices(state_path)
     if state_has_slices:

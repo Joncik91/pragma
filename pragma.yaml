@@ -600,6 +600,37 @@ requirements:
     expected: success
   milestone: M01
   slice: M01.S16
+- id: REQ-028
+  title: spec add-requirement assigns milestone and slice
+  description: 'BUG-031. The authoring CLI must be able to produce a freezable requirement without manual YAML editing. Adds --milestone MNN and --slice MNN.SN to pragma spec add-requirement. The resulting pragma.yaml passes pragma freeze and pragma verify manifest without further hand-editing.'
+  touches:
+  - packages/pragma/src/pragma/cli/commands/spec.py
+  permutations:
+  - id: accepts_milestone_and_slice
+    description: pragma spec add-requirement --milestone M01 --slice M01.S1 writes both fields
+    expected: success
+  - id: freeze_passes_after_add
+    description: pragma freeze succeeds on a manifest where every requirement was added via CLI with milestone+slice
+    expected: success
+  - id: rejects_unknown_slice
+    description: pragma spec add-requirement --slice M99.S99 raises slice_not_found with declared slice ids in the remediation
+    expected: reject
+  milestone: M01
+  slice: M01.S17
+- id: REQ-029
+  title: audit_orphan diagnostic ignores non-slice events
+  description: 'BUG-030. doctor diagnosed an audit_orphan false positive whenever audit.jsonl had entries like hooks_seal or spans_cleaned but state.slices was empty. Those events are metadata, not slice history. Fix - the orphan check only counts slice-transition events (slice_activated / slice_completed / slice_cancelled / unlocked / emergency_unlock).'
+  touches:
+  - packages/pragma/src/pragma/core/recovery.py
+  permutations:
+  - id: hooks_seal_only_does_not_trip_orphan
+    description: audit.jsonl containing only hooks_seal entries does not produce audit_orphan
+    expected: success
+  - id: slice_transition_without_state_does_trip
+    description: audit.jsonl containing a slice_activated entry with empty state.slices still produces audit_orphan
+    expected: success
+  milestone: M01
+  slice: M01.S18
 milestones:
 - id: M00
   title: Implicit brownfield milestone
@@ -708,3 +739,13 @@ milestones:
     description: 'BUG-028. The remediation catalogue in pragma.narrative.remediation only had entries for three discipline AST rules (complexity, nesting_depth, loc_per_function). Every other error code — commit_shape_violation, unlock_missing_tests, slice_already_shipped, gate_hash_drift, manifest_schema_error, etc. — fell through to a generic "Rule X triggered: got N budget M" placeholder that carried no useful signal for the user. Fix - add catalogue entries for the handful of error codes a user hits under CI / pre-push and wants specific guidance on. Keep the generic fallback for truly unknown codes so the CLI never crashes.'
     requirements:
     - REQ-027
+  - id: M01.S17
+    title: spec add-requirement accepts --milestone / --slice (BUG-031)
+    description: 'BUG-031. `pragma spec add-requirement` had no flags for milestone or slice. Every requirement on v2 needs both (REQ-008 enforces this at freeze time). The authoring CLI could not produce a valid-freezable REQ — users had to hand-edit pragma.yaml after every add-requirement call. Fix - add optional --milestone and --slice options; thread to the Requirement model; when the target slice does not exist in the manifest, raise slice_not_found with a remediation that names the declared slices.'
+    requirements:
+    - REQ-028
+  - id: M01.S18
+    title: audit_orphan ignores non-slice events (BUG-030)
+    description: 'BUG-030. `pragma doctor` reported an audit_orphan diagnostic when audit.jsonl had any entry but state.slices was empty. Events like hooks_seal and spans_cleaned populate audit without creating slice history; a fresh sandbox that had re-sealed its hash tripped the diagnostic despite having a perfectly valid empty state. Fix - only count slice-transition events (slice_activated, slice_completed, slice_cancelled, unlocked, emergency_unlock) toward audit_orphan detection.'
+    requirements:
+    - REQ-029

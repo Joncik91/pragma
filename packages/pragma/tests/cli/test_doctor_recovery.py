@@ -175,8 +175,12 @@ def test_doctor_claude_settings_mismatch(tmp_path: Path) -> None:
 def test_doctor_audit_orphan(tmp_path: Path) -> None:
     _init_brownfield(tmp_path)
     pragma_dir = tmp_path / ".pragma"
+    # BUG-030 / REQ-029: only slice-transition events trip orphan.
+    # The real event name is `unlocked` (past tense, as emitted by
+    # gate.unlock_transition); the pre-v0.1.1 fixture used `unlock`
+    # which never matched any real event in the first place.
     (pragma_dir / "audit.jsonl").write_text(
-        '{"event":"unlock","actor":"pragma","slice":"S1",'
+        '{"event":"unlocked","actor":"pragma","slice":"S1",'
         '"from_state":"LOCKED","to_state":"UNLOCKED","reason":"test",'
         '"context":{},"ts":"2026-04-21T00:00:00Z"}\n',
         encoding="utf-8",

@@ -17,9 +17,10 @@ from pragma.core.errors import (
     DuplicateRequirementId,
     ManifestSchemaError,
     PragmaError,
+    SliceNotFound,
 )
 from pragma.core.manifest import load_manifest
-from pragma.core.models import Permutation, Requirement
+from pragma.core.models import Manifest, Permutation, Requirement
 from pragma.core.plan_greenfield import plan_greenfield
 
 spec_app = typer.Typer(
@@ -47,6 +48,16 @@ def add_requirement(
             "(repeatable, at least one required)."
         ),
     ),
+    milestone: str | None = typer.Option(
+        None,
+        "--milestone",
+        help="Milestone id (e.g. M01) the new requirement belongs to. v2 schema.",
+    ),
+    slice_: str | None = typer.Option(
+        None,
+        "--slice",
+        help="Slice id (e.g. M01.S1) the new requirement belongs to. v2 schema.",
+    ),
 ) -> None:
     """Append one requirement to pragma.yaml. Idempotent-hostile: errors on duplicate id."""
     cwd = Path.cwd()
@@ -59,25 +70,47 @@ def add_requirement(
             description=description,
             touches=list(touches),
             permutations=parsed_permutations,
+            milestone=milestone,
+            slice_id=slice_,
         )
     except PragmaError as exc:
         typer.echo(exc.to_json())
         raise typer.Exit(code=1) from None
 
     typer.echo(
-        json.dumps(
-            {
-                "ok": True,
-                "added": {
-                    "id": id,
-                    "title": title,
-                    "touches": list(touches),
-                    "permutation_count": len(parsed_permutations),
-                },
-            },
-            sort_keys=True,
-            separators=(",", ":"),
+        _added_json(
+            id,
+            title,
+            list(touches),
+            len(parsed_permutations),
+            milestone,
+            slice_,
         )
+    )
+
+
+def _added_json(
+    rid: str,
+    title: str,
+    touches: list[str],
+    permutation_count: int,
+    milestone: str | None,
+    slice_id: str | None,
+) -> str:
+    return json.dumps(
+        {
+            "ok": True,
+            "added": {
+                "id": rid,
+                "title": title,
+                "touches": touches,
+                "permutation_count": permutation_count,
+                "milestone": milestone,
+                "slice": slice_id,
+            },
+        },
+        sort_keys=True,
+        separators=(",", ":"),
     )
 
 
@@ -146,23 +179,25 @@ def _parse_permutation_arg(arg: str) -> Permutation:
         ) from exc
 
 
-def _append_requirement(
-    yaml_path: Path,
+def _build_requirement_or_raise(
     *,
     rid: str,
     title: str,
     description: str,
     touches: list[str],
     permutations: list[Permutation],
-) -> None:
-    # Validate the new requirement in isolation first.
+    milestone: str | None,
+    slice_id: str | None,
+) -> Requirement:
     try:
-        new_req = Requirement(
+        return Requirement(
             id=rid,
             title=title,
             description=description,
             touches=tuple(touches),
             permutations=tuple(permutations),
+            milestone=milestone,
+            slice=slice_id,
         )
     except ValidationError as exc:
         raise ManifestSchemaError(
@@ -171,9 +206,68 @@ def _append_requirement(
             context={"id": rid},
         ) from exc
 
-    # Load current manifest (validates the existing file).
-    manifest = load_manifest(yaml_path)
 
+def _raise_if_slice_unknown(manifest: Manifest, slice_id: str) -> None:
+    """BUG-031 / REQ-028: refuse add-requirement --slice for unknown slice."""
+    declared = [s.id for m in manifest.milestones for s in m.slices]
+    if slice_id in declared:
+        return
+    raise SliceNotFound(
+        message=f"Slice {slice_id!r} is not declared in the manifest.",
+        remediation=(
+            "Add the slice under milestones[].slices[] in "
+            "pragma.yaml first, or pick one of the declared "
+            f"slices: {', '.join(declared) if declared else '(none yet)'}."
+        ),
+        context={"slice": slice_id, "declared": declared},
+    )
+
+
+def _patch_slice_requirements(raw: dict[str, object], slice_id: str, rid: str) -> None:
+    """BUG-031 / REQ-028: keep slices[*].requirements in sync with the new REQ."""
+    milestones = raw.get("milestones") or []
+    if not isinstance(milestones, list):
+        return
+    for m in milestones:
+        if _try_patch_one_milestone(m, slice_id, rid):
+            return
+
+
+def _try_patch_one_milestone(m: object, slice_id: str, rid: str) -> bool:
+    if not isinstance(m, dict):
+        return False
+    for s in m.get("slices") or []:
+        if isinstance(s, dict) and s.get("id") == slice_id:
+            reqs_list = s.setdefault("requirements", [])
+            if isinstance(reqs_list, list) and rid not in reqs_list:
+                reqs_list.append(rid)
+            return True
+    return False
+
+
+def _append_requirement(
+    yaml_path: Path,
+    *,
+    rid: str,
+    title: str,
+    description: str,
+    touches: list[str],
+    permutations: list[Permutation],
+    milestone: str | None = None,
+    slice_id: str | None = None,
+) -> None:
+    new_req = _build_requirement_or_raise(
+        rid=rid,
+        title=title,
+        description=description,
+        touches=touches,
+        permutations=permutations,
+        milestone=milestone,
+        slice_id=slice_id,
+    )
+    manifest = load_manifest(yaml_path)
+    if slice_id is not None:
+        _raise_if_slice_unknown(manifest, slice_id)
     if any(r.id == rid for r in manifest.requirements):
         raise DuplicateRequirementId(
             message=f"Requirement {rid!r} already exists in pragma.yaml.",
@@ -181,16 +275,15 @@ def _append_requirement(
             context={"id": rid},
         )
 
-    # Append by round-tripping the full YAML: load dict, append to
-    # 'requirements' list, re-dump. yaml.safe_dump has no comment-AST
-    # awareness, so the template's human-facing comment block AND the
-    # original quoting (double vs single quotes) are discarded on the
-    # first append. For v0.1 we accept that trade-off. Comment + quote
-    # preservation is a v0.2+ concern that will require ruamel.yaml
-    # (which does a text-level round-trip).
+    # Append by round-tripping the full YAML. yaml.safe_dump has no
+    # comment-AST awareness, so the template's human-facing comment
+    # block AND the original quoting (double vs single quotes) are
+    # discarded on the first append. v0.2+ can swap to ruamel.yaml.
     raw = yaml.safe_load(yaml_path.read_text(encoding="utf-8"))
     raw.setdefault("requirements", [])
     raw["requirements"].append(new_req.model_dump(mode="json"))
+    if slice_id is not None:
+        _patch_slice_requirements(raw, slice_id, rid)
 
     yaml_text = yaml.safe_dump(
         raw,
