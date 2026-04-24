@@ -155,13 +155,17 @@ project:
 milestones:
 - id: M01
   title: PIL smoke
-  description: minimal first-run flow
+  description: multi-slice first-run flow
   depends_on: []
   slices:
   - id: M01.S1
     title: echo
     description: single permutation to prove the PIL populates
     requirements: [REQ-001]
+  - id: M01.S2
+    title: shout
+    description: second slice so BUG-021 (junit overwritten per slice) stays closed
+    requirements: [REQ-002]
 requirements:
 - id: REQ-001
   title: echo returns input
@@ -173,12 +177,22 @@ requirements:
     expected: success
   milestone: M01
   slice: M01.S1
+- id: REQ-002
+  title: shout uppercases input
+  description: shout(x) returns x.upper().
+  touches: [src/shout_mod.py]
+  permutations:
+  - id: upper
+    description: shout("hi") returns "HI"
+    expected: success
+  milestone: M01
+  slice: M01.S2
 YAML
 
   "$PRAGMA" freeze > /dev/null
   "$PRAGMA" slice activate M01.S1 > /dev/null
 
-  # Red test + red stub.
+  # Red test + red stub for slice 1.
   cat > tests/test_req_001_echo.py <<PY
 from pragma_sdk import set_permutation
 
@@ -201,7 +215,6 @@ PY
 
   "$PRAGMA" unlock > /dev/null
 
-  # Make the test green.
   cat > src/echo_mod.py <<PY
 from pragma_sdk import trace
 
@@ -213,6 +226,44 @@ PY
 
   "$PRAGMA" slice complete > /dev/null
 
+  # Slice 2 — added specifically to exercise BUG-021: if slice complete
+  # overwrites junit instead of regenerating from the full suite, the
+  # final PIL assertion below will show REQ-001 as missing.
+  "$PRAGMA" slice activate M01.S2 > /dev/null
+
+  cat > tests/test_req_002_shout.py <<PY
+from pragma_sdk import set_permutation
+
+from shout_mod import shout
+
+
+def test_req_002_upper() -> None:
+    with set_permutation("upper"):
+        assert shout("hi") == "HI"
+PY
+
+  cat > src/shout_mod.py <<PY
+from pragma_sdk import trace
+
+
+@trace("REQ-002")
+def shout(x: str) -> str:
+    raise NotImplementedError
+PY
+
+  "$PRAGMA" unlock > /dev/null
+
+  cat > src/shout_mod.py <<PY
+from pragma_sdk import trace
+
+
+@trace("REQ-002")
+def shout(x: str) -> str:
+    return x.upper()
+PY
+
+  "$PRAGMA" slice complete > /dev/null
+
   # BUG-020 assertion #1: junit.xml must exist and be non-empty after
   # slice complete.
   if [ ! -s .pragma/pytest-junit.xml ]; then
@@ -220,22 +271,24 @@ PY
     exit 1
   fi
 
-  # BUG-020 assertion #2: --json report shows ok > 0 and missing == 0.
+  # BUG-020 assertion #2: --json report shows ok >= 2 (both slices) and
+  # missing == 0. BUG-021 would fail this because junit from slice 1
+  # would be overwritten by slice 2's per-slice run.
   report_json="$("$PRAGMA" report --json)"
   ok_count="$(echo "$report_json" | "$PY" -c 'import json,sys; print(json.loads(sys.stdin.read())["summary"]["ok"])')"
   missing_count="$(echo "$report_json" | "$PY" -c 'import json,sys; print(json.loads(sys.stdin.read())["summary"]["missing"])')"
-  if [ "$ok_count" -lt 1 ] || [ "$missing_count" -ne 0 ]; then
-    echo "ERROR: pragma report shows ok=$ok_count missing=$missing_count — expected ok>=1 missing=0"
+  if [ "$ok_count" -lt 2 ] || [ "$missing_count" -ne 0 ]; then
+    echo "ERROR: pragma report shows ok=$ok_count missing=$missing_count — expected ok>=2 missing=0 after shipping both slices"
     echo "full report:"
     echo "$report_json"
     exit 1
   fi
 
-  # BUG-020 assertion #3: --human output contains "1 verified" and no
-  # diagnostic banner.
+  # BUG-020 assertion #3: --human output shows both slices verified and
+  # no diagnostic banner.
   report_md="$("$PRAGMA" report --human)"
-  if ! echo "$report_md" | grep -q "1 verified"; then
-    echo "ERROR: pragma report --human missing '1 verified' line"
+  if ! echo "$report_md" | grep -q "2 verified"; then
+    echo "ERROR: pragma report --human missing '2 verified' line (BUG-021 regression check)"
     echo "$report_md"
     exit 1
   fi

@@ -22,6 +22,7 @@ from pragma.core.tests_discovery import (
     collect_tests,
     expected_test_name,
     group_by_name,
+    run_full_suite_junit,
     run_tests,
 )
 
@@ -127,6 +128,16 @@ def _assert_active_slice_tests_green(cwd: Path, state: State) -> None:
             remediation="Make the tests pass (or run with --skip-tests for the bootstrap case).",
             context={"failing": failing},
         )
+
+    # BUG-021 / REQ-020: the per-slice run above wrote a junit.xml
+    # that only covers this slice's tests. `pragma report` across
+    # multiple shipped slices would then flag every earlier slice's
+    # permutations as missing. Regenerate junit from a full-suite
+    # run so the PIL reflects the whole project. The gate check
+    # already passed on this slice; we tolerate unrelated failures
+    # in other slices' tests (the full-suite run's exit code is
+    # advisory here, not gating).
+    run_full_suite_junit(tests_dir=tests_dir, cwd=cwd)
 
 
 @slice_app.command(name="complete")

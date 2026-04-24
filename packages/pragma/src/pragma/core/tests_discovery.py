@@ -141,3 +141,54 @@ def run_tests(
     for nodeid in nodeids:
         results.setdefault(nodeid, "error")
     return results
+
+
+def run_full_suite_junit(
+    *,
+    tests_dir: Path,
+    cwd: Path,
+    junit_xml: Path | None = None,
+) -> bool:
+    """Regenerate junit.xml from a full-suite pytest run (BUG-021/REQ-020).
+
+    ``slice complete`` runs pytest on only the active slice's nodeids
+    for its gate check, and the resulting junit overwrites any
+    previous slice's. Multi-slice projects then show every earlier
+    slice as ``missing`` in ``pragma report``. Fix: after the per-
+    slice gate run succeeds, call this helper to regenerate
+    ``.pragma/pytest-junit.xml`` from a full-suite run so the PIL
+    reflects every test in the project.
+
+    Returns True if pytest exited cleanly (returncode 0 or 5,
+    meaning all-passed or no-tests-collected). False on any other
+    exit — caller can decide whether to fail loudly or warn. We
+    don't raise because the gate check already passed; if the
+    full-suite run hits a pre-existing unrelated failure in some
+    other slice's tests, callers may want to keep the slice
+    shipped anyway.
+    """
+    effective_junit = junit_xml if junit_xml is not None else cwd / ".pragma" / "pytest-junit.xml"
+    effective_junit.parent.mkdir(parents=True, exist_ok=True)
+    cmd = [
+        sys.executable,
+        "-m",
+        "pytest",
+        str(tests_dir),
+        "--tb=no",
+        "--no-header",
+        "-q",
+        "-p",
+        "no:cacheprovider",
+        "-o",
+        "addopts=",
+        f"--junit-xml={effective_junit}",
+        "-o",
+        "junit_family=xunit2",
+    ]
+    proc = subprocess.run(  # noqa: S603 — controlled pytest invocation
+        cmd,
+        capture_output=True,
+        text=True,
+        cwd=str(cwd),
+    )
+    return proc.returncode in (0, 5)

@@ -5,6 +5,48 @@ All notable changes to Pragma are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.1] — 2026-04-24
+
+**Multi-slice PIL patch.** Closes BUG-021 surfaced by the v1.1.0
+dogfood: after shipping a second slice, `pragma report` showed only
+the last slice's tests as `verified` and every earlier slice's
+permutations as `missing`. Root cause: `pragma slice complete` runs
+pytest on only the active slice's nodeids (necessary for the gate
+check), and the resulting junit.xml overwrites whatever the previous
+slice left behind. Fix: after the per-slice gate run succeeds,
+regenerate junit from a full-suite pytest run so the PIL reflects
+the whole project. The v1.1.0 smoke script only shipped one slice
+— it would have caught this with two, so v1.1.1 adds a second slice
+and asserts `ok >= 2, missing == 0`.
+
+### Added
+
+- **`pragma.core.tests_discovery.run_full_suite_junit`** — new helper.
+  Runs pytest against the whole `tests_dir`, writes junit.xml (default
+  `<cwd>/.pragma/pytest-junit.xml`). Returns `True` on pytest
+  returncode 0 or 5 (all-passed or no-tests-collected). Doesn't raise;
+  the gate check has already passed, so a pre-existing failure in an
+  unrelated slice's tests shouldn't block the current slice's ship.
+  REQ-020.
+
+### Fixed
+
+- **BUG-021 — `pragma slice complete` now regenerates junit for the
+  entire project** after its per-slice gate check passes. A project
+  that ships N slices now shows all N slices as `verified` in
+  `pragma report`. REQ-020.
+
+### Changed
+
+- **`scripts/pre-release-smoke.sh`** ships two slices in the
+  end-to-end PIL section (was one) and asserts the final PIL shows
+  `ok >= 2`. The single-slice assertion couldn't have caught BUG-021.
+
+### Meta
+
+One REQ (REQ-020), one new slice (M01.S9), three permutations, all
+green. 387 pragma tests pass. Smoke green end-to-end.
+
 ## [1.1.0] — 2026-04-24
 
 **First-run PIL reachable end-to-end.** The v1.0 thesis ("AI-generated

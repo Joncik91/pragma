@@ -455,6 +455,25 @@ requirements:
     expected: success
   milestone: M01
   slice: M01.S8
+- id: REQ-020
+  title: slice complete emits junit covering all project tests not just the active slice
+  description: 'BUG-021. After `pragma slice complete` succeeds its per-slice gate check, it must regenerate `.pragma/pytest-junit.xml` from a full-suite pytest run so `pragma report` across multiple shipped slices sees every permutation, not just the last slice''s. Without this, a project that ships N slices reports N-1 slices as `missing` in the PIL even though every test is green. Fix is a dedicated helper `run_full_suite_junit` that runs pytest against the whole tests_dir and writes junit; called by slice complete after gate-check, not by unlock (unlock only cares about per-slice red-test verdicts).'
+  touches:
+  - packages/pragma/src/pragma/core/tests_discovery.py
+  - packages/pragma/src/pragma/cli/commands/slice.py
+  - scripts/pre-release-smoke.sh
+  permutations:
+  - id: run_full_suite_writes_junit_for_all_tests
+    description: run_full_suite_junit produces a junit.xml containing every test under tests_dir
+    expected: success
+  - id: slice_complete_regenerates_full_junit
+    description: after `pragma slice complete` the junit contains tests from every previously-shipped slice plus the current one
+    expected: success
+  - id: smoke_ships_two_slices_and_pil_sees_both
+    description: the pre-release smoke script ships two slices and asserts pragma report shows both as verified
+    expected: success
+  milestone: M01
+  slice: M01.S9
 milestones:
 - id: M00
   title: Implicit brownfield milestone
@@ -523,3 +542,8 @@ milestones:
     - REQ-017
     - REQ-018
     - REQ-019
+  - id: M01.S9
+    title: v1.1.1 multi-slice PIL reflects the whole project
+    description: Close BUG-021. `pragma slice complete` runs pytest on only the current slice's nodeids for the gate check, and the resulting junit.xml overwrites the previous slice's. After shipping N slices, `pragma report` shows only the Nth slice's tests as verified and every earlier slice's permutations as missing. Fix - after the per-slice gate run succeeds, do a second full-suite run to regenerate a complete junit.xml covering every test in the project. Also teaches the smoke script to ship two slices, not one.
+    requirements:
+    - REQ-020
