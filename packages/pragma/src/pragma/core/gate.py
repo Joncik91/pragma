@@ -13,6 +13,7 @@ from pragma.core.errors import (
     GateWrongState,
     MilestoneDepUnshipped,
     SliceAlreadyActive,
+    SliceAlreadyShipped,
     SliceNotActive,
     SliceNotFound,
 )
@@ -130,6 +131,20 @@ def activate(
     milestone_id = _locate_slice_or_raise(manifest, slice_id)
     if state.active_slice is not None and not force:
         _reject_already_active(state.active_slice, slice_id)
+    # BUG-024 / REQ-022: refuse to re-activate a shipped slice unless
+    # --force is given. Before this guard, activate on a shipped slice
+    # silently flipped status=shipped -> in_progress and erased the
+    # ship record, breaking dep-gated slices downstream.
+    existing = state.slices.get(slice_id)
+    if existing is not None and existing.status == "shipped" and not force:
+        raise SliceAlreadyShipped(
+            message=f"Slice {slice_id!r} is already shipped.",
+            remediation=(
+                "Shipped slices are terminal. Pass --force to deliberately "
+                "re-open (loses the ship record), or pick a different slice."
+            ),
+            context={"slice": slice_id, "status": "shipped"},
+        )
     _check_milestone_deps_shipped(state, manifest, milestone_id, slice_id)
     # BUG-011: --force must cancel the prior active slice rather than
     # leaving it in_progress-forever in state.slices.

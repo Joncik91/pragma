@@ -99,6 +99,11 @@ class SliceAlreadyActive(PragmaError):
 
 
 @dataclass(kw_only=True)
+class SliceAlreadyShipped(PragmaError):
+    code: str = "slice_already_shipped"
+
+
+@dataclass(kw_only=True)
 class SliceNotActive(PragmaError):
     code: str = "slice_not_active"
 

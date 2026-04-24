@@ -18,3 +18,5 @@
 {"actor":"doctor","context":{"previous_gate":"LOCKED","previous_slice":"M01.S9"},"event":"emergency_unlock","from_state":"LOCKED","reason":"manifest extended with REQ-020","slice":"M01.S9","to_state":null,"ts":"2026-04-24T20:33:31Z"}
 {"actor":"cli","context":{},"event":"slice_activated","from_state":null,"reason":"pragma slice activate M01.S10","slice":"M01.S10","to_state":"LOCKED","ts":"2026-04-24T20:55:09Z"}
 {"actor":"cli","context":{},"event":"slice_cancelled","from_state":"LOCKED","reason":"pragma slice cancel (slice M01.S10)","slice":"M01.S10","to_state":null,"ts":"2026-04-24T20:59:07Z"}
+{"actor":"cli","context":{},"event":"slice_activated","from_state":null,"reason":"pragma slice activate M01.S11","slice":"M01.S11","to_state":"LOCKED","ts":"2026-04-24T21:42:39Z"}
+{"actor":"cli","context":{},"event":"slice_cancelled","from_state":"LOCKED","reason":"pragma slice cancel (slice M01.S11)","slice":"M01.S11","to_state":null,"ts":"2026-04-24T21:42:40Z"}

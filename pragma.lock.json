@@ -1,7 +1,7 @@
 {
   "version": "1",
-  "manifest_hash": "sha256:8948e3109f8f74b1c8383fd1e1bbfc084e3c47e31fa6e261210002a770c41c55",
-  "generated_at": "2026-04-24T20:55:09Z",
+  "manifest_hash": "sha256:5b16de99e90b643b2f9a01ec2429840c46000a27d4ec6595d232ac49c9cd0ef8",
+  "generated_at": "2026-04-24T21:41:50Z",
   "manifest": {
     "version": "2",
     "project": {
@@ -123,6 +123,14 @@
             "description": "Close BUG-022. Gate-state writing transitions (activate, unlock, complete, cancel) preserved state.manifest_hash from the previous state. Cancel was fixed in v1.0.6 (BUG-016). But greenfield scaffold writes state.json with the original manifest hash, and the user's first `pragma freeze` after editing the seed manifest produces a new hash. Activate, unlock, and complete all propagate the old hash, so after shipping all slices (or cancelling the last one without re-freezing) state.manifest_hash is stale vs the lock. verify gate fails with gate_hash_drift, emergency-unlock refuses (already-neutral), user must delete state.json by hand. Fix - every transition takes an optional manifest_hash arg and rebinds when given, same pattern as cancel in v1.0.6.",
             "requirements": [
               "REQ-021"
+            ]
+          },
+          {
+            "id": "M01.S11",
+            "title": "slice activate refuses to un-ship a shipped slice (BUG-024)",
+            "description": "Surfaced by the v0.1.0 edge-case dogfood. `pragma slice activate <id>` on a slice already in state.slices with status=shipped silently flipped it back to in_progress + LOCKED, losing the ship record, blocking dep-gated slices that were previously free to activate, and leaving no doctor diagnostic. Fix - refuse activation when the requested slice is already shipped, with a remediation pointing at either --force (if the intent is explicit re-open) or just noting that shipped slices are terminal.",
+            "requirements": [
+              "REQ-022"
             ]
           }
         ]
@@ -821,6 +829,34 @@
         ],
         "milestone": "M01",
         "slice": "M01.S10"
+      },
+      {
+        "id": "REQ-022",
+        "title": "slice activate refuses to un-ship a shipped slice",
+        "description": "BUG-024. Before this fix, `pragma slice activate <id>` on a slice whose state.slices record already had status=shipped quietly transitioned it back to in_progress + LOCKED, erased the ship record, and (cascadingly) made dependent slices in later milestones refuse activation because the dep check walks state.slices. No confirmation, no warning, no recoverable audit. Real data loss from a perfectly plausible command. Fix - activate raises slice_already_shipped when the target slice is shipped (without --force). With --force the existing BUG-011 behaviour takes over.",
+        "touches": [
+          "packages/pragma/src/pragma/core/gate.py",
+          "packages/pragma/src/pragma/core/errors.py"
+        ],
+        "permutations": [
+          {
+            "id": "activate_refuses_shipped",
+            "description": "activate on a shipped slice raises slice_already_shipped",
+            "expected": "reject"
+          },
+          {
+            "id": "activate_force_reopens_shipped",
+            "description": "activate --force on a shipped slice reopens it deliberately",
+            "expected": "success"
+          },
+          {
+            "id": "shipped_record_survives_refused_activate",
+            "description": "after a refused activate, state.slices still shows the slice as shipped",
+            "expected": "success"
+          }
+        ],
+        "milestone": "M01",
+        "slice": "M01.S11"
       }
     ],
     "spans_retention": null
