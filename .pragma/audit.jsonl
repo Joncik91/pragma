@@ -5,3 +5,4 @@
 {"actor":"cli","context":{},"event":"slice_activated","from_state":null,"reason":"pragma slice activate M01.S6","slice":"M01.S6","to_state":"LOCKED","ts":"2026-04-24T16:16:43Z"}
 {"actor":"cli","context":{},"event":"unlocked","from_state":"LOCKED","reason":"pragma unlock (slice M01.S6)","slice":"M01.S6","to_state":"UNLOCKED","ts":"2026-04-24T16:17:56Z"}
 {"actor":"cli","context":{},"event":"slice_completed","from_state":"UNLOCKED","reason":"pragma slice complete (slice M01.S6)","slice":"M01.S6","to_state":null,"ts":"2026-04-24T16:27:29Z"}
+{"actor":"doctor","context":{"bytes_freed":1040922,"files_removed":26,"strategy":"keep_runs=20"},"event":"spans_cleaned","from_state":null,"reason":"clean_spans retention","slice":null,"to_state":null,"ts":"2026-04-24T18:04:04Z"}
