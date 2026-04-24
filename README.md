@@ -83,7 +83,9 @@ See [`docs/migrate.md`](docs/migrate.md) for failure modes.
 - **Recovery** — `pragma doctor` is a real diagnostic tool: eight
   classifier codes with exact remediation commands. `pragma doctor
   --emergency-unlock --reason "..."` is the escape hatch for a
-  wedged gate.
+  wedged gate. `pragma doctor --clean-spans` prunes old
+  `.pragma/spans/*.jsonl` by retention policy (`--keep-runs` /
+  `--keep-days`, or `spans_retention:` in the manifest).
 - **Reports** — `pragma report` produces byte-identical JSON from the
   same inputs. `pragma narrative commit` / `pragma narrative pr`
   compose senior-engineer-grade commit and PR copy from the active

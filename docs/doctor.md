@@ -16,13 +16,15 @@ to stdout. Shape:
 ```json
 {
   "ok": true,
-  "pragma_version": "1.0.0",
+  "pragma_version": "1.0.5",
   "cwd": "/path/to/repo",
   "manifest_exists": true,
   "lock_exists": true,
   "pragma_dir_exists": true,
   "pre_commit_config_exists": true,
   "claude_settings_exists": true,
+  "spans_count": 42,
+  "spans_bytes": 180224,
   "diagnostics": [
     {
       "code": "stale_state",
@@ -223,3 +225,51 @@ pragma doctor --emergency-unlock --reason "abandoning M01.S3 — requirement REQ
 After emergency unlock you are back at the start of the slice flow:
 `pragma slice activate <id>` → red tests → `pragma unlock` → green →
 `pragma slice complete`.
+
+## Span retention (`--clean-spans`)
+
+Every pytest run writes a uniquely-named JSONL under
+`.pragma/spans/`. Those files are the raw input to
+`pragma report` and to the PIL narrative — evidence, not cache — but
+they accumulate linearly with test runs. On a long-running project
+the directory starts slowing `ls`, `pragma report`, and (eventually)
+disk.
+
+`pragma doctor` surfaces accumulation in standard mode:
+`spans_count` and `spans_bytes` are always in the payload. When
+they get uncomfortable, prune with:
+
+```shell
+pragma doctor --clean-spans                 # default: keep_runs=50
+pragma doctor --clean-spans --keep-runs 20
+pragma doctor --clean-spans --keep-days 30
+pragma doctor --clean-spans --keep-runs 50 --keep-days 30   # union: either rule keeps
+pragma doctor --clean-spans --dry-run       # preview, no fs change
+```
+
+`--keep-runs N` keeps the N newest files by mtime. `--keep-days D`
+keeps files whose mtime is within D days. Both together take the
+union — a file is kept when it satisfies *either* rule (the more
+lenient wins).
+
+Prefer writing your retention policy once in `pragma.yaml` so the
+CLI call stays short:
+
+```yaml
+spans_retention:
+  keep_runs: 50
+  keep_days: 30
+```
+
+CLI flags override the manifest block for one invocation.
+
+Every non-dry `--clean-spans` run appends one line to
+`.pragma/audit.jsonl` with event `spans_cleaned`, `files_removed`,
+`bytes_freed`, and the `strategy` used. You still have the
+forensic record of what rolled off, even though the span files
+themselves are gone.
+
+Defaults: `keep_runs=50` when neither the CLI flag nor the manifest
+block is present. Nothing is auto-pruned — `pragma doctor
+--clean-spans` runs on demand, never as a side effect of another
+command.
