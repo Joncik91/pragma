@@ -57,15 +57,16 @@ repos:
   - repo: local
     hooks:
       - id: deptry
-        name: deptry (pragma-sdk only — KI-14)
+        name: deptry (all packages)
         # Top-level pyproject is a uv workspace with no [project]; the
-        # upstream deptry hook fails on it. Running per-package through
-        # the project venv (same pattern as mypy-pragma). pragma-sdk
-        # currently passes cleanly. `packages/pragma` has 8 DEP002
-        # false-positives (dev deps listed under project.dependencies
-        # instead of project.optional-dependencies.dev) — a config-shape
-        # cleanup parked as KI-14, not a Pragma bug.
-        entry: bash -c 'ROOT="$(git rev-parse --show-toplevel)"; PY="$ROOT/.venv/bin/python3"; [ -x "$PY" ] || PY=python3; cd "$ROOT/packages/pragma-sdk" && exec "$PY" -m deptry src'
+        # upstream deptry hook fails on it. Runs per-package through
+        # the project venv (same pattern as mypy-pragma). v1.0.6
+        # (BUG-019 / REQ-015) closes the prior single-package
+        # workaround by configuring `[tool.deptry]
+        # pep621_dev_dependency_groups = ["dev"]` in the pragma
+        # pyproject so deptry treats optional-dependencies.dev as
+        # dev-only.
+        entry: bash -c 'ROOT="$(git rev-parse --show-toplevel)"; PY="$ROOT/.venv/bin/python3"; [ -x "$PY" ] || PY=python3; for pkg in packages/pragma packages/pragma-sdk; do echo "=== deptry $pkg ==="; (cd "$ROOT/$pkg" && "$PY" -m deptry src) || exit $?; done'
         language: system
         pass_filenames: false
         always_run: true

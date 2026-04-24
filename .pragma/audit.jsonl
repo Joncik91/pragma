@@ -6,3 +6,7 @@
 {"actor":"cli","context":{},"event":"unlocked","from_state":"LOCKED","reason":"pragma unlock (slice M01.S6)","slice":"M01.S6","to_state":"UNLOCKED","ts":"2026-04-24T16:17:56Z"}
 {"actor":"cli","context":{},"event":"slice_completed","from_state":"UNLOCKED","reason":"pragma slice complete (slice M01.S6)","slice":"M01.S6","to_state":null,"ts":"2026-04-24T16:27:29Z"}
 {"actor":"doctor","context":{"bytes_freed":1040922,"files_removed":26,"strategy":"keep_runs=20"},"event":"spans_cleaned","from_state":null,"reason":"clean_spans retention","slice":null,"to_state":null,"ts":"2026-04-24T18:04:04Z"}
+{"actor":"cli","context":{},"event":"slice_activated","from_state":null,"reason":"pragma slice activate M01.S7","slice":"M01.S7","to_state":"LOCKED","ts":"2026-04-24T18:37:05Z"}
+{"actor":"doctor","context":{"previous_gate":"LOCKED","previous_slice":"M01.S7"},"event":"emergency_unlock","from_state":"LOCKED","reason":"manifest extended with REQ-011..015 after initial M01.S7 activate","slice":"M01.S7","to_state":null,"ts":"2026-04-24T19:01:24Z"}
+{"actor":"cli","context":{},"event":"slice_activated","from_state":null,"reason":"pragma slice activate M01.S7","slice":"M01.S7","to_state":"LOCKED","ts":"2026-04-24T19:01:24Z"}
+{"actor":"cli","context":{},"event":"slice_cancelled","from_state":"LOCKED","reason":"pragma slice cancel (slice M01.S7)","slice":"M01.S7","to_state":null,"ts":"2026-04-24T19:01:53Z"}

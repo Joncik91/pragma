@@ -5,6 +5,87 @@ All notable changes to Pragma are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.6] — 2026-04-24
+
+**Bug sweep.** Closes five defects surfaced by the v1.0.5 dogfood
+session (and the brownfield KIs parked at v1.0.5 release). No feature
+changes; no schema changes. Unblocks the first-greenfield-project
+flow end-to-end.
+
+Bug IDs are unified under `BUG-NNN` from this release forward — see
+the convention note in v1.0.5's Known Issues section. The two prior
+`KI-N` entries are renamed in place: KI-13 → BUG-018, KI-14 → BUG-019.
+
+### Fixed
+
+- **BUG-015 — `run_tests` inherited `-q` from a user `pytest.ini` `addopts`.**
+  Compressed per-test output from `node::id PASSED` lines to `.`/`F`
+  dots, which made `run_tests`'s output regex match zero lines and
+  reported every test as `error` even when passing. `slice complete`
+  on a fresh greenfield project (which ships `pytest.ini` with
+  `addopts = -q`) was broken end-to-end. Fix: pass `-o addopts=` to
+  the pytest subprocess. Matches the `collect_tests` fix from v1.0.3
+  (BUG-009 / ex-KI-12). REQ-011.
+
+- **BUG-016 — `slice cancel` left a stale `manifest_hash` in state.**
+  Cancel only nulled `active_slice` and `gate`. If the manifest had
+  been rewritten between activate and cancel, post-cancel state
+  failed `gate_hash_drift` on the next `pragma verify gate`, and
+  `doctor --emergency-unlock` refused because it saw state as
+  already-neutral. The user had no in-tool recovery path and had to
+  delete `.pragma/state.json` by hand. Fix: `cancel_transition` now
+  accepts `manifest_hash=lock.manifest_hash` from the caller and
+  rebinds state to the current hash. REQ-012.
+
+- **BUG-017 — greenfield scaffold had no `src/` ↔ `tests/` import
+  glue.** The first test file following the documented
+  `test_req_<id>_<permutation>` convention raised `ModuleNotFoundError`
+  at pytest collection because nothing put `src/` on `sys.path`, which
+  in turn blocked `pragma unlock`. Fix: `pragma init --greenfield`
+  now renders a `tests/conftest.py` that inserts `<project>/src` into
+  `sys.path`. REQ-013.
+
+- **BUG-018 [ex-KI-13] — `collect_tests` / `run_tests` subprocess cwd
+  broke on brownfield layouts with nested `tests_root`.** Both
+  functions chdir'd pytest to `tests_dir.parent`; emitted nodeids
+  were relative to the user cwd, so for nested layouts pytest looked
+  for nodeids at a doubled path and reported every test as `error`.
+  Fix: both functions now accept an optional `cwd` parameter
+  (defaulting to `tests_dir.parent` for backwards compat); callers
+  (`slice`, `unlock`, `verify`) thread `Path.cwd()` through.
+  REQ-014. **Unblocks `pragma slice complete` on Pragma's own repo**
+  — no more `--skip-tests` workaround needed on the brownfield path.
+
+- **BUG-019 [ex-KI-14] — deptry hook flagged dev tools as unused
+  runtime deps on `packages/pragma`.** The pyproject already had
+  them in `[project.optional-dependencies.dev]`, but deptry walked
+  both dependency groups together. Fix: add
+  `[tool.deptry] pep621_dev_dependency_groups = ["dev"]` to
+  `packages/pragma/pyproject.toml`. Deptry pre-commit hook now runs
+  on both packages (was scoped to pragma-sdk only in v1.0.5 as the
+  KI-14 workaround). REQ-015.
+
+### Changed
+
+- `pragma.core.tests_discovery.collect_tests` and `run_tests` now
+  accept an optional `cwd: Path | None = None` keyword. Default
+  preserves the v1.0.5 behaviour. See BUG-018.
+- `pragma.core.gate.cancel` accepts `manifest_hash: str | None = None`.
+  Default preserves the v1.0.5 behaviour. See BUG-016.
+- New template `packages/pragma/src/pragma/templates/conftest.py.tpl`
+  rendered to `<project>/tests/conftest.py` on `init --greenfield`.
+- `.pre-commit-config.yaml` deptry hook widened from
+  `packages/pragma-sdk` to `packages/pragma + packages/pragma-sdk`.
+
+### Meta
+
+This release is a defect batch, not a feature. One new slice
+(M01.S7), five REQs (REQ-011 … REQ-015), fourteen permutations, all
+green. Gate ceremony was deferred via `slice cancel` + release-prep
+commit-on-main (same shape as v1.0.5 under ex-KI-13) because
+bug-sweep fixes are green-on-arrival and the test-first invariant
+has no meaningful form for "fix three modules at once."
+
 ## [1.0.5] — 2026-04-24
 
 **Span retention.** Closes the v1.0.4-parked paper cut that
@@ -70,7 +151,8 @@ its own cycle.
 > BUG-018 and BUG-019 respectively; the descriptions below are updated
 > in place.
 
-- **BUG-018 [ex-KI-13]: `pragma slice complete` subprocess cwd breaks for brownfield
+- **~~BUG-018 [ex-KI-13]~~ — resolved in v1.0.6 (REQ-014). Kept here for historical context.**
+  `pragma slice complete` subprocess cwd breaks for brownfield
   workspaces with nested `tests_root` (e.g. Pragma's own
   `tests_root: packages/pragma/tests/`).**
   `pragma.core.tests_discovery.run_tests` invokes pytest with
@@ -86,7 +168,8 @@ its own cycle.
   the repo root into both functions as an explicit parameter and
   cwd there. Deferred to a focused follow-up so v1.0.5 stays
   scoped to span retention.
-- **BUG-019 [ex-KI-14]: deptry hook runs on `pragma-sdk` only — `pragma` package
+- **~~BUG-019 [ex-KI-14]~~ — resolved in v1.0.6 (REQ-015). Kept here for historical context.**
+  Deptry hook runs on `pragma-sdk` only — `pragma` package
   has eight DEP002 false-positives** where dev-only tools
   (ruff, mypy, pytest-cov, pre-commit, types-PyYAML, opentelemetry-api,
   opentelemetry-sdk) are listed under `[project.dependencies]` rather

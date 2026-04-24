@@ -233,9 +233,9 @@ def _check_manifest(cwd: Path) -> dict[str, object]:
     return {"ok": True, "check": "manifest", "manifest_hash": lock.manifest_hash}
 
 
-def _collect_or_raise(tests_dir: Path) -> dict[str, list[CollectedTest]]:
+def _collect_or_raise(tests_dir: Path, *, cwd: Path) -> dict[str, list[CollectedTest]]:
     try:
-        collected = collect_tests(tests_dir)
+        collected = collect_tests(tests_dir, cwd=cwd)
     except CollectError as exc:
         raise VerifyCollectFailed(
             message=f"pytest could not collect tests: {exc}",
@@ -245,10 +245,15 @@ def _collect_or_raise(tests_dir: Path) -> dict[str, list[CollectedTest]]:
 
 
 def _raise_if_red_tests_green(
-    tests_dir: Path, expected: list[str], by_name: dict[str, list[CollectedTest]]
+    tests_dir: Path,
+    expected: list[str],
+    by_name: dict[str, list[CollectedTest]],
+    *,
+    cwd: Path,
 ) -> None:
     # BUG-006: include every parametrised variant per expected name.
-    results = run_tests(tests_dir, [c.nodeid for n in expected for c in by_name[n]])
+    # BUG-018 / REQ-014: thread the project root.
+    results = run_tests(tests_dir, [c.nodeid for n in expected for c in by_name[n]], cwd=cwd)
     passing = [nid for nid, v in results.items() if v == "passed"]
     if passing:
         raise UnlockTestPassing(
@@ -275,7 +280,7 @@ def _assert_locked_slice_tests_red(cwd: Path, manifest: Manifest, state: State) 
             remediation=f"Create {tests_dir} and add failing tests.",
             context={"tests_root": str(tests_dir)},
         )
-    by_name = _collect_or_raise(tests_dir)
+    by_name = _collect_or_raise(tests_dir, cwd=cwd)
     missing = [n for n in expected if n not in by_name]
     if missing:
         raise UnlockMissingTests(
@@ -283,7 +288,7 @@ def _assert_locked_slice_tests_red(cwd: Path, manifest: Manifest, state: State) 
             remediation="Add failing tests per the naming convention.",
             context={"missing": missing},
         )
-    _raise_if_red_tests_green(tests_dir, expected, by_name)
+    _raise_if_red_tests_green(tests_dir, expected, by_name, cwd=cwd)
 
 
 def _check_gate(cwd: Path) -> dict[str, object]:

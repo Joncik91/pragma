@@ -244,22 +244,13 @@ def complete(state: State, *, now_iso: str) -> tuple[State, dict[str, Any]]:
     return new_state, audit
 
 
-def cancel(state: State, *, now_iso: str) -> tuple[State, dict[str, Any]]:
-    """Cancel the active slice.
-
-    KI-5: slices that never reached UNLOCKED have no useful history
-    (the user activated by mistake, changed their mind, or the
-    transition failed halfway). Those are erased from state.slices
-    entirely so a subsequent ``pragma freeze`` on a slightly-edited
-    manifest does not cause gate_hash_drift against a stale slice
-    record that the state machine can't move forward or clean up.
-
-    Slices that did reach UNLOCKED at some point are genuine history:
-    they stay in state.slices with status=cancelled for downstream
-    narrative / doctor audit. The distinction is ``unlocked_at`` -
-    non-None means the gate observed the slice pass the red-tests
-    check, so the record is worth keeping.
-    """
+def cancel(
+    state: State,
+    *,
+    now_iso: str,
+    manifest_hash: str | None = None,
+) -> tuple[State, dict[str, Any]]:
+    """Cancel the active slice. Rebinds manifest_hash when given (BUG-016)."""
     if state.active_slice is None:
         raise SliceNotActive(
             message="No active slice; nothing to cancel.",
@@ -284,7 +275,7 @@ def cancel(state: State, *, now_iso: str) -> tuple[State, dict[str, Any]]:
         version=1,
         active_slice=None,
         gate=None,
-        manifest_hash=state.manifest_hash,
+        manifest_hash=manifest_hash if manifest_hash is not None else state.manifest_hash,
         slices=new_slices,
         last_transition=LastTransition(
             event="slice_cancelled",

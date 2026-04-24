@@ -55,7 +55,7 @@ def _assert_slice_unlock_ready(cwd: Path, manifest: Manifest, state: State) -> N
     slice_reqs = slice_requirements(manifest, state.active_slice)
     expected = [expected_test_name(r.id, p.id) for r in slice_reqs for p in r.permutations]
     try:
-        collected = collect_tests(tests_dir)
+        collected = collect_tests(tests_dir, cwd=cwd)
     except CollectError as exc:
         raise UnlockCollectFailed(
             message=f"pytest could not collect tests: {exc}",
@@ -76,7 +76,8 @@ def _assert_slice_unlock_ready(cwd: Path, manifest: Manifest, state: State) -> N
     # BUG-006: include every parametrised variant so unlock's "must be red"
     # check covers all of them, not just the one pytest collected last.
     nodeids = [c.nodeid for n in expected for c in by_name[n]]
-    results = run_tests(tests_dir, nodeids)
+    # BUG-018 / REQ-014: thread the project root.
+    results = run_tests(tests_dir, nodeids, cwd=cwd)
     passing = [nid for nid, v in results.items() if v == "passed"]
     if passing:
         raise UnlockTestPassing(

@@ -128,8 +128,17 @@ def scaffold_greenfield(cwd: Path, *, name: str, language: str) -> list[str]:
         created.append("pytest.ini")
 
     src_dir.mkdir(exist_ok=True)
-    (cwd / "tests").mkdir(exist_ok=True)
+    tests_dir = cwd / "tests"
+    tests_dir.mkdir(exist_ok=True)
     created.extend(["src/", "tests/"])
+
+    # BUG-017 / REQ-013: wire src/ onto sys.path so the first test file
+    # a user writes can `from <module> import ...` without needing the
+    # project to be pip-installed. Rendered, not copied, so the docstring
+    # reports the project name.
+    conftest_tpl = env.get_template("conftest.py.tpl")
+    (tests_dir / "conftest.py").write_text(conftest_tpl.render(project_name=name), encoding="utf-8")
+    created.append("tests/conftest.py")
 
     write_state(pragma_dir, default_state(manifest_hash=hash_manifest(manifest)))
     created.append(".pragma/state.json")

@@ -57,3 +57,7 @@ packages/*/.pragma/claude-settings.hash
 # so a buggy hook or a noisy test run doesn't pollute the real gate log.
 .pragma/hook-crash.jsonl
 packages/*/.pragma/hook-crash.jsonl
+
+# Throwaway sandboxes — greenfield demos, scratch experiments. Fully
+# ignored so a dogfood session doesn't leak into the real repo.
+.sandbox/

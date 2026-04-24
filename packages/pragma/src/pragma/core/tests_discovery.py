@@ -22,7 +22,17 @@ def expected_test_name(req_id: str, permutation_id: str) -> str:
     return f"test_{normalised}_{permutation_id}"
 
 
-def collect_tests(tests_dir: Path) -> list[CollectedTest]:
+def collect_tests(tests_dir: Path, *, cwd: Path | None = None) -> list[CollectedTest]:
+    """Invoke pytest --collect-only against ``tests_dir`` and parse nodeids.
+
+    ``cwd`` is the directory pytest runs in and the reference point for
+    emitted nodeids. Defaults to ``tests_dir.parent`` for backward
+    compatibility with greenfield projects where tests_root is
+    top-level. Callers working on brownfield layouts with nested
+    tests_root should pass the project root explicitly (BUG-018 /
+    REQ-014).
+    """
+    effective_cwd = cwd if cwd is not None else tests_dir.parent
     cmd = [
         sys.executable,
         "-m",
@@ -38,7 +48,7 @@ def collect_tests(tests_dir: Path) -> list[CollectedTest]:
         cmd,
         capture_output=True,
         text=True,
-        cwd=str(tests_dir.parent),
+        cwd=str(effective_cwd),
     )
     if proc.returncode not in (0, 5):
         raise CollectError(
@@ -75,9 +85,24 @@ def group_by_name(collected: list[CollectedTest]) -> dict[str, list[CollectedTes
 _RESULT_RE = re.compile(r"^(\S+::\S+)\s+(PASSED|FAILED|ERROR)")
 
 
-def run_tests(tests_dir: Path, nodeids: list[str]) -> dict[str, str]:
+def run_tests(
+    tests_dir: Path,
+    nodeids: list[str],
+    *,
+    cwd: Path | None = None,
+) -> dict[str, str]:
+    """Run pytest on the given nodeids. Returns a dict {nodeid: verdict}.
+
+    ``cwd`` is the directory pytest runs in; nodeids must be resolvable
+    relative to it. Defaults to ``tests_dir.parent`` for backward
+    compatibility with greenfield projects. Callers working on
+    brownfield layouts with nested tests_root (BUG-018 / REQ-014)
+    should pass the project root explicitly and match what was used
+    for ``collect_tests``.
+    """
     if not nodeids:
         return {}
+    effective_cwd = cwd if cwd is not None else tests_dir.parent
     cmd = [
         sys.executable,
         "-m",
@@ -88,12 +113,18 @@ def run_tests(tests_dir: Path, nodeids: list[str]) -> dict[str, str]:
         "--no-header",
         "-p",
         "no:cacheprovider",
+        # BUG-015 / REQ-011: clear inherited addopts (e.g. `-q` in a
+        # user pytest.ini) that would collapse per-test output to dots
+        # and defeat the _RESULT_RE parse below. Matches the
+        # collect_tests fix from v1.0.3 (BUG-009 / ex-KI-12).
+        "-o",
+        "addopts=",
     ]
     proc = subprocess.run(  # noqa: S603 — controlled pytest invocation
         cmd,
         capture_output=True,
         text=True,
-        cwd=str(tests_dir.parent),
+        cwd=str(effective_cwd),
     )
     results: dict[str, str] = {}
     for line in proc.stdout.splitlines():

@@ -104,7 +104,7 @@ def _assert_active_slice_tests_green(cwd: Path, state: State) -> None:
     slice_reqs = slice_requirements(manifest, state.active_slice)
     expected = [expected_test_name(r.id, p.id) for r in slice_reqs for p in r.permutations]
     try:
-        collected = collect_tests(tests_dir)
+        collected = collect_tests(tests_dir, cwd=cwd)
     except CollectError as exc:
         raise CompleteCollectFailed(
             message=f"pytest could not collect tests: {exc}",
@@ -115,7 +115,9 @@ def _assert_active_slice_tests_green(cwd: Path, state: State) -> None:
     # not just one; otherwise gate completion depends on pytest's
     # collection order.
     nodeids = [c.nodeid for n in expected for c in by_name.get(n, [])]
-    results = run_tests(tests_dir, nodeids) if nodeids else {}
+    # BUG-018 / REQ-014: thread the project root so nodeids resolve
+    # correctly on brownfield layouts with nested tests_root.
+    results = run_tests(tests_dir, nodeids, cwd=cwd) if nodeids else {}
     failing = [nid for nid, v in results.items() if v != "passed"]
     if failing:
         from pragma.core.errors import CompleteTestsFailing
@@ -172,8 +174,12 @@ def complete(
 def cancel() -> None:
     cwd = Path.cwd()
     try:
-        state, _, pragma_dir = _load_state_or_default(cwd)
-        new_state, audit_fields = cancel_transition(state, now_iso=_now_iso())
+        state, lock, pragma_dir = _load_state_or_default(cwd)
+        new_state, audit_fields = cancel_transition(
+            state,
+            now_iso=_now_iso(),
+            manifest_hash=lock.manifest_hash,
+        )
         write_state(pragma_dir, new_state)
         append_audit(
             pragma_dir,

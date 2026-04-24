@@ -307,6 +307,84 @@ requirements:
     expected: success
   milestone: M01
   slice: M01.S6
+- id: REQ-011
+  title: run_tests overrides inherited addopts
+  description: '`pragma.core.tests_discovery.run_tests` must clear inherited pytest `addopts` via `-o addopts=` so that a user `pytest.ini` or `pyproject.toml` pinning `-q` does not compress pytest output below what run_tests regex can parse. Before v1.0.6, a greenfield `pytest.ini` with `addopts = -q` made `pragma slice complete` report every test as `error` even when the tests passed, because `-q` turned per-test `PASSED/FAILED` lines into `.`/`F` dots. Matches the fix already in `collect_tests` (v1.0.3, BUG-009/KI-12).'
+  touches:
+  - packages/pragma/src/pragma/core/tests_discovery.py
+  permutations:
+  - id: runs_under_parent_addopts_q
+    description: run_tests reports the correct verdicts when a parent pytest.ini pins -q in addopts
+    expected: success
+  - id: runs_from_clean_dir
+    description: run_tests without parent addopts still returns correct verdicts
+    expected: success
+  milestone: M01
+  slice: M01.S7
+- id: REQ-012
+  title: slice cancel resets state to fully neutral
+  description: '`pragma slice cancel` must reset `.pragma/state.json` to the default neutral shape bound to the current lock hash, not just null out `active_slice`. Before v1.0.6, cancel left the previous `manifest_hash` in state, so `pragma verify gate` failed with `gate_hash_drift` if the manifest had changed since activation, and `doctor --emergency-unlock` refused because it saw state as already neutral. The user had no in-tool recovery path and had to delete `.pragma/state.json` by hand.'
+  touches:
+  - packages/pragma/src/pragma/cli/commands/slice.py
+  - packages/pragma/src/pragma/core/gate.py
+  permutations:
+  - id: cancel_rebinds_to_current_lock_hash
+    description: after cancel, state.manifest_hash equals the current lock hash
+    expected: success
+  - id: cancel_then_verify_gate_passes
+    description: pragma verify gate is green after cancel even if manifest was rewritten mid-slice
+    expected: success
+  milestone: M01
+  slice: M01.S7
+- id: REQ-013
+  title: greenfield scaffold ships src import glue
+  description: '`pragma init --greenfield --language python` must scaffold tests in a way that allows `from <module> import ...` where `<module>` lives in `src/`. Before v1.0.6 the scaffold wrote `src/` and `tests/` but no `conftest.py` or `pyproject.toml` wiring, so the first test file written per the documented convention raised ImportError and blocked `pragma unlock`. Fix: the init template writes `tests/conftest.py` that inserts `<project>/src` into `sys.path`.'
+  touches:
+  - packages/pragma/src/pragma/core/greenfield.py
+  - packages/pragma/src/pragma/templates/conftest.py.tpl
+  permutations:
+  - id: greenfield_writes_conftest
+    description: pragma init --greenfield writes tests/conftest.py
+    expected: success
+  - id: greenfield_tests_can_import_src
+    description: a fresh greenfield tree can collect a test that imports from src/
+    expected: success
+  milestone: M01
+  slice: M01.S7
+- id: REQ-014
+  title: slice complete subprocess cwd honours manifest source layout
+  description: 'BUG-018 (ex-KI-13). `pragma.core.tests_discovery.run_tests` and `collect_tests` invoke pytest with `cwd=tests_dir.parent`, which breaks on brownfield workspaces where `tests_root` is more than one directory deep (e.g. Pragma''s own `packages/pragma/tests/`): the emitted nodeids are relative to the user cwd but pytest is chdir''d below that, so it looks for them at a doubled path and every test reports as `error`. Fix: accept a `cwd` parameter defaulting to `Path.cwd()` from the caller, and thread the real project root through.'
+  touches:
+  - packages/pragma/src/pragma/core/tests_discovery.py
+  - packages/pragma/src/pragma/cli/commands/slice.py
+  - packages/pragma/src/pragma/cli/commands/unlock.py
+  permutations:
+  - id: collect_tests_on_nested_tests_root
+    description: collect_tests returns nodeids that run_tests can consume when tests_root is packages/foo/tests/
+    expected: success
+  - id: run_tests_on_nested_tests_root
+    description: run_tests returns the correct verdicts when tests_root is packages/foo/tests/
+    expected: success
+  milestone: M01
+  slice: M01.S7
+- id: REQ-015
+  title: pragma package pyproject separates runtime and dev deps
+  description: 'BUG-019 (ex-KI-14). `packages/pragma/pyproject.toml` lists ruff, mypy, pytest-cov, pre-commit, types-PyYAML, opentelemetry-api, opentelemetry-sdk under `[project.dependencies]` — but they are not imported by pragma at runtime. Deptry correctly reports them as DEP002 unused dependencies. Fix: move them to `[project.optional-dependencies.dev]` so `pip install pragma` pulls only real runtime deps and `pip install pragma[dev]` pulls the full set. After fix, deptry hook runs clean on both packages/pragma and packages/pragma-sdk.'
+  touches:
+  - packages/pragma/pyproject.toml
+  - .pre-commit-config.yaml
+  permutations:
+  - id: runtime_deps_do_not_include_dev_tools
+    description: packages/pragma/pyproject.toml project.dependencies contains none of ruff/mypy/pre-commit/pytest-cov/types-PyYAML/opentelemetry-api/opentelemetry-sdk
+    expected: success
+  - id: dev_extra_contains_dev_tools
+    description: packages/pragma/pyproject.toml project.optional-dependencies.dev contains all the dev tools
+    expected: success
+  - id: deptry_clean_on_pragma_package
+    description: deptry src exits 0 with no issues on packages/pragma
+    expected: success
+  milestone: M01
+  slice: M01.S7
 milestones:
 - id: M00
   title: Implicit brownfield milestone
@@ -358,3 +436,12 @@ milestones:
     description: doctor --clean-spans with keep_runs / keep_days retention and manifest config. Closes the v1.0.4-parked paper cut that .pragma/spans/ accumulates forever.
     requirements:
     - REQ-010
+  - id: M01.S7
+    title: v1.0.6 bug sweep
+    description: Closes BUG-015 (run_tests inherited -q), BUG-016 (slice cancel leaves stale manifest_hash), BUG-017 (greenfield scaffold missing src import glue), BUG-018 (ex-KI-13, slice complete subprocess cwd on nested tests_root), BUG-019 (ex-KI-14, deptry false-positives on pragma pyproject).
+    requirements:
+    - REQ-011
+    - REQ-012
+    - REQ-013
+    - REQ-014
+    - REQ-015

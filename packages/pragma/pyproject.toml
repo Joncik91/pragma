@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "pragma"
-version = "1.0.5"
+version = "1.0.6"
 description = "Senior engineer on rails for AI-driven development"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -54,6 +54,13 @@ ignore = ["S101", "B008"]
 python_version = "3.11"
 strict = true
 files = ["src/pragma"]
+
+# BUG-019 / REQ-015: tell deptry that `[project.optional-dependencies.dev]`
+# is a dev-only group so it stops flagging ruff/mypy/pytest-cov/etc as
+# unused runtime deps. Without this deptry walks both runtime and
+# optional-dependencies together and every dev tool trips DEP002.
+[tool.deptry]
+pep621_dev_dependency_groups = ["dev"]
 
 # pytest config lives in the repo-root pyproject.toml so pytest's rootdir
 # is the repo root; this keeps spans and junit-xml at the same path
