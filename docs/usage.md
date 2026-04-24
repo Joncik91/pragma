@@ -4,6 +4,12 @@ This page walks a first-time user through both Pragma flows — adopting Pragma
 on an existing repo (brownfield) and starting a new project from empty
 (greenfield). Read this before your first `pragma init`.
 
+> **New to Pragma?** Read [`concepts.md`](concepts.md) first for the
+> mental model — what the manifest is for, why the gate exists, what
+> the PIL is. This page assumes those concepts and shows you how to
+> drive the tool. For every flag and field, see
+> [`reference.md`](reference.md).
+
 ## Install
 
 Install as a standalone CLI with pipx:
@@ -263,6 +269,8 @@ blockers:
 
 ## Where to go next
 
+- [`concepts.md`](concepts.md) — mental model, when to use which piece, why each piece exists.
+- [`reference.md`](reference.md) — every CLI flag, manifest field, audit event, hook.
 - [`doctor.md`](doctor.md) — when the pre-commit hook blocks you and
   you need to understand why.
 - [`migrate.md`](migrate.md) — when you pull a repo with an older
