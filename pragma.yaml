@@ -563,6 +563,43 @@ requirements:
     expected: success
   milestone: M01
   slice: M01.S14
+- id: REQ-026
+  title: hooks verify signals drift via ok=false + non-zero exit
+  description: 'BUG-029. pragma hooks verify returned ok=true with integrity=drifted + exit 0 when the hash mismatch detected tampering. Any CI script or pre-push hook that read the ok field would treat drift as success. pragma verify integrity already returns ok=false + exit 1 on drift; hooks verify was the inconsistent surface. Fix - on drifted, return ok=false and raise typer.Exit(1); other non-drift states keep ok=true + exit 0.'
+  touches:
+  - packages/pragma/src/pragma/cli/commands/hooks.py
+  permutations:
+  - id: drifted_is_ok_false_and_exit_1
+    description: hooks verify on a tampered settings.json returns ok=false and exit 1
+    expected: reject
+  - id: sealed_is_ok_true_and_exit_0
+    description: hooks verify on a clean sealed settings.json returns ok=true and exit 0
+    expected: success
+  - id: not_sealed_is_ok_true_and_exit_0
+    description: hooks verify when no hash exists yet returns ok=true integrity=not_sealed and exit 0
+    expected: success
+  - id: no_settings_is_ok_true_and_exit_0
+    description: hooks verify when there is no .claude/settings.json returns ok=true integrity=no_settings and exit 0
+    expected: success
+  milestone: M01
+  slice: M01.S15
+- id: REQ-027
+  title: narrative remediation serves real error codes
+  description: 'BUG-028. The remediation catalogue had only discipline-AST rules. User-facing error codes (commit_shape_violation, unlock_missing_tests, slice_already_shipped, gate_hash_drift, manifest_hash_mismatch) fell through to generic placeholder text. Fix - catalogue entries for the common error codes a user hits under pre-commit / pre-push / CI. Generic fallback stays for unknown codes so the CLI does not crash.'
+  touches:
+  - packages/pragma/src/pragma/narrative/remediation.py
+  permutations:
+  - id: known_discipline_rule_is_specific
+    description: remediation for 'complexity' names extract helpers and early returns
+    expected: success
+  - id: known_error_code_is_specific
+    description: remediation for 'commit_shape_violation' names WHY / trailer / subject length
+    expected: success
+  - id: unknown_rule_falls_back_to_generic
+    description: remediation for an unknown rule string still returns a non-empty generic message
+    expected: success
+  milestone: M01
+  slice: M01.S16
 milestones:
 - id: M00
   title: Implicit brownfield milestone
@@ -661,3 +698,13 @@ milestones:
     description: 'BUG-027. After `pragma slice complete`, active_slice is None by design. `pragma narrative commit` running in that window (a perfectly natural user flow: ship slice, then commit the change) emits WHY="Maintenance change outside any active slice." — factually correct but reads as amnesia when the user literally just shipped a slice seconds ago. Also, _summarise_files appended "/" to every path segment even when the segment was a single top-level file (e.g. "pragma.yaml/ (1)" instead of "pragma.yaml (1)"). Fix - (a) when active_slice is None but state.slices has a most-recently-shipped entry, cite its title/ID in WHY; (b) only append "/" to genuine directories (those that contained a slash in the original path).'
     requirements:
     - REQ-025
+  - id: M01.S15
+    title: pragma hooks verify returns ok=false on drift (BUG-029)
+    description: 'BUG-029. `pragma hooks verify` returned `{"ok":true,"integrity":"drifted"}` + exit 0 when the hash detected tampering. Anyone scripting a CI or pre-push check against the `ok` field would treat drift as success. `pragma verify integrity` already has the strict contract (`{"error":...}` + exit 1 on drift); hooks verify was the inconsistent surface. Fix - when integrity is `drifted`, return `ok=false` and exit non-zero. `sealed` / `not_sealed` / `no_settings` keep `ok=true` (those are neutral-to-good states).'
+    requirements:
+    - REQ-026
+  - id: M01.S16
+    title: narrative remediation covers real error codes (BUG-028)
+    description: 'BUG-028. The remediation catalogue in pragma.narrative.remediation only had entries for three discipline AST rules (complexity, nesting_depth, loc_per_function). Every other error code — commit_shape_violation, unlock_missing_tests, slice_already_shipped, gate_hash_drift, manifest_schema_error, etc. — fell through to a generic "Rule X triggered: got N budget M" placeholder that carried no useful signal for the user. Fix - add catalogue entries for the handful of error codes a user hits under CI / pre-push and wants specific guidance on. Keep the generic fallback for truly unknown codes so the CLI never crashes.'
+    requirements:
+    - REQ-027

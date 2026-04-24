@@ -89,13 +89,18 @@ def verify() -> None:
             )
         )
     else:
+        # BUG-029 / REQ-026: drift must surface as ok=false + non-zero
+        # exit so CI / pre-push scripts that gate on `ok` catch
+        # tampered settings. `pragma verify integrity` already has
+        # this contract; hooks verify was the inconsistent surface.
         typer.echo(
             json.dumps(
-                {"ok": True, "integrity": "drifted"},
+                {"ok": False, "integrity": "drifted"},
                 sort_keys=True,
                 separators=(",", ":"),
             )
         )
+        raise typer.Exit(code=1)
 
 
 @hooks_app.command(name="show")
