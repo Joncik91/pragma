@@ -57,13 +57,20 @@ its own cycle.
   ignores GHSA-58qw-9mgm-455v (pip advisory with no published fix);
   deptry replaced with a local hook that targets `packages/pragma-sdk`
   only (upstream hook can't handle the uv-workspace top-level
-  pyproject; pragma package cleanup parked as KI-14). All three are
+  pyproject; pragma package cleanup parked as BUG-019 [ex-KI-14]). All three are
   infra fixes surfaced when v1.0.4→v1.0.5 pre-commit caches were
   rebuilt after the repo's on-disk move.
 
 ### Known Issues
 
-- **KI-13: `pragma slice complete` subprocess cwd breaks for brownfield
+> **Convention note (added in v1.0.6-prep):** bug IDs are unified under
+> `BUG-NNN` from v1.0.6 onward. Historic `KI-N` entries in shipped
+> changelog sections stay as-is — those are frozen release documents.
+> The two issues originally filed as KI-13 and KI-14 are renamed to
+> BUG-018 and BUG-019 respectively; the descriptions below are updated
+> in place.
+
+- **BUG-018 [ex-KI-13]: `pragma slice complete` subprocess cwd breaks for brownfield
   workspaces with nested `tests_root` (e.g. Pragma's own
   `tests_root: packages/pragma/tests/`).**
   `pragma.core.tests_discovery.run_tests` invokes pytest with
@@ -79,7 +86,7 @@ its own cycle.
   the repo root into both functions as an explicit parameter and
   cwd there. Deferred to a focused follow-up so v1.0.5 stays
   scoped to span retention.
-- **KI-14: deptry hook runs on `pragma-sdk` only — `pragma` package
+- **BUG-019 [ex-KI-14]: deptry hook runs on `pragma-sdk` only — `pragma` package
   has eight DEP002 false-positives** where dev-only tools
   (ruff, mypy, pytest-cov, pre-commit, types-PyYAML, opentelemetry-api,
   opentelemetry-sdk) are listed under `[project.dependencies]` rather
