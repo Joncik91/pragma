@@ -514,6 +514,23 @@ requirements:
     expected: success
   milestone: M01
   slice: M01.S11
+- id: REQ-023
+  title: single-permutation requirement scored ok without set_permutation
+  description: 'BUG-023. When a requirement declares exactly one permutation, tests may legitimately skip the `set_permutation(...)` call; the span still carries `pragma.logic_id` and the test-name binding is unambiguous. Before this fix the aggregator matcher required the span''s `pragma.permutation` attr to equal the declared permutation id literally, so spans with the SDK default `"none"` value never matched and the permutation read as `mocked`. Fix - when total_permutations == 1, accept a `"none"` span as a match (the courtesy the comment already advertised).'
+  touches:
+  - packages/pragma/src/pragma/report/aggregator.py
+  permutations:
+  - id: single_perm_without_set_permutation_is_ok
+    description: a single-permutation REQ whose test omits set_permutation scores ok
+    expected: success
+  - id: multi_perm_still_requires_exact_match
+    description: a multi-permutation REQ still requires pragma.permutation to match perm_id literally
+    expected: success
+  - id: single_perm_with_explicit_set_permutation_still_ok
+    description: the courtesy does not regress the explicit-match path; single-perm with set_permutation still scores ok
+    expected: success
+  milestone: M01
+  slice: M01.S12
 milestones:
 - id: M00
   title: Implicit brownfield milestone
@@ -597,3 +614,8 @@ milestones:
     description: Surfaced by the v0.1.0 edge-case dogfood. `pragma slice activate <id>` on a slice already in state.slices with status=shipped silently flipped it back to in_progress + LOCKED, losing the ship record, blocking dep-gated slices that were previously free to activate, and leaving no doctor diagnostic. Fix - refuse activation when the requested slice is already shipped, with a remediation pointing at either --force (if the intent is explicit re-open) or just noting that shipped slices are terminal.
     requirements:
     - REQ-022
+  - id: M01.S12
+    title: single-permutation courtesy in PIL (BUG-023)
+    description: 'The aggregator comment in packages/pragma/src/pragma/report/aggregator.py claimed that a requirement with exactly one permutation whose test omits `set_permutation(...)` would still score `ok`. Implementation never matched the claim; such permutations scored `mocked` because the span''s `pragma.permutation` attribute was `"none"` and the matcher required `span_perm == perm_id`. Fix - thread total-permutations-on-requirement into the matcher; when total==1, accept a span with `pragma.permutation == "none"` as matching.'
+    requirements:
+    - REQ-023

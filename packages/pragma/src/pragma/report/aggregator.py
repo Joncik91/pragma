@@ -66,32 +66,47 @@ def _parse_junit(path: Path | None) -> dict[str, str]:
     return results
 
 
+def _span_matches(
+    span: dict[str, object],
+    *,
+    req_id: str,
+    perm_id: str,
+    total_permutations: int,
+) -> bool:
+    """True when `span` is evidence of `(req_id, perm_id)` executing.
+
+    BUG-007: both pragma.logic_id and pragma.permutation must match
+    for a span to count (matching on logic_id alone scored unrelated
+    spans as exercising every permutation).
+
+    BUG-023 / REQ-023: on single-permutation requirements the test
+    name alone disambiguates, so a span with pragma.permutation="none"
+    (SDK default when set_permutation wasn't called) is accepted.
+    """
+    attrs = span.get("attrs")
+    if not isinstance(attrs, dict) or attrs.get("pragma.logic_id") != req_id:
+        return False
+    span_perm = attrs.get("pragma.permutation")
+    if span_perm == perm_id:
+        return True
+    return span_perm == "none" and total_permutations == 1
+
+
 def _compute_permutation_status(
     *,
     req_id: str,
     perm_id: str,
     junit_results: dict[str, str],
     spans_by_test: dict[str, list[dict[str, object]]],
+    total_permutations: int = 1,
 ) -> tuple[PermutationStatus, int, str | None]:
     test_name = expected_test_name(req_id, perm_id)
     junit_status = junit_results.get(test_name)
-    # BUG-007: a span counts for (req_id, perm_id) only when BOTH
-    # attributes match. Matching on logic_id alone let a span emitted
-    # outside a set_permutation block (or inside the wrong one) score
-    # the enclosing permutation as ok, so PIL went green for
-    # implementations the tests had never actually exercised per-
-    # permutation. We still accept "none" as a courtesy for single-
-    # permutation requirements where the author skipped
-    # set_permutation; those get scored ok only when the requirement
-    # has exactly one permutation (and thus no ambiguity).
-    matching: list[dict[str, object]] = []
-    for s in spans_by_test.get(test_name, []):
-        attrs = s.get("attrs")
-        if not isinstance(attrs, dict) or attrs.get("pragma.logic_id") != req_id:
-            continue
-        span_perm = attrs.get("pragma.permutation")
-        if span_perm == perm_id:
-            matching.append(s)
+    matching = [
+        s
+        for s in spans_by_test.get(test_name, [])
+        if _span_matches(s, req_id=req_id, perm_id=perm_id, total_permutations=total_permutations)
+    ]
     span_count = len(matching)
 
     if junit_status is None:
@@ -126,12 +141,14 @@ def _build_report_requirement(
     summary: dict[str, int],
 ) -> ReportRequirement:
     report_perms: list[ReportPermutation] = []
+    total_permutations = len(req.permutations)
     for perm in req.permutations:
         status, span_count, remediation = _compute_permutation_status(
             req_id=req.id,
             perm_id=perm.id,
             junit_results=junit_results,
             spans_by_test=spans_by_test,
+            total_permutations=total_permutations,
         )
         report_perms.append(
             ReportPermutation(
