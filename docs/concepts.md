@@ -115,6 +115,13 @@ every declared permutation, whether it was "exercised at runtime"
 (real span seen), "test passed but no span" (possibly mocked), or
 "never run."
 
+Both artifacts — the spans JSONL and the junit XML — are produced
+automatically by `pragma slice complete` / `pragma unlock` / `pragma
+verify gate`, via Pragma's internal pytest subprocess invocations.
+You don't need a separate `pytest` step to populate the PIL. If either
+artifact is absent on a run of `pragma report`, the output includes a
+diagnostic banner naming what's missing and the one-line fix.
+
 **Why a PIL at all?** Because "tests pass" is lying to you when the
 test mocked the thing it was supposed to prove. The PIL
 distinguishes "the real code path ran and asserted" from "a stub

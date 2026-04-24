@@ -90,19 +90,17 @@ def run_tests(
     nodeids: list[str],
     *,
     cwd: Path | None = None,
+    junit_xml: Path | None = None,
 ) -> dict[str, str]:
-    """Run pytest on the given nodeids. Returns a dict {nodeid: verdict}.
-
-    ``cwd`` is the directory pytest runs in; nodeids must be resolvable
-    relative to it. Defaults to ``tests_dir.parent`` for backward
-    compatibility with greenfield projects. Callers working on
-    brownfield layouts with nested tests_root (BUG-018 / REQ-014)
-    should pass the project root explicitly and match what was used
-    for ``collect_tests``.
-    """
+    """Run pytest. Emits junit.xml (BUG-020); cwd-safe on nested tests_root (BUG-018)."""
     if not nodeids:
         return {}
     effective_cwd = cwd if cwd is not None else tests_dir.parent
+    effective_junit = (
+        junit_xml if junit_xml is not None else effective_cwd / ".pragma" / "pytest-junit.xml"
+    )
+    # Ensure the parent dir exists — pytest won't create it.
+    effective_junit.parent.mkdir(parents=True, exist_ok=True)
     cmd = [
         sys.executable,
         "-m",
@@ -119,6 +117,14 @@ def run_tests(
         # collect_tests fix from v1.0.3 (BUG-009 / ex-KI-12).
         "-o",
         "addopts=",
+        # BUG-020 / REQ-016: emit junit.xml via an explicit CLI flag so
+        # it survives the addopts clear. Without this the PIL cannot
+        # be populated from pragma's own flows (slice complete etc.)
+        # because the aggregator needs junit+spans, and junit never
+        # lands if it only lives in user pytest.ini addopts.
+        f"--junit-xml={effective_junit}",
+        "-o",
+        "junit_family=xunit2",
     ]
     proc = subprocess.run(  # noqa: S603 — controlled pytest invocation
         cmd,

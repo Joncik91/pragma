@@ -2,6 +2,14 @@
 
 Generated: {{ report.generated_at }}
 Gate: {{ report.gate or "N/A" }}
+{% if report.diagnostics %}
+
+## Diagnostics
+
+{% for d in report.diagnostics -%}
+- {{ d }}
+{% endfor %}
+{%- endif %}
 
 ## Summary
 

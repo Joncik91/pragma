@@ -151,6 +151,60 @@ def _build_report_requirement(
     )
 
 
+def _compute_diagnostics(
+    *,
+    spans_jsonl: Path | None,
+    junit_xml: Path | None,
+    spans_by_test: dict[str, list[dict[str, object]]],
+    junit_results: dict[str, str],
+    summary: dict[str, int],
+) -> tuple[str, ...]:
+    """Return short banner strings naming absent artifacts.
+
+    BUG-020 / REQ-017. When a user runs `pragma report` without the
+    artifacts the aggregator needs, they see a wall of "missing"
+    rows and no remediation. These banners tell them *why* and
+    what to type.
+
+    Only fires when either artifact is absent AND at least one
+    permutation came back `missing` or `mocked` (i.e. the absence
+    plausibly explains the rows). On the happy path — both artifacts
+    present, all verified — returns empty.
+    """
+    banners: list[str] = []
+    silent_rows = summary.get("missing", 0) + summary.get("mocked", 0)
+    if silent_rows == 0:
+        return ()
+
+    junit_absent = junit_xml is None or not junit_xml.exists()
+    if junit_absent:
+        banners.append(
+            ".pragma/pytest-junit.xml not found — every permutation reads "
+            "`missing` without it. `pragma slice complete` produces this "
+            "automatically in v1.1+; if you're on an older version, run "
+            "`pytest` once before `pragma report`."
+        )
+
+    spans_absent = (
+        spans_jsonl is None
+        or not spans_jsonl.exists()
+        or not spans_by_test  # directory exists but is empty / unparseable
+    )
+    if spans_absent:
+        banners.append(
+            ".pragma/spans/ is empty or missing — no runtime evidence "
+            "of the real code executing. Make sure your production "
+            "functions are decorated with `@trace('REQ-NNN')` and your "
+            "tests wrap the call in `set_permutation('perm_id')`."
+        )
+
+    # Defensive: the caller may pass paths that do exist but produced
+    # zero useful data (e.g. junit parsed but no matching test names).
+    # We don't add a banner for that case — the "mocked" remediation
+    # per row already points at the problem.
+    return tuple(banners)
+
+
 def build_report(
     *,
     manifest: Manifest,
@@ -176,10 +230,19 @@ def build_report(
         for req in requirements
     ]
 
+    diagnostics = _compute_diagnostics(
+        spans_jsonl=spans_jsonl,
+        junit_xml=junit_xml,
+        spans_by_test=spans_by_test,
+        junit_results=junit_results,
+        summary=summary,
+    )
+
     return Report(
         slice=active_slice,
         gate=state.gate if state is not None else None,
         generated_at=commit_timestamp,
         requirements=tuple(report_reqs),
         summary=summary,
+        diagnostics=diagnostics,
     )

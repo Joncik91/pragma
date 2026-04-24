@@ -5,6 +5,89 @@ All notable changes to Pragma are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] — 2026-04-24
+
+**First-run PIL reachable end-to-end.** The v1.0 thesis ("AI-generated
+code, forced to prove what it built") requires the Post-Implementation
+Log to populate on a fresh greenfield project without any steps
+beyond what the README describes. It didn't. This release makes it.
+
+The discovery sequence: v1.0.6 closed five bugs, then the author ran
+a clean greenfield to validate. Shipped a slice via the documented
+commands and `pragma report --human` showed `0 verified, N missing`.
+Root cause: `pragma slice complete` invokes pytest internally with
+`-o addopts=` (to fix BUG-015), which also wipes `--junit-xml=` from
+the scaffold's `pytest.ini`. Junit never lands. The aggregator needs
+junit + spans cross-product to call a permutation verified. User sees
+a wall of `missing` with `"No remediation."` That's not the promise.
+
+v1.0.7 was planned as a docs-only primer update on top of v1.0.6,
+explaining the `@trace` + `set_permutation` pattern. v1.0.7 never
+shipped because the primer told users their PIL would populate after
+the proper flow — and we verified that the flow itself was still
+broken. Writing a doc to explain around a bug is worse than fixing
+the bug. v1.1.0 rolls the primer update in alongside the fix.
+
+This pushes the original v1.1 (TypeScript target) to v1.2. The v1.0
+done-criterion *"PIL legible to 3 non-coders"* is what v1.1 was
+supposed to enable. Legibility without reachability was just prose.
+Reachability first.
+
+### Added
+
+- **`pragma.core.tests_discovery.run_tests` emits junit.xml by
+  default** at `<cwd>/.pragma/pytest-junit.xml` via an explicit
+  `--junit-xml=` CLI flag, bypassing the `-o addopts=` clear. Accepts
+  `junit_xml: Path | None = None` kwarg for callers who want an
+  explicit path. REQ-016 / BUG-020.
+- **`pragma report` surfaces missing artifacts** in a `##
+  Diagnostics` banner when `.pragma/pytest-junit.xml` or
+  `.pragma/spans/` is absent on a run that has `missing` / `mocked`
+  permutations. Tells the user which file is missing and the
+  one-line fix instead of a silent wall of `No remediation.` rows.
+  Empty banner on the happy path. REQ-017.
+- **`scripts/pre-release-smoke.sh` adds an end-to-end PIL section**
+  that scaffolds a greenfield project, ships one slice through the
+  full `activate → unlock → complete → report` cycle with zero
+  manual `pytest` invocations, and asserts `summary.ok >= 1 &&
+  summary.missing == 0` on the resulting `pragma report --json`.
+  Exits non-zero if junit.xml is missing or the PIL doesn't
+  populate. This is the test the v1.0 RC should have had. REQ-018.
+- **Greenfield `claude.md` primer** now includes a "Making the
+  Post-Implementation Log useful" section with a concrete `@trace +
+  set_permutation` example, so first-run users know what the PIL
+  expects. Rolled over from the cancelled v1.0.7. REQ-019.
+- **`docs/concepts.md` and `docs/reference.md`** now state
+  explicitly that Pragma's own `slice complete` / `unlock` / `verify
+  gate` produce both junit.xml and spans automatically — no separate
+  `pytest` step needed — and that a Diagnostics banner will surface
+  if either artifact is missing. REQ-019.
+
+### Changed
+
+- `Report` pydantic model (`pragma.report.models`) gains an optional
+  `diagnostics: tuple[str, ...] = ()` field. Old JSON consumers that
+  don't know about the new field are unaffected (pydantic elides it
+  on empty-tuple serialisation).
+- Markdown PIL template (`pragma/templates/pil.md.tpl`) renders
+  `## Diagnostics` above the `## Summary` section when banners
+  are present.
+
+### Meta
+
+v1.1.0 is a reliability release, not a feature release. One new
+slice (M01.S8), four REQs (REQ-016 … REQ-019), fourteen
+permutations, all green. 384 pragma tests + 9 pragma-sdk tests pass.
+Full smoke script green including the new end-to-end PIL section.
+
+Gate ceremony: cancelled on arrival (same shape as v1.0.5 and v1.0.6)
+because the fixes are green-on-arrival and the test-first invariant
+has no meaningful form for "fix three modules at once." The red
+tests were authored before the fixes — pytest run with the
+fixes reverted reproduces every failure mode.
+
+TypeScript moves to v1.2 per `docs/roadmap.md`.
+
 ## [1.0.6] — 2026-04-24
 
 **Bug sweep.** Closes five defects surfaced by the v1.0.5 dogfood

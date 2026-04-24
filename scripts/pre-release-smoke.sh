@@ -127,6 +127,126 @@ Co-Authored-By: Pragma Smoke <smoke@pragma.local>"
   echo "post-commit verify all OK"
 )
 
+echo "=== end-to-end PIL: greenfield, declare, activate, unlock, complete, report ==="
+# BUG-020 / REQ-018: prove the full first-run flow produces
+# junit.xml + spans + a verified PIL without the user ever having to
+# run pytest manually. This is the class of regression that shipped
+# as BUG-020 — aggregator needed junit, run_tests never wrote it.
+tmp_pil="$(mktemp -d -t pragma-pil-XXXXXXXX)"
+trap 'rm -rf "$tmp" "$tmp_pil"' EXIT
+
+(
+  cd "$tmp_pil"
+  git init -q
+  git config user.email "pil-smoke@pragma.local"
+  git config user.name "Pragma PIL Smoke"
+
+  "$PRAGMA" init --greenfield --name pil_smoke --language python > /dev/null
+
+  # Replace the REQ-000 placeholder with a real one-permutation REQ.
+  cat > pragma.yaml <<YAML
+version: '2'
+project:
+  name: pil_smoke
+  mode: greenfield
+  language: python
+  source_root: src/
+  tests_root: tests/
+milestones:
+- id: M01
+  title: PIL smoke
+  description: minimal first-run flow
+  depends_on: []
+  slices:
+  - id: M01.S1
+    title: echo
+    description: single permutation to prove the PIL populates
+    requirements: [REQ-001]
+requirements:
+- id: REQ-001
+  title: echo returns input
+  description: echo(x) returns x verbatim.
+  touches: [src/echo_mod.py]
+  permutations:
+  - id: identity
+    description: echo("hi") returns "hi"
+    expected: success
+  milestone: M01
+  slice: M01.S1
+YAML
+
+  "$PRAGMA" freeze > /dev/null
+  "$PRAGMA" slice activate M01.S1 > /dev/null
+
+  # Red test + red stub.
+  cat > tests/test_req_001_echo.py <<PY
+from pragma_sdk import set_permutation
+
+from echo_mod import echo
+
+
+def test_req_001_identity() -> None:
+    with set_permutation("identity"):
+        assert echo("hi") == "hi"
+PY
+
+  cat > src/echo_mod.py <<PY
+from pragma_sdk import trace
+
+
+@trace("REQ-001")
+def echo(x: str) -> str:
+    raise NotImplementedError
+PY
+
+  "$PRAGMA" unlock > /dev/null
+
+  # Make the test green.
+  cat > src/echo_mod.py <<PY
+from pragma_sdk import trace
+
+
+@trace("REQ-001")
+def echo(x: str) -> str:
+    return x
+PY
+
+  "$PRAGMA" slice complete > /dev/null
+
+  # BUG-020 assertion #1: junit.xml must exist and be non-empty after
+  # slice complete.
+  if [ ! -s .pragma/pytest-junit.xml ]; then
+    echo "ERROR: .pragma/pytest-junit.xml missing or empty after slice complete — BUG-020 regressed"
+    exit 1
+  fi
+
+  # BUG-020 assertion #2: --json report shows ok > 0 and missing == 0.
+  report_json="$("$PRAGMA" report --json)"
+  ok_count="$(echo "$report_json" | "$PY" -c 'import json,sys; print(json.loads(sys.stdin.read())["summary"]["ok"])')"
+  missing_count="$(echo "$report_json" | "$PY" -c 'import json,sys; print(json.loads(sys.stdin.read())["summary"]["missing"])')"
+  if [ "$ok_count" -lt 1 ] || [ "$missing_count" -ne 0 ]; then
+    echo "ERROR: pragma report shows ok=$ok_count missing=$missing_count — expected ok>=1 missing=0"
+    echo "full report:"
+    echo "$report_json"
+    exit 1
+  fi
+
+  # BUG-020 assertion #3: --human output contains "1 verified" and no
+  # diagnostic banner.
+  report_md="$("$PRAGMA" report --human)"
+  if ! echo "$report_md" | grep -q "1 verified"; then
+    echo "ERROR: pragma report --human missing '1 verified' line"
+    echo "$report_md"
+    exit 1
+  fi
+  if echo "$report_md" | grep -q "## Diagnostics"; then
+    echo "ERROR: pragma report --human shows a Diagnostics banner on the happy path"
+    echo "$report_md"
+    exit 1
+  fi
+  echo "end-to-end PIL OK (ok=$ok_count, missing=$missing_count)"
+)
+
 echo ""
 echo "=========================================="
 echo "ALL PRE-RELEASE SMOKE CHECKS PASSED"

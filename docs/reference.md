@@ -127,6 +127,14 @@ Every subcommand exits `0` on pass, non-zero with a JSON error on fail.
 | `--human` | Emit Markdown PIL to stdout. |
 | `--output PATH` | Write to file instead of stdout. |
 
+Reads `.pragma/pytest-junit.xml` (pytest junit output) and
+`.pragma/spans/*.jsonl` (OpenTelemetry span dumps from
+`pragma-sdk`'s pytest plugin). Both artifacts are produced
+automatically by `pragma slice complete`, `pragma unlock`, and
+`pragma verify gate` — no separate `pytest` invocation needed. If
+either is absent when `pragma report` runs, the output includes a
+`## Diagnostics` banner naming the missing artifact.
+
 ### `pragma narrative <subcommand>`
 
 - `commit` — draft a commit message for the active slice.

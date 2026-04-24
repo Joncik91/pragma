@@ -10,3 +10,7 @@
 {"actor":"doctor","context":{"previous_gate":"LOCKED","previous_slice":"M01.S7"},"event":"emergency_unlock","from_state":"LOCKED","reason":"manifest extended with REQ-011..015 after initial M01.S7 activate","slice":"M01.S7","to_state":null,"ts":"2026-04-24T19:01:24Z"}
 {"actor":"cli","context":{},"event":"slice_activated","from_state":null,"reason":"pragma slice activate M01.S7","slice":"M01.S7","to_state":"LOCKED","ts":"2026-04-24T19:01:24Z"}
 {"actor":"cli","context":{},"event":"slice_cancelled","from_state":"LOCKED","reason":"pragma slice cancel (slice M01.S7)","slice":"M01.S7","to_state":null,"ts":"2026-04-24T19:01:53Z"}
+{"actor":"cli","context":{},"event":"slice_activated","from_state":null,"reason":"pragma slice activate M01.S8","slice":"M01.S8","to_state":"LOCKED","ts":"2026-04-24T20:02:03Z"}
+{"actor":"doctor","context":{"previous_gate":"LOCKED","previous_slice":"M01.S8"},"event":"emergency_unlock","from_state":"LOCKED","reason":"manifest extended with REQ-016..019 during v1.1.0 implementation","slice":"M01.S8","to_state":null,"ts":"2026-04-24T20:08:08Z"}
+{"actor":"cli","context":{},"event":"slice_activated","from_state":null,"reason":"pragma slice activate M01.S8","slice":"M01.S8","to_state":"LOCKED","ts":"2026-04-24T20:08:08Z"}
+{"actor":"cli","context":{},"event":"slice_cancelled","from_state":"LOCKED","reason":"pragma slice cancel (slice M01.S8)","slice":"M01.S8","to_state":null,"ts":"2026-04-24T20:08:17Z"}

@@ -385,6 +385,76 @@ requirements:
     expected: success
   milestone: M01
   slice: M01.S7
+- id: REQ-016
+  title: pragma's internal pytest runs emit junit.xml by default
+  description: 'BUG-020. `pragma.core.tests_discovery.run_tests` passes `-o addopts=` to clear inherited `-q` from user pytest.ini (BUG-015 fix). That clear also strips any `--junit-xml=<path>` the user declared in addopts, so `pragma slice complete` and `pragma unlock` finish without writing `.pragma/pytest-junit.xml`. The PIL aggregator requires junit + spans to mark a permutation "verified"; with junit missing, every permutation reads "missing" on a fresh greenfield project - contradicting the docs. Fix: run_tests emits junit explicitly via `--junit-xml=<path>` so it survives the addopts clear, defaulting to `<cwd>/.pragma/pytest-junit.xml` which is where the aggregator looks.'
+  touches:
+  - packages/pragma/src/pragma/core/tests_discovery.py
+  permutations:
+  - id: run_tests_writes_junit_xml
+    description: run_tests emits a non-empty junit.xml at the default path when no explicit path is given
+    expected: success
+  - id: run_tests_honours_explicit_junit_path
+    description: run_tests honours an explicit junit_xml parameter over the default
+    expected: success
+  - id: run_tests_junit_survives_addopts_q
+    description: run_tests emits junit.xml even when a parent pytest.ini pins -q in addopts
+    expected: success
+  milestone: M01
+  slice: M01.S8
+- id: REQ-017
+  title: report surfaces which artifact is missing instead of silent "missing"
+  description: 'BUG-020 companion. When the PIL aggregator computes "missing" for ≥50% of permutations because `.pragma/pytest-junit.xml` (or `.pragma/spans/`) is absent, `pragma report --human` and `--json` must include a diagnostic banner naming the absent artifact and the one-line fix. Without the banner, a user who hits the failure mode sees a silent wall of "missing" rows with "No remediation." - the worst possible UX for a tool whose whole point is trusted summaries.'
+  touches:
+  - packages/pragma/src/pragma/cli/commands/report.py
+  - packages/pragma/src/pragma/report/aggregator.py
+  permutations:
+  - id: report_banner_when_junit_absent
+    description: pragma report --human shows a banner when junit.xml is missing
+    expected: success
+  - id: report_banner_when_spans_absent
+    description: pragma report --human shows a banner when .pragma/spans/ is missing or empty
+    expected: success
+  - id: report_no_banner_on_happy_path
+    description: pragma report --human does not show a banner when both artifacts exist and the permutation count is correct
+    expected: success
+  milestone: M01
+  slice: M01.S8
+- id: REQ-018
+  title: pre-release-smoke asserts end-to-end PIL reachability
+  description: '`scripts/pre-release-smoke.sh` currently runs `pragma verify all` and checks that span files exist but never runs `pragma report` end-to-end. That blind spot is what let BUG-020 ship. Fix: after the first `slice complete` in the greenfield smoke section, assert `.pragma/pytest-junit.xml` exists and is non-empty, run `pragma report --human`, assert it contains at least one "ok" row and no banners, and run `pragma report --json` parsing for `summary.ok > 0` and `summary.missing == 0`. Exit non-zero if any assertion fails.'
+  touches:
+  - scripts/pre-release-smoke.sh
+  permutations:
+  - id: smoke_asserts_junit_exists
+    description: smoke script exits non-zero when junit.xml is not produced after slice complete
+    expected: success
+  - id: smoke_asserts_pil_verified
+    description: smoke script exits non-zero when pragma report --json shows any missing permutations
+    expected: success
+  milestone: M01
+  slice: M01.S8
+- id: REQ-019
+  title: docs describe the loop as it actually is
+  description: 'The daily flow described in README / concepts.md / usage.md / reference.md / claude.md.tpl shows activate → red tests → unlock → implement → complete. After REQ-016 lands, that exact flow produces junit + spans automatically, and the PIL shows real coverage. Docs must state that - including what artifacts the PIL depends on - so a first-run user knows what to expect, and so the v1.0 done-criterion "PIL legible to 3 non-coders" becomes a question of legibility rather than reachability.'
+  touches:
+  - README.md
+  - docs/concepts.md
+  - docs/usage.md
+  - docs/reference.md
+  - packages/pragma/src/pragma/templates/claude.md.tpl
+  permutations:
+  - id: readme_describes_full_loop
+    description: README Quick start explicitly names the `pragma report --human` step as part of the loop
+    expected: success
+  - id: concepts_describes_artifacts
+    description: docs/concepts.md states the PIL requires junit + spans and that pragma's own flows produce both
+    expected: success
+  - id: primer_mentions_report_step
+    description: greenfield claude.md primer ends with a "make the PIL useful" section pointing at @trace + set_permutation
+    expected: success
+  milestone: M01
+  slice: M01.S8
 milestones:
 - id: M00
   title: Implicit brownfield milestone
@@ -445,3 +515,11 @@ milestones:
     - REQ-013
     - REQ-014
     - REQ-015
+  - id: M01.S8
+    title: v1.1.0 first-run PIL reachable
+    description: Close BUG-020 (Pragma's internal pytest runs clear --junit-xml via -o addopts=, so PIL shows 0 verified on a fresh first-run project even when user follows the docs). Scope is the full proof chain - subprocess emits junit, report surfaces artifact gaps instead of silently returning "missing" everywhere, smoke script asserts the end-to-end PIL story, docs describe the loop as it is.
+    requirements:
+    - REQ-016
+    - REQ-017
+    - REQ-018
+    - REQ-019
