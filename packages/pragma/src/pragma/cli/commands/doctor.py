@@ -32,6 +32,11 @@ from pragma.core.errors import (
 )
 from pragma.core.manifest import hash_manifest, load_manifest
 from pragma.core.recovery import diagnose
+from pragma.core.spans import (
+    SpansRetention,
+    clean_spans,
+    summarize_spans,
+)
 from pragma.core.state import default_state, read_state, write_state
 
 _FALLBACK_HASH = "sha256:" + "0" * 64
@@ -173,6 +178,74 @@ def _handle_emergency_unlock(*, cwd: Path, reason: str) -> None:
     )
 
 
+def _resolve_retention_from_manifest(cwd: Path) -> SpansRetention:
+    """Read `spans_retention:` from pragma.yaml. Return empty if absent/invalid.
+
+    Silent on read/parse failures: the CLI fallback (DEFAULT_KEEP_RUNS)
+    kicks in via SpansRetention(). A broken manifest is already
+    surfaced by `pragma verify manifest`; this command must not crash
+    on it because cleanup is exactly when a user might have a broken
+    repo.
+    """
+    try:
+        manifest = load_manifest(cwd / "pragma.yaml")
+    except Exception:
+        return SpansRetention()
+    cfg = getattr(manifest, "spans_retention", None)
+    if cfg is None:
+        return SpansRetention()
+    return SpansRetention(keep_runs=cfg.keep_runs, keep_days=cfg.keep_days)
+
+
+@trace("REQ-010")
+def _handle_clean_spans(
+    *,
+    cwd: Path,
+    keep_runs: int | None,
+    keep_days: float | None,
+    dry_run: bool,
+) -> None:
+    """Apply retention and emit a JSON report + audit event."""
+    if keep_runs is not None or keep_days is not None:
+        retention = SpansRetention(keep_runs=keep_runs, keep_days=keep_days)
+    else:
+        retention = _resolve_retention_from_manifest(cwd)
+
+    pragma_dir = cwd / ".pragma"
+    report = clean_spans(pragma_dir=pragma_dir, retention=retention, dry_run=dry_run)
+
+    if not dry_run and report.files_removed > 0:
+        append_audit(
+            pragma_dir,
+            event="spans_cleaned",
+            actor="doctor",
+            slice=None,
+            from_state=None,
+            to_state=None,
+            reason="clean_spans retention",
+            context={
+                "files_removed": report.files_removed,
+                "bytes_freed": report.bytes_freed,
+                "strategy": report.strategy,
+            },
+        )
+
+    typer.echo(
+        json.dumps(
+            {
+                "ok": True,
+                "action": "clean_spans",
+                "files_removed": report.files_removed,
+                "bytes_freed": report.bytes_freed,
+                "strategy": report.strategy,
+                "dry_run": report.dry_run,
+            },
+            sort_keys=True,
+            separators=(",", ":"),
+        )
+    )
+
+
 @trace("REQ-001")
 def doctor(
     emergency_unlock: bool = typer.Option(
@@ -185,6 +258,26 @@ def doctor(
         "--reason",
         help="Required with --emergency-unlock. Non-empty free-text.",
     ),
+    clean_spans_flag: bool = typer.Option(
+        False,
+        "--clean-spans",
+        help="Prune .pragma/spans/ by retention policy.",
+    ),
+    keep_runs: int | None = typer.Option(
+        None,
+        "--keep-runs",
+        help="Keep the N newest span files. Overrides manifest.",
+    ),
+    keep_days: float | None = typer.Option(
+        None,
+        "--keep-days",
+        help="Keep span files newer than D days. Overrides manifest.",
+    ),
+    dry_run: bool = typer.Option(
+        False,
+        "--dry-run",
+        help="With --clean-spans: report deletions but do not touch disk.",
+    ),
 ) -> None:
     """Print local install + project state as JSON, with recovery advice."""
     cwd = Path.cwd()
@@ -193,6 +286,11 @@ def doctor(
         _handle_emergency_unlock(cwd=cwd, reason=reason)
         return
 
+    if clean_spans_flag:
+        _handle_clean_spans(cwd=cwd, keep_runs=keep_runs, keep_days=keep_days, dry_run=dry_run)
+        return
+
+    spans_summary = summarize_spans(cwd / ".pragma" / "spans")
     diagnostics = diagnose(cwd)
     payload: dict[str, object] = {
         "ok": True,
@@ -203,6 +301,8 @@ def doctor(
         "pre_commit_config_exists": (cwd / ".pre-commit-config.yaml").exists(),
         "pragma_dir_exists": (cwd / ".pragma").exists(),
         "claude_settings_exists": (cwd / ".claude" / "settings.json").exists(),
+        "spans_count": spans_summary.count,
+        "spans_bytes": spans_summary.bytes_total,
         "diagnostics": diagnostics,
     }
     typer.echo(json.dumps(payload, sort_keys=True, separators=(",", ":")))

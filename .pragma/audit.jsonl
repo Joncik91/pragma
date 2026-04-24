@@ -1,0 +1,7 @@
+{"actor":"cli","context":{},"event":"slice_activated","from_state":null,"reason":"pragma slice activate M01.S6","slice":"M01.S6","to_state":"LOCKED","ts":"2026-04-24T16:08:47Z"}
+{"actor":"cli","context":{},"event":"slice_cancelled","from_state":"LOCKED","reason":"pragma slice cancel (slice M01.S6)","slice":"M01.S6","to_state":null,"ts":"2026-04-24T16:16:27Z"}
+{"actor":"cli","context":{},"event":"slice_activated","from_state":null,"reason":"pragma slice activate M01.S6","slice":"M01.S6","to_state":"LOCKED","ts":"2026-04-24T16:16:27Z"}
+{"actor":"doctor","context":{"previous_gate":"LOCKED","previous_slice":"M01.S6"},"event":"emergency_unlock","from_state":"LOCKED","reason":"resync state manifest_hash after model extension","slice":"M01.S6","to_state":null,"ts":"2026-04-24T16:16:43Z"}
+{"actor":"cli","context":{},"event":"slice_activated","from_state":null,"reason":"pragma slice activate M01.S6","slice":"M01.S6","to_state":"LOCKED","ts":"2026-04-24T16:16:43Z"}
+{"actor":"cli","context":{},"event":"unlocked","from_state":"LOCKED","reason":"pragma unlock (slice M01.S6)","slice":"M01.S6","to_state":"UNLOCKED","ts":"2026-04-24T16:17:56Z"}
+{"actor":"cli","context":{},"event":"slice_completed","from_state":"UNLOCKED","reason":"pragma slice complete (slice M01.S6)","slice":"M01.S6","to_state":null,"ts":"2026-04-24T16:27:29Z"}

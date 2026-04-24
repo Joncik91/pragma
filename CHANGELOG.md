@@ -5,6 +5,88 @@ All notable changes to Pragma are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.5] — 2026-04-24
+
+**Span retention.** Closes the v1.0.4-parked paper cut that
+`.pragma/spans/*.jsonl` accumulates forever on long-running projects.
+Since KI-1 each pytest run writes a fresh uniquely-named JSONL, so on
+a busy repo the directory grows linearly with test runs and starts
+hurting `ls`, `pragma report`, and disk after a few months of real
+use. v1.0.5 adds retention to `pragma doctor` — opt-in cleanup, not
+auto-prune.
+
+### Added
+
+- **`pragma doctor --clean-spans`** with `--keep-runs N` / `--keep-days D`
+  / `--dry-run`. Keeps the N newest span files by mtime, or files within
+  D days, or both (union — more lenient rule wins). Default when no
+  flag and no manifest config: `keep_runs=50`. `--dry-run` reports
+  what would be removed without touching the filesystem.
+- **`spans_retention:` block in `pragma.yaml`** — optional, fields
+  `keep_runs` and `keep_days`. Picked up by `pragma doctor
+  --clean-spans` when no CLI flag is given, so projects can pin their
+  policy without typing it every time. CLI flags override manifest
+  config for the one invocation.
+- **`spans_cleaned` audit event** — every non-dry `--clean-spans` run
+  appends one line to `.pragma/audit.jsonl` with `files_removed`,
+  `bytes_freed`, and the strategy used. Keeps the forensic record
+  complete even as span files themselves roll off.
+- **`pragma doctor` base mode now reports `spans_count` and `spans_bytes`**
+  in its diagnostics payload so users see accumulation before the
+  directory gets uncomfortable. No new flag required.
+- **`pragma.core.spans`** — pure-functional module with `SpansRetention`,
+  `CleanReport`, `clean_spans`, `summarize_spans`, `span_files`. Sorted
+  outputs for deterministic reporting. All paths traced with
+  `@trace("REQ-010")`.
+
+### Meta
+
+v1.0.5 was scoped tight on purpose: one REQ (REQ-010), one new slice
+(M01.S6), one new core module, seven permutations. No behavior change
+to the gate, manifest canonicalisation of an optional new field
+(`spans_retention`), `pragma freeze` re-runs idempotently on the same
+input. Next release is v1.1.0 — TypeScript SDK + battery template +
+discipline checker — which is a different shape of work and deserves
+its own cycle.
+
+### Changed
+
+- `.pre-commit-config.yaml` — semgrep hook now pins
+  `additional_dependencies: [setuptools]` so its vendored
+  opentelemetry import of `pkg_resources` resolves on py3.12+; pip-audit
+  ignores GHSA-58qw-9mgm-455v (pip advisory with no published fix);
+  deptry replaced with a local hook that targets `packages/pragma-sdk`
+  only (upstream hook can't handle the uv-workspace top-level
+  pyproject; pragma package cleanup parked as KI-14). All three are
+  infra fixes surfaced when v1.0.4→v1.0.5 pre-commit caches were
+  rebuilt after the repo's on-disk move.
+
+### Known Issues
+
+- **KI-13: `pragma slice complete` subprocess cwd breaks for brownfield
+  workspaces with nested `tests_root` (e.g. Pragma's own
+  `tests_root: packages/pragma/tests/`).**
+  `pragma.core.tests_discovery.run_tests` invokes pytest with
+  `cwd=tests_dir.parent`, and `collect_tests` emits nodeids relative to
+  the user's cwd. On a brownfield repo where `tests_root` is two
+  levels deep, those nodeids prepend `packages/pragma/tests/...` but
+  pytest is already chdir'd into `packages/pragma/`, so it looks for
+  `packages/pragma/packages/pragma/tests/...` and reports every test
+  as `error`. Workaround: finish the slice with
+  `pragma slice complete --skip-tests` when the suite is known green
+  via `python -m pytest` directly. Does not affect greenfield
+  projects (the smoke script validates this). Targeted fix: thread
+  the repo root into both functions as an explicit parameter and
+  cwd there. Deferred to a focused follow-up so v1.0.5 stays
+  scoped to span retention.
+- **KI-14: deptry hook runs on `pragma-sdk` only — `pragma` package
+  has eight DEP002 false-positives** where dev-only tools
+  (ruff, mypy, pytest-cov, pre-commit, types-PyYAML, opentelemetry-api,
+  opentelemetry-sdk) are listed under `[project.dependencies]` rather
+  than `[project.optional-dependencies.dev]`. Deptry correctly reports
+  they are unused at runtime. Fix is a pyproject.toml reshape, not a
+  dependency change; parked so v1.0.5 does not conflate scope.
+
 ## [1.0.4] — 2026-04-21
 
 **Release readiness.** Closing the v1.0 series with the gate gaps that

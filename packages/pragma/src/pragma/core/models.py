@@ -102,12 +102,24 @@ class Requirement(_StrictModel):
         return self
 
 
+class SpansRetentionConfig(_StrictModel):
+    """Optional retention policy for `.pragma/spans/` in `pragma.yaml`.
+
+    Either or both fields may be present. If both are set, a span file
+    is kept when it satisfies at least one rule (union semantics).
+    """
+
+    keep_runs: int | None = Field(default=None, ge=1)
+    keep_days: float | None = Field(default=None, gt=0)
+
+
 class Manifest(_StrictModel):
     version: Literal["1", "2"]
     project: Project
     vision: str | None = None
     milestones: tuple[Milestone, ...] = Field(default=())
     requirements: tuple[Requirement, ...] = Field(default=())
+    spans_retention: SpansRetentionConfig | None = None
 
     @model_validator(mode="after")
     def _check_unique_requirement_ids(self) -> Manifest:

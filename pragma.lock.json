@@ -1,7 +1,7 @@
 {
   "version": "1",
-  "manifest_hash": "sha256:0ead10ca8d6ce0a3defccee907ed9415f3a392eaadac058d826c6d579a03c729",
-  "generated_at": "2026-04-21T17:20:34Z",
+  "manifest_hash": "sha256:a386a10d6106ab03a2dcc9b8b504b68cf1bee9df1a18b69c568a54b0587b6d3b",
+  "generated_at": "2026-04-24T16:14:27Z",
   "manifest": {
     "version": "2",
     "project": {
@@ -76,6 +76,14 @@
               "REQ-007",
               "REQ-008",
               "REQ-009"
+            ]
+          },
+          {
+            "id": "M01.S6",
+            "title": "v1.0.5 span retention",
+            "description": "doctor --clean-spans with keep_runs / keep_days retention and manifest config. Closes the v1.0.4-parked paper cut that .pragma/spans/ accumulates forever.",
+            "requirements": [
+              "REQ-010"
             ]
           }
         ]
@@ -434,7 +442,57 @@
         ],
         "milestone": "M01",
         "slice": "M01.S5"
+      },
+      {
+        "id": "REQ-010",
+        "title": "doctor --clean-spans prunes old span files by retention policy",
+        "description": "`pragma doctor --clean-spans` removes old `.pragma/spans/*.jsonl` files to bound disk growth over long-running projects. Retention is configured via `spans_retention:` in `pragma.yaml` (keys `keep_runs` and `keep_days`, both optional; default `keep_runs: 50` when the block is absent) or overridden at the CLI with `--keep-runs N` / `--keep-days N`. `--dry-run` reports what would be deleted without touching the filesystem. Non-dry runs append a `spans_cleaned` event to `audit.jsonl` with files_removed, bytes_freed, and the strategy used. `doctor` base mode (no flag) reports `spans_count` and `spans_bytes` in its diagnostics so users see accumulation before it hurts.",
+        "touches": [
+          "packages/pragma/src/pragma/cli/commands/doctor.py",
+          "packages/pragma/src/pragma/core/spans.py",
+          "packages/pragma/src/pragma/core/models.py"
+        ],
+        "permutations": [
+          {
+            "id": "clean_spans_keep_runs_removes_oldest",
+            "description": "with N+K files present, --keep-runs N removes the K oldest span files",
+            "expected": "success"
+          },
+          {
+            "id": "clean_spans_keep_days_respects_mtime",
+            "description": "--keep-days D preserves files with mtime within D days and removes older ones",
+            "expected": "success"
+          },
+          {
+            "id": "clean_spans_dry_run_no_fs_change",
+            "description": "--clean-spans --dry-run reports deletions without removing any file",
+            "expected": "success"
+          },
+          {
+            "id": "clean_spans_default_keep_runs_50",
+            "description": "--clean-spans with no flags and no manifest config defaults to keep_runs=50",
+            "expected": "success"
+          },
+          {
+            "id": "clean_spans_manifest_config_used",
+            "description": "--clean-spans with no CLI flags honours pragma.yaml spans_retention block",
+            "expected": "success"
+          },
+          {
+            "id": "clean_spans_audit_event_appended",
+            "description": "non-dry --clean-spans appends a spans_cleaned event to audit.jsonl",
+            "expected": "success"
+          },
+          {
+            "id": "doctor_base_reports_spans_stats",
+            "description": "plain `pragma doctor` includes spans_count and spans_bytes in diagnostics",
+            "expected": "success"
+          }
+        ],
+        "milestone": "M01",
+        "slice": "M01.S6"
       }
-    ]
+    ],
+    "spans_retention": null
   }
 }
