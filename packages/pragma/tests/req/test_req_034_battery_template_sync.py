@@ -44,7 +44,7 @@ def _assert_pytest_hook_uses_resolution_chain(
     # Find the pytest hook block and assert its entry uses the chain.
     assert "id: pytest" in config
     pytest_block_start = config.index("id: pytest")
-    pytest_block = config[pytest_block_start : pytest_block_start + 400]
+    pytest_block = config[pytest_block_start : pytest_block_start + 800]
     assert sys.executable in pytest_block, (
         f"pytest hook must use the {{ pragma_python_bin }} chain; got:\n{pytest_block}"
     )

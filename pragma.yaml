@@ -772,6 +772,34 @@ requirements:
     expected: success
   milestone: M01
   slice: M01.S27
+- id: REQ-039
+  title: commit-shape check skips pre-Pragma history
+  description: 'BUG-047. Round-18 brownfield walkthrough surfaced this - `pragma verify all` running pre-commit walked the entire git history and rejected every pre-Pragma commit for missing WHY/Co-Authored-By. The whole point of brownfield is to adopt Pragma into a repo with existing history; Pragma cannot retro-impose its commit shape on commits that predate its adoption. Fix - when --base ref does not exist, scope the range to commits that touched pragma.yaml. When pragma.yaml is staged for the very first adopt commit, return an empty range so the check trivially passes.'
+  touches:
+  - packages/pragma/src/pragma/cli/commands/verify_checks.py
+  permutations:
+  - id: pre_adopt_history_excluded
+    description: when adopt commit exists, _git_range_spec walks only adopt^..HEAD
+    expected: success
+  - id: first_adopt_commit_in_progress
+    description: when pragma.yaml is staged but unmerged, _git_range_spec returns empty range
+    expected: success
+  milestone: M01
+  slice: M01.S28
+- id: REQ-040
+  title: scaffolded pytest hook tolerates no-tests state
+  description: 'BUG-048. Round-18 brownfield walkthrough - scaffolded brownfield project has no tests/ dir, so pytest exits 5 (no tests collected) and pre-commit treats that as a hook failure. The user cannot land the very first adopt-pragma commit until they manually create a tests/ dir. Fix - scaffolded pytest hook suppresses exit 5 to 0 (no tests is a legitimate state for a freshly-adopted brownfield repo). Every other exit code still propagates.'
+  touches:
+  - packages/pragma/src/pragma/templates/pre-commit-config.yaml.tpl
+  permutations:
+  - id: pytest_hook_suppresses_exit_5
+    description: scaffolded pytest hook traps exit 5 from pytest and exits 0
+    expected: success
+  - id: pytest_hook_propagates_other_failures
+    description: scaffolded pytest hook propagates non-5 exit codes verbatim
+    expected: success
+  milestone: M01
+  slice: M01.S29
 milestones:
 - id: M00
   title: Implicit brownfield milestone
@@ -935,3 +963,13 @@ milestones:
     description: 'BUG-045 surfaced in the round-16 brownfield README walkthrough. Before this fix, init --brownfield wrote v1 schema with no milestones/slices; add-requirement accepted milestone:null/slice:null; freeze succeeded; then `pragma slice activate M01.S1` failed because no slice existed. Fix - ship v2 brownfield template with implicit M00.S0; default add-requirement to the only-declared slice; document brownfield uses M00.S0 in the ship-a-slice section.'
     requirements:
     - REQ-038
+  - id: M01.S28
+    title: commit-shape check skips pre-Pragma history (BUG-047)
+    description: 'BUG-047 surfaced in round-18. Pragma cannot demand its commit shape on commits that predate its adoption. Fix - when --base ref is absent, scope the range to commits that touched pragma.yaml; if pragma.yaml is staged but uncommitted (the first adopt commit), return an empty range.'
+    requirements:
+    - REQ-039
+  - id: M01.S29
+    title: scaffolded pytest hook tolerates no-tests state (BUG-048)
+    description: 'BUG-048 surfaced in round-18. Scaffolded brownfield project ships pytest.ini but no tests/ dir, so pytest exits 5 (no tests collected) and pre-commit treats that as a hook failure. The very first adopt-pragma commit cannot land. Fix - scaffolded pytest hook traps exit 5 to 0 while still propagating other exit codes.'
+    requirements:
+    - REQ-040

@@ -143,8 +143,67 @@ def _git_range_spec(cwd: Path, base: str) -> str:
             check=True,
         )
     except subprocess.CalledProcessError:
+        # BUG-047 / REQ-039: when --base doesn't exist (e.g. sandbox is
+        # on `master`, brownfield repo never had a `main`), walk only
+        # commits that introduced or modified `pragma.yaml`. Pre-Pragma
+        # history is exempt by definition — Pragma cannot demand its
+        # commit shape on commits that predate its adoption. If
+        # pragma.yaml is staged but not yet committed (the very first
+        # adopt-pragma commit), there's nothing in-range to check, so
+        # return an empty range that yields zero commits.
+        adopt = _first_commit_touching_pragma_yaml(cwd)
+        if adopt is not None:
+            return f"{adopt}^..HEAD"
+        if _pragma_yaml_staged_or_present(cwd):
+            return "HEAD..HEAD"
         return "HEAD"
     return f"{base}..HEAD"
+
+
+def _pragma_yaml_staged_or_present(cwd: Path) -> bool:
+    """True if pragma.yaml is staged for commit or sitting in the working tree.
+
+    Brownfield's first adopt-pragma commit hasn't introduced pragma.yaml
+    to git history yet, so `git log --diff-filter=A` returns empty. But
+    we know a Pragma adoption is in flight when the file exists locally
+    or appears in the staged index.
+    """
+    if (cwd / "pragma.yaml").exists():
+        return True
+    try:
+        out = subprocess.run(  # noqa: S603
+            ["git", "diff", "--cached", "--name-only"],  # noqa: S607
+            cwd=str(cwd),
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout
+    except subprocess.CalledProcessError:
+        return False
+    return any(line.strip() == "pragma.yaml" for line in out.splitlines())
+
+
+def _first_commit_touching_pragma_yaml(cwd: Path) -> str | None:
+    """Return SHA of the earliest commit that touched pragma.yaml, or None.
+
+    Used to scope the commit-shape check to the post-adoption range when
+    no `--base` ref is available. Returns None when pragma.yaml has never
+    been committed (e.g. brownfield mid-init), which lets the caller fall
+    back to scanning full HEAD.
+    """
+    try:
+        out = subprocess.run(  # noqa: S603
+            ["git", "log", "--diff-filter=A", "--format=%H", "--", "pragma.yaml"],  # noqa: S607
+            cwd=str(cwd),
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout.strip()
+    except subprocess.CalledProcessError:
+        return None
+    if not out:
+        return None
+    return out.splitlines()[-1].strip() or None
 
 
 def _partition_commits(commit_log: str) -> tuple[int, list[dict[str, object]]]:

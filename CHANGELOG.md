@@ -5,6 +5,20 @@ All notable changes to Pragma are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.4] — 2026-04-25
+
+**Brownfield adopt-pragma commit lands cleanly.** Round-18 strict
+brownfield walkthrough surfaced two more dead-ends after BUG-045:
+the commit-shape check rejected pre-Pragma history (BUG-047) and
+the scaffolded pytest hook treated "no tests yet" as a hook failure
+(BUG-048). Both fixed.
+
+### Fixed
+
+- **BUG-047 / REQ-039** — `pragma verify commits` skips pre-Pragma history. When `--base` (default `main`) does not exist, the range scopes to commits that touched `pragma.yaml` instead of walking full HEAD. When `pragma.yaml` is staged but uncommitted (the first adopt commit), the range yields zero commits so the check trivially passes. Pre-Pragma commits are exempt by definition.
+- **BUG-048 / REQ-040** — scaffolded pre-commit pytest hook traps pytest exit code 5 ("no tests collected") to 0. A freshly-adopted brownfield repo with no `tests/` dir can now land its first commit. Other exit codes still propagate.
+- **README** — brownfield "chore: adopt pragma" example now uses the multi-line WHY/Co-Authored-By shape that the gate actually enforces.
+
 ## [0.1.3] — 2026-04-25
 
 **Brownfield quick-start reaches LOCKED gate.** Round-16 strict

@@ -83,7 +83,12 @@ repos:
     hooks:
       - id: pytest
         name: pytest
-        entry: bash -c 'PY="{{ pragma_python_bin }}"; [ -x "$PY" ] || PY=".venv/bin/python3"; [ -x "$PY" ] || PY=python3; exec "$PY" -m pytest'
+        # BUG-048 / REQ-040: exit 5 means "no tests collected" — that is a
+        # legitimate state for a brownfield repo on the very first
+        # adopt-pragma commit, before any test files exist. Suppress 5
+        # to 0 so the gate doesn't refuse the adopt commit; every other
+        # exit code still propagates.
+        entry: bash -c 'PY="{{ pragma_python_bin }}"; [ -x "$PY" ] || PY=".venv/bin/python3"; [ -x "$PY" ] || PY=python3; "$PY" -m pytest; rc=$?; [ "$rc" -eq 5 ] && exit 0; exit "$rc"'
         language: system
         pass_filenames: false
         always_run: true

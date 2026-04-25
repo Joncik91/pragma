@@ -8,7 +8,7 @@ specification, a test-first gate, and a plain-English report of what
 actually ran — so you can ship code an AI wrote and know what you're
 shipping.
 
-- **Current version:** v0.1.3 (2026-04-25)
+- **Current version:** v0.1.4 (2026-04-25)
 - **License:** Apache-2.0
 - **Status:** Alpha. Python-only. Thesis works end-to-end on a fresh greenfield; dogfood is still finding bugs. See [`CHANGELOG.md`](CHANGELOG.md) for the release cadence plan and known issues.
 
@@ -55,9 +55,20 @@ pragma spec add-requirement --id REQ-001 \
     --permutation 'valid_credentials|Returns JWT on valid email + strong password|success' \
     --permutation 'weak_password|Rejects weak passwords|reject'
 pragma freeze
-git add pragma.yaml pragma.lock.json .pre-commit-config.yaml
-git commit -m "chore: adopt pragma"
+git add pragma.yaml pragma.lock.json .pre-commit-config.yaml PRAGMA.md .claude/ pytest.ini .pragma/claude-settings.hash
+git commit -m "$(cat <<'MSG'
+chore: adopt pragma
+
+WHY: Wire the manifest, lockfile, hooks, and Claude Code settings
+into the repo so every future commit goes through the gate.
+
+Co-Authored-By: <name> <email>
+MSG
+)"
 ```
+
+The commit-msg hook enforces a WHY line and a `Co-Authored-By:` trailer,
+even on the very first commit — the gate does not exempt itself.
 
 ## Quick start — greenfield (new project)
 
