@@ -40,6 +40,10 @@ starts.
 - **BUG-025** — `span_count` in the PIL multiplies by the number of pytest invocations run across the project (unlock + complete + full-suite regen). Cosmetic; doesn't affect `status`.
 - **BUG-026** — `pragma narrative commit` produces valid shape but placeholder "WHY" and a raw file list that includes `.pyc` + `.pragma/state.json.lock`. The senior-engineer prose isn't generated yet.
 
+### Fixed since v0.1.0 (rolling, untagged)
+
+- **BUG-044 / REQ-036** — `pragma init --greenfield` now runs `git init -q` when the cwd has no repo, so the README quick-start (`mkdir demo && cd demo && pragma init --greenfield`) actually wires the pre-commit / commit-msg / pre-push hooks. Previously `hooks_installed: false` shipped silently and the gate enforcement the README advertises was not in place on a literal first run. Brownfield is unaffected.
+
 ### Pre-v0.1.0 history
 
 The git log contains the iterative development path from the first

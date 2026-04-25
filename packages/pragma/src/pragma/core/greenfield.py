@@ -115,6 +115,36 @@ def _write_gitignore_entries(cwd: Path) -> None:
         f.write("\n".join(new_entries) + "\n")
 
 
+def _ensure_git_repo(cwd: Path) -> bool:
+    """If `cwd` is not a git repo, run `git init -q`. Returns True if initialised.
+
+    BUG-044 / REQ-036. The greenfield README quick-start does not tell the
+    user to `git init` first, so the downstream `pre-commit install` step
+    silently no-ops and `hooks_installed` is false. Greenfield by definition
+    is a fresh project — initialising the repo here is the least-surprise
+    behaviour and keeps the README walkthrough honest.
+    """
+    import shutil
+    import subprocess
+
+    if (cwd / ".git").exists():
+        return False
+    git_bin = shutil.which("git")
+    if git_bin is None:
+        return False
+    try:
+        subprocess.run(  # noqa: S603 — resolved git binary, fixed args
+            [git_bin, "init", "-q"],
+            cwd=str(cwd),
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return False
+    return True
+
+
 @trace("REQ-001")
 def scaffold_greenfield(cwd: Path, *, name: str, language: str) -> list[str]:
     """Scaffold a greenfield Pragma project in ``cwd``.
@@ -125,6 +155,8 @@ def scaffold_greenfield(cwd: Path, *, name: str, language: str) -> list[str]:
     """
     src_dir = cwd / "src"
     _refuse_if_initialised(cwd, src_dir)
+
+    _ensure_git_repo(cwd)
 
     env = _jinja_env()
     created = _render_manifest_and_templates(env, cwd, name, language)

@@ -40,3 +40,7 @@
 {"actor":"cli","context":{},"event":"slice_cancelled","from_state":"LOCKED","reason":"pragma slice cancel (slice M01.S23)","slice":"M01.S23","to_state":null,"ts":"2026-04-25T12:22:16Z"}
 {"actor":"cli","context":{},"event":"slice_activated","from_state":null,"reason":"pragma slice activate M01.S24","slice":"M01.S24","to_state":"LOCKED","ts":"2026-04-25T12:32:06Z"}
 {"actor":"cli","context":{},"event":"slice_cancelled","from_state":"LOCKED","reason":"pragma slice cancel (slice M01.S24)","slice":"M01.S24","to_state":null,"ts":"2026-04-25T12:32:06Z"}
+{"actor":"cli","context":{},"event":"slice_activated","from_state":null,"reason":"pragma slice activate M01.S25","slice":"M01.S25","to_state":"LOCKED","ts":"2026-04-25T12:56:08Z"}
+{"actor":"cli","context":{},"event":"slice_cancelled","from_state":"LOCKED","reason":"pragma slice cancel (slice M01.S25)","slice":"M01.S25","to_state":null,"ts":"2026-04-25T12:56:26Z"}
+{"actor":"cli","context":{},"event":"slice_activated","from_state":null,"reason":"pragma slice activate M01.S25","slice":"M01.S25","to_state":"LOCKED","ts":"2026-04-25T12:56:31Z"}
+{"actor":"doctor","context":{"previous_gate":"LOCKED","previous_slice":"M01.S25"},"event":"emergency_unlock","from_state":"LOCKED","reason":"REQ-036 retroactive entry \u2014 implementation and tests existed before slice activation","slice":"M01.S25","to_state":null,"ts":"2026-04-25T12:56:35Z"}

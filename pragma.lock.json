@@ -1,7 +1,7 @@
 {
   "version": "1",
-  "manifest_hash": "sha256:1ef969792fb2c4419414da227d5747e4673abfab1c8aae504cc47d019ba94dcf",
-  "generated_at": "2026-04-25T12:32:06Z",
+  "manifest_hash": "sha256:19695d1eb45b0c2cd47c68c889d36ab9d6d2d54c17d4e6136787ad8fcc8e576b",
+  "generated_at": "2026-04-25T12:52:13Z",
   "manifest": {
     "version": "2",
     "project": {
@@ -235,6 +235,14 @@
             "description": "BUG-042 surfaced by round-8 README walkthrough. Scaffolded .gitignore only had `.pragma/spans/` and `.pragma/pytest-junit.xml`. Missing entries: `.pragma/state.json` (machine-local gate state — should never be tracked), `.pragma/state.json.lock` (flock file), `.pragma/claude-settings.hash` (... actually committed, see CLAUDE.md context), `__pycache__/`, `*.pyc`. The downstream effect: a first git commit stages cache files; ruff-format and pytest end up \"modifying\" cache files on every commit, which pre-commit treats as a hook failure. The user sees mysterious ruff/pytest hook failures and bounces. Fix - ship the same gitignore entries pragma's own repo uses for state/cache/pyc.",
             "requirements": [
               "REQ-035"
+            ]
+          },
+          {
+            "id": "M01.S25",
+            "title": "greenfield init bootstraps git repo (BUG-044)",
+            "description": "BUG-044 surfaced by round-11 strict README walkthrough. README quick-start `mkdir demo && cd demo && pragma init --greenfield` produces `hooks_installed: false` because `pre-commit install` silently no-ops without `.git/`. Result - the gate enforcement the README advertises is not actually wired on a literal first-run. Fix - greenfield init runs `git init -q` when the cwd has no repo, so the documented quick-start works end-to-end without an undocumented step.",
+            "requirements": [
+              "REQ-036"
             ]
           }
         ]
@@ -1291,6 +1299,28 @@
         ],
         "milestone": "M01",
         "slice": "M01.S24"
+      },
+      {
+        "id": "REQ-036",
+        "title": "greenfield init bootstraps the git repo",
+        "description": "BUG-044. The README quick-start runs `mkdir demo && cd demo && pragma init --greenfield` without a `git init` step. Result - `pre-commit install` silently no-ops because `.git/` is absent, so `hooks_installed` is false and the gate enforcement the README advertises is not actually wired. Greenfield by definition is a fresh project, so `pragma init --greenfield` should `git init -q` when the cwd is not already a repo. Brownfield is unaffected because brownfield assumes an existing repo.",
+        "touches": [
+          "packages/pragma/src/pragma/core/greenfield.py"
+        ],
+        "permutations": [
+          {
+            "id": "greenfield_inits_git_when_absent",
+            "description": "scaffold_greenfield creates .git when cwd has no repo",
+            "expected": "success"
+          },
+          {
+            "id": "greenfield_leaves_existing_git_alone",
+            "description": "scaffold_greenfield does not touch an existing .git",
+            "expected": "success"
+          }
+        ],
+        "milestone": "M01",
+        "slice": "M01.S25"
       }
     ],
     "spans_retention": null
