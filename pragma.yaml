@@ -819,6 +819,23 @@ requirements:
     expected: success
   milestone: M01
   slice: M01.S30
+- id: REQ-042
+  title: unlock --skip-tests for brownfield retroactive REQ
+  description: 'BUG-046. Logged at v0.1.3 - brownfield retroactive-REQ flow had no clean gate path. `pragma unlock` refused when tests already passed (TDD red-first rule); doctor --emergency-unlock cleared the active slice, leaving slice complete unreachable. Workaround required hand-editing state.json. Fix - `pragma unlock --skip-tests --reason "..."` bypasses the red-test check, requires explicit reason, and audit-logs the bypass. TDD rule still applies by default; --skip-tests is the explicit, audited escape hatch.'
+  touches:
+  - packages/pragma/src/pragma/cli/commands/unlock.py
+  permutations:
+  - id: unlock_skip_tests_requires_reason
+    description: unlock --skip-tests without --reason raises reason_required
+    expected: reject
+  - id: unlock_skip_tests_unlocks_with_passing_tests
+    description: unlock --skip-tests --reason "..." flips gate to UNLOCKED even when tests pass
+    expected: success
+  - id: unlock_skip_tests_audited
+    description: unlock --skip-tests records the bypass and reason verbatim in audit.jsonl
+    expected: success
+  milestone: M01
+  slice: M01.S31
 milestones:
 - id: M00
   title: Implicit brownfield milestone
@@ -997,3 +1014,8 @@ milestones:
     description: 'Round-19 edge-case dogfood: three remediation strings either pointed at fake commands, omitted available --force, or omitted declared slice ids. Fix - PIL mocked points at set_permutation, slice activate lists declared slices, greenfield already_initialised explains --force honestly.'
     requirements:
     - REQ-041
+  - id: M01.S31
+    title: unlock --skip-tests escape hatch (BUG-046)
+    description: 'BUG-046 from v0.1.3 was the last open known-issue. Brownfield retroactive REQ flow (existing code, write-test-after) had no clean gate path. Fix - `pragma unlock --skip-tests --reason "..."` requires reason, audit-logs the bypass, flips gate to UNLOCKED. TDD remains the default.'
+    requirements:
+    - REQ-042

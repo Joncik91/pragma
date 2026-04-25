@@ -5,6 +5,20 @@ All notable changes to Pragma are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.6] — 2026-04-25
+
+**Last open known-issue closed.** BUG-046 was logged at v0.1.3 as a
+real friction point (brownfield retroactive REQ flow had no clean
+gate path). Fixed.
+
+### Fixed
+
+- **BUG-046 / REQ-042** — `pragma unlock --skip-tests --reason "..."` is the brownfield-import escape hatch. The TDD red-first rule still applies by default; `--skip-tests` requires a non-empty `--reason` and audit-logs the bypass to `.pragma/audit.jsonl` so the trail is honest. Use case: existing code that you're retroactively wrapping in a manifest REQ — tests already pass, hand-editing `.pragma/state.json` is no longer necessary. Documented in `docs/reference.md`.
+
+### Open known-issues at v0.1.6
+
+None.
+
 ## [0.1.5] — 2026-04-25
 
 **Edge-case dogfood pass.** Probed 15 first-run-user error scenarios.

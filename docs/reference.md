@@ -23,7 +23,7 @@ payload, or non-zero with a JSON `{"error": "code", "message": "...",
 | `pragma slice complete` | Ship the slice (requires green tests). |
 | `pragma slice cancel` | Abandon the active slice. |
 | `pragma slice status` | Print the gate + slice state as JSON. |
-| `pragma unlock` | Flip gate LOCKED → UNLOCKED (requires red tests). |
+| `pragma unlock` | Flip gate LOCKED → UNLOCKED (requires red tests; `--skip-tests --reason` bypasses for brownfield). |
 | `pragma verify manifest` | Check manifest ↔ lock agreement. |
 | `pragma verify gate` | Check gate state is coherent with manifest. |
 | `pragma verify discipline` | Check AST overengineering budgets. |
@@ -103,9 +103,13 @@ to review and refine.
 
 ### `pragma unlock`
 
-Flips gate LOCKED → UNLOCKED. Refused unless every permutation in the
-active slice has a *failing* test named per convention
-(`test_req_<id>_<permutation>`). No flags.
+Flips gate LOCKED → UNLOCKED. Default refuses unless every permutation
+in the active slice has a *failing* test named per convention
+(`test_req_<id>_<permutation>`).
+
+| Flag | Purpose |
+|---|---|
+| `--skip-tests --reason "..."` | Brownfield-import escape hatch (REQ-042). Bypasses the red-tests check when code already exists and tests already pass. Requires a non-empty `--reason` so the bypass is recorded in `.pragma/audit.jsonl`. |
 
 ### `pragma verify <subcommand>`
 

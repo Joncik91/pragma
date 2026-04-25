@@ -92,37 +92,72 @@ def _assert_slice_unlock_ready(cwd: Path, manifest: Manifest, state: State) -> N
         )
 
 
+def _raise_if_skip_tests_missing_reason(skip_tests: bool, reason: str) -> None:
+    if not (skip_tests and not reason.strip()):
+        return
+    from pragma.core.errors import ReasonRequired
+
+    raise ReasonRequired(
+        message="`--skip-tests` requires `--reason` (logged to audit).",
+        remediation=(
+            "Pass `--reason 'brownfield import — REQ-001 already implemented'` "
+            "or similar so the audit trail records why the red-test check was bypassed."
+        ),
+        context={},
+    )
+
+
+def _do_unlock_transition(cwd: Path, *, skip_tests: bool, reason: str) -> dict[str, str | None]:
+    lock = read_lock(cwd / "pragma.lock.json")
+    try:
+        state = read_state(cwd / ".pragma")
+    except StateNotFound:
+        state = default_state(manifest_hash=lock.manifest_hash)
+    manifest = load_manifest(cwd / "pragma.yaml")
+    if state.active_slice is not None and state.gate == "LOCKED" and not skip_tests:
+        _assert_slice_unlock_ready(cwd, manifest, state)
+    now_iso = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+    new_state, audit_fields = unlock_transition(
+        state, now_iso=now_iso, manifest_hash=lock.manifest_hash
+    )
+    write_state(cwd / ".pragma", new_state)
+    audit_reason = (
+        f"unlock --skip-tests: {reason.strip()}" if skip_tests else audit_fields["reason"]
+    )
+    append_audit(
+        cwd / ".pragma",
+        event=audit_fields["event"],
+        actor="cli",
+        slice=audit_fields["slice"],
+        from_state=audit_fields["from_state"],
+        to_state=audit_fields["to_state"],
+        reason=audit_reason,
+        now_iso=now_iso,
+    )
+    return audit_fields
+
+
 @trace("REQ-003")
-def unlock() -> None:
+def unlock(
+    skip_tests: bool = typer.Option(
+        False,
+        "--skip-tests",
+        help=(
+            "BUG-046 / REQ-042: bypass the red-tests-first check for "
+            "brownfield retroactive imports where the code already exists "
+            "and tests are green. Requires --reason. Audit records the bypass."
+        ),
+    ),
+    reason: str = typer.Option(
+        "",
+        "--reason",
+        help="Required when --skip-tests is set. Logged to audit.jsonl.",
+    ),
+) -> None:
     cwd = Path.cwd()
     try:
-        lock = read_lock(cwd / "pragma.lock.json")
-        try:
-            state = read_state(cwd / ".pragma")
-        except StateNotFound:
-            state = default_state(manifest_hash=lock.manifest_hash)
-        manifest = load_manifest(cwd / "pragma.yaml")
-
-        if state.active_slice is not None and state.gate == "LOCKED":
-            _assert_slice_unlock_ready(cwd, manifest, state)
-
-        now_iso = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
-        new_state, audit_fields = unlock_transition(
-            state,
-            now_iso=now_iso,
-            manifest_hash=lock.manifest_hash,
-        )
-        write_state(cwd / ".pragma", new_state)
-        append_audit(
-            cwd / ".pragma",
-            event=audit_fields["event"],
-            actor="cli",
-            slice=audit_fields["slice"],
-            from_state=audit_fields["from_state"],
-            to_state=audit_fields["to_state"],
-            reason=audit_fields["reason"],
-            now_iso=now_iso,
-        )
+        _raise_if_skip_tests_missing_reason(skip_tests, reason)
+        audit_fields = _do_unlock_transition(cwd, skip_tests=skip_tests, reason=reason)
     except PragmaError as exc:
         typer.echo(exc.to_json())
         raise typer.Exit(code=1) from None
@@ -133,6 +168,7 @@ def unlock() -> None:
                 "ok": True,
                 "slice": audit_fields["slice"],
                 "gate": "UNLOCKED",
+                "skip_tests": skip_tests,
             },
             sort_keys=True,
             separators=(",", ":"),
