@@ -73,15 +73,29 @@ pragma freeze
 
 ```shell
 pragma slice activate M01.S1       # gate flips LOCKED
-# write failing tests: test_req_001_valid_credentials, etc.
+# write a failing test for each declared permutation, named
+# test_req_<id>_<permutation_id> to match what `pragma unlock` checks.
+# Run `pragma slice status` or open pragma.yaml to see the exact ids.
 pragma unlock                      # refuses if any permutation lacks a red test
 # write code, tests go green
 pragma slice complete              # refuses if any test is red
-git commit -m "feat: REQ-001 login flow"
+git commit -m "$(cat <<'MSG'
+feat: REQ-001 login flow
+
+WHY: <one paragraph on why this slice matters; pre-commit checks shape>
+
+Co-Authored-By: <name> <email>
+MSG
+)"
 pragma report --human              # Post-Implementation Log
 ```
 
 `pragma slice status` at any time. `pragma slice cancel` to abandon.
+
+The pre-commit / commit-msg / pre-push hooks are wired by `pragma init`
+(see [`docs/reference.md`](docs/reference.md)). They enforce shape on
+the message above; a one-line subject without WHY/trailer is
+refused.
 
 ## Documentation
 

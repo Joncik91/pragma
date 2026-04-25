@@ -242,7 +242,17 @@ def _render_scaffold_templates(cwd: Path, project_name: str) -> list[str]:
 
 def _append_gitignore_entries(cwd: Path) -> None:
     gitignore_path = cwd / ".gitignore"
-    entries_to_add = [".pragma/spans/", ".pragma/pytest-junit.xml"]
+    # BUG-042 / REQ-035: ship the cache + machine-local-state entries
+    # the user would otherwise have to discover when their first
+    # `git add -A` accidentally stages bytecode + flock files.
+    entries_to_add = [
+        ".pragma/spans/",
+        ".pragma/pytest-junit.xml",
+        ".pragma/state.json",
+        ".pragma/state.json.lock",
+        "__pycache__/",
+        "*.pyc",
+    ]
     existing_lines: set[str] = set()
     if gitignore_path.exists():
         existing_lines = set(gitignore_path.read_text(encoding="utf-8").splitlines())

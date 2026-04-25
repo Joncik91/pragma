@@ -92,7 +92,17 @@ def _render_manifest_and_templates(
 
 def _write_gitignore_entries(cwd: Path) -> None:
     gitignore_path = cwd / ".gitignore"
-    entries_to_add = [".pragma/spans/", ".pragma/pytest-junit.xml"]
+    # BUG-042 / REQ-035: ship cache + machine-local-state entries so a
+    # first `git add -A` doesn't accidentally stage bytecode or the
+    # gate's flock file. Mirrors what the brownfield path writes.
+    entries_to_add = [
+        ".pragma/spans/",
+        ".pragma/pytest-junit.xml",
+        ".pragma/state.json",
+        ".pragma/state.json.lock",
+        "__pycache__/",
+        "*.pyc",
+    ]
     existing_lines: set[str] = set()
     if gitignore_path.exists():
         existing_lines = set(gitignore_path.read_text(encoding="utf-8").splitlines())
