@@ -63,16 +63,42 @@ def _summarise_files(files: list[str], *, cap: int = 8) -> str:
 
 
 def _why_from_slice(reqs: list[Requirement], slice_title: str) -> str:
-    """Derive a WHY that cites slice + permutation verdict counts."""
-    total = sum(len(r.permutations) for r in reqs)
-    success = sum(1 for r in reqs for p in r.permutations if p.expected == "success")
-    reject = total - success
-    perm_phrase = (
-        f"{total} permutation"
-        + ("s" if total != 1 else "")
-        + (f" ({success} success, {reject} reject)" if reject else "")
-    )
-    return f"{slice_title}: {perm_phrase} declared."
+    """Derive a WHY that cites the slice and the REQs it ships.
+
+    BUG-026 / REQ-037. Earlier output was "<slice>: N permutations
+    declared" — mechanical, not motivating. New shape names the REQs
+    by title so the reader sees what the slice is *about*, not just
+    how many things it counts.
+    """
+    if not reqs:
+        return f"{slice_title}." if slice_title else "Slice work."
+    titles = [str(r.title).strip() for r in reqs if str(r.title).strip()]
+    if len(titles) == 1:
+        body = titles[0]
+    elif len(titles) == 2:
+        body = f"{titles[0]} and {titles[1]}"
+    else:
+        body = ", ".join(titles[:-1]) + f", and {titles[-1]}"
+    head = f"{slice_title} — " if slice_title else ""
+    return f"{head}{body}."
+
+
+def _what_from_reqs(reqs: list[Requirement]) -> str:
+    """Render a per-REQ WHAT summary instead of a bare file count.
+
+    BUG-026 / REQ-037. The reader of a commit message wants the
+    behaviour that landed, not "Touched N file(s)". Each REQ gets a
+    line; permutations show their `expected` verdict so success vs
+    reject is visible without opening the manifest.
+    """
+    if not reqs:
+        return ""
+    lines: list[str] = []
+    for r in reqs:
+        perms = [f"{p.id}={p.expected}" for p in r.permutations]
+        perms_str = f" — perms: {', '.join(perms)}" if perms else ""
+        lines.append(f"  - {r.id}: {r.title}{perms_str}")
+    return "\n".join(lines)
 
 
 def _slice_title(manifest: Manifest, slice_id: str) -> str:
@@ -162,6 +188,7 @@ def build_commit_message(
     )
     filtered = [f for f in staged_files if not _is_noise(f)]
     where = _summarise_files(filtered) if filtered else "(no non-noise files staged)"
+    what_body = _what_from_reqs(reqs)
 
     env = Environment(
         loader=FileSystemLoader(_TPL_DIR),
@@ -174,4 +201,5 @@ def build_commit_message(
         files=filtered,
         where=where,
         file_count=len(filtered),
+        what_body=what_body,
     )

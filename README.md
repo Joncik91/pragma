@@ -8,7 +8,7 @@ specification, a test-first gate, and a plain-English report of what
 actually ran — so you can ship code an AI wrote and know what you're
 shipping.
 
-- **Current version:** v0.1.1 (2026-04-25)
+- **Current version:** v0.1.2 (2026-04-25)
 - **License:** Apache-2.0
 - **Status:** Alpha. Python-only. Thesis works end-to-end on a fresh greenfield; dogfood is still finding bugs. See [`CHANGELOG.md`](CHANGELOG.md) for the release cadence plan and known issues.
 

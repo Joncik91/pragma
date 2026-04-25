@@ -1,7 +1,7 @@
 {
   "version": "1",
-  "manifest_hash": "sha256:19695d1eb45b0c2cd47c68c889d36ab9d6d2d54c17d4e6136787ad8fcc8e576b",
-  "generated_at": "2026-04-25T12:52:13Z",
+  "manifest_hash": "sha256:b4c55c6a9ebf36f897eb90ef45c4b0512674cd3ef5907a61e06e59ba209d40c1",
+  "generated_at": "2026-04-25T13:23:37Z",
   "manifest": {
     "version": "2",
     "project": {
@@ -243,6 +243,14 @@
             "description": "BUG-044 surfaced by round-11 strict README walkthrough. README quick-start `mkdir demo && cd demo && pragma init --greenfield` produces `hooks_installed: false` because `pre-commit install` silently no-ops without `.git/`. Result - the gate enforcement the README advertises is not actually wired on a literal first-run. Fix - greenfield init runs `git init -q` when the cwd has no repo, so the documented quick-start works end-to-end without an undocumented step.",
             "requirements": [
               "REQ-036"
+            ]
+          },
+          {
+            "id": "M01.S26",
+            "title": "narrative commit produces senior-engineer prose (BUG-026)",
+            "description": "BUG-026 lingered from v0.1.0. Earlier output was mechanical - WHY counted permutations and WHAT only said \"Touched N file(s).\" Fix - WHY names REQ titles instead of permutation counts; WHAT lists each REQ with id, title, and per-permutation verdicts so a reader sees the behaviour that landed without opening the manifest. Senior-engineer voice stays compact and honest.",
+            "requirements": [
+              "REQ-037"
             ]
           }
         ]
@@ -1321,6 +1329,29 @@
         ],
         "milestone": "M01",
         "slice": "M01.S25"
+      },
+      {
+        "id": "REQ-037",
+        "title": "narrative commit produces senior-engineer prose",
+        "description": "BUG-026. README headline is \"Senior engineer on rails.\" Earlier narrative output was mechanical - \"WHY: <slice>: 2 permutations declared.\" and \"WHAT: Touched N file(s).\" A reader could not tell what the slice was about, only how many things it counted. Fix - WHY names REQ titles instead of permutation counts; WHAT lists each REQ with its title and the per-permutation verdicts so a reader sees the behaviour that landed without opening the manifest.",
+        "touches": [
+          "packages/pragma/src/pragma/narrative/commit.py",
+          "packages/pragma/src/pragma/templates/commit-message.tpl"
+        ],
+        "permutations": [
+          {
+            "id": "why_names_req_titles",
+            "description": "WHY cites REQ titles in the active slice instead of bare permutation counts",
+            "expected": "success"
+          },
+          {
+            "id": "what_lists_reqs_with_perms",
+            "description": "WHAT body lists each REQ with id, title, and inline permutation=verdict pairs",
+            "expected": "success"
+          }
+        ],
+        "milestone": "M01",
+        "slice": "M01.S26"
       }
     ],
     "spans_retention": null

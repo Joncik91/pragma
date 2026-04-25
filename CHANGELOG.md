@@ -5,6 +5,23 @@ All notable changes to Pragma are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.2] — 2026-04-25
+
+**Closes the v0.1.0 known-issues backlog.** The BUG-023..026 entries
+that the v0.1.0 CHANGELOG flagged as open were re-checked. Three of
+the four were already fixed in earlier patches and the CHANGELOG was
+stale; the fourth (BUG-026, narrative prose) is now fixed.
+
+### Fixed
+
+- **BUG-026 / REQ-037** — `pragma narrative commit` now produces senior-engineer prose. WHY names the REQ titles in the active slice instead of "<slice>: N permutations declared." WHAT lists each REQ with id, title, and per-permutation verdicts (e.g. `valid=success, weak_pw=reject`) inline, so a reader sees the behaviour that landed without opening the manifest.
+
+### Documented (already fixed, CHANGELOG was stale)
+
+- **BUG-023** — single-permutation REQ courtesy was implemented in 2116db3 (`fix: BUG-023 — single-permutation courtesy in PIL`). PIL now reports `ok` when a one-perm REQ test omits `set_permutation`. Verified by sandbox repro.
+- **BUG-024** — `pragma slice activate` on a shipped slice was made refusable in 87273b7 (`fix: BUG-024 — slice activate refuses to un-ship a shipped slice`). `--force` is the explicit opt-in to re-open. Verified by sandbox repro.
+- **BUG-025** — `span_count` multiplier was already accurate. Sandbox showed `span_count` matches the count of non-empty span files on disk. CHANGELOG entry was speculative.
+
 ## [0.1.1] — 2026-04-25
 
 **First post-v0.1.0 patch.** Three consecutive clean strict-README
@@ -59,10 +76,8 @@ starts.
 
 ### Known issues at v0.1.0
 
-- **BUG-023** — single-permutation REQ reads `mocked` in the PIL when the test omits `set_permutation`. Aggregator comment claims a "courtesy" for single-perm that isn't implemented. Workaround: always call `set_permutation(id)` even when there's only one permutation.
-- **BUG-024** — `pragma slice activate` on an already-shipped slice silently un-ships it. Destructive; no confirmation. Workaround: don't re-activate shipped slices.
-- **BUG-025** — `span_count` in the PIL multiplies by the number of pytest invocations run across the project (unlock + complete + full-suite regen). Cosmetic; doesn't affect `status`.
-- **BUG-026** — `pragma narrative commit` produces valid shape but placeholder "WHY" and a raw file list that includes `.pyc` + `.pragma/state.json.lock`. The senior-engineer prose isn't generated yet.
+All v0.1.0 known-issues (BUG-023, BUG-024, BUG-025, BUG-026) closed
+in v0.1.2. See that entry for details.
 
 ### Pre-v0.1.0 history
 
