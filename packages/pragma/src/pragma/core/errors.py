@@ -104,6 +104,11 @@ class SliceAlreadyShipped(PragmaError):
 
 
 @dataclass(kw_only=True)
+class NarrativeMissingArgs(PragmaError):
+    code: str = "narrative_missing_args"
+
+
+@dataclass(kw_only=True)
 class SliceNotActive(PragmaError):
     code: str = "slice_not_active"
 

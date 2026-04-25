@@ -645,6 +645,20 @@ requirements:
     expected: success
   milestone: M01
   slice: M01.S19
+- id: REQ-031
+  title: narrative adr lists all missing options in one error
+  description: 'BUG-035. narrative adr requires five options. Currently Typer surfaces them one-at-a-time; user discovers the full set across five invocations. Fix - make options optional, collect missing ones, raise a single PragmaError naming every missing field.'
+  touches:
+  - packages/pragma/src/pragma/cli/commands/narrative.py
+  permutations:
+  - id: lists_all_missing_in_one_error
+    description: invocation with no required options surfaces all five missing fields in one error payload
+    expected: reject
+  - id: full_args_succeed
+    description: invocation with all five options renders the ADR
+    expected: success
+  milestone: M01
+  slice: M01.S20
 milestones:
 - id: M00
   title: Implicit brownfield milestone
@@ -768,3 +782,8 @@ milestones:
     description: 'BUG-032. `pragma freeze` updated the lockfile but never updated state.manifest_hash. On a fresh greenfield project, the user edits the seed manifest (via plan-greenfield or spec add-requirement), runs freeze to update the lock, and immediately `pragma doctor` reports `stale_state` because state.json still carries the scaffold-init hash. The user did nothing wrong; freeze is the authoritative "lock on this manifest" action and should carry state along with it — but only when no slice is active (a rebind mid-active-slice would hide real drift the gate needs to catch).'
     requirements:
     - REQ-030
+  - id: M01.S20
+    title: narrative adr lists all missing options at once (BUG-035)
+    description: 'BUG-035. `pragma narrative adr` declares five required options (--context, --decision, --consequences, --alternatives, --who) plus the SLUG argument. Typer surfaces them one-at-a-time, so a user must invoke the command at least five times to discover the full required set. UX papercut, not a correctness bug. Fix - make the options optional in the CLI signature, collect missing ones, raise a single PragmaError listing every missing field with --help-style guidance.'
+    requirements:
+    - REQ-031

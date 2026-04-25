@@ -7,6 +7,7 @@ import typer
 
 from pragma.core.errors import (
     NarrativeEmptyStage,
+    NarrativeMissingArgs,
     NarrativeNoActiveSlice,
     PragmaError,
     StateNotFound,
@@ -144,12 +145,49 @@ def cmd_pr(
 @narrative_app.command(name="adr")
 def cmd_adr(
     slug: str = typer.Argument(...),
-    context: str = typer.Option(..., "--context"),
-    decision: str = typer.Option(..., "--decision"),
-    consequences: str = typer.Option(..., "--consequences"),
-    alternatives: str = typer.Option(..., "--alternatives"),
-    who: str = typer.Option(..., "--who"),
+    context: str | None = typer.Option(None, "--context"),
+    decision: str | None = typer.Option(None, "--decision"),
+    consequences: str | None = typer.Option(None, "--consequences"),
+    alternatives: str | None = typer.Option(None, "--alternatives"),
+    who: str | None = typer.Option(None, "--who"),
 ) -> None:
+    """Render an ADR. BUG-035: surface ALL missing options in one error.
+
+    Typer's required-option machinery only reports the first missing
+    option per invocation, so a user discovering the contract has to
+    fail once per option. Making them optional and collecting the
+    missing set lets us emit one PragmaError that names every gap.
+    """
+    missing = [
+        name
+        for name, value in (
+            ("--context", context),
+            ("--decision", decision),
+            ("--consequences", consequences),
+            ("--alternatives", alternatives),
+            ("--who", who),
+        )
+        if value is None
+    ]
+    if missing:
+        _emit_error_and_exit(
+            NarrativeMissingArgs(
+                message=("narrative adr requires: " + ", ".join(missing) + "."),
+                remediation=(
+                    "Re-run with each missing option, e.g. "
+                    "`pragma narrative adr <slug> --context '...' "
+                    "--decision '...' --consequences '...' "
+                    "--alternatives '...' --who '...'`."
+                ),
+                context={"missing": missing},
+            )
+        )
+        return
+    assert context is not None
+    assert decision is not None
+    assert consequences is not None
+    assert alternatives is not None
+    assert who is not None
     try:
         md = build_adr(
             slug=slug,
