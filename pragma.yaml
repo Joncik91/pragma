@@ -659,6 +659,24 @@ requirements:
     expected: success
   milestone: M01
   slice: M01.S20
+- id: REQ-032
+  title: pragma init installs git hooks
+  description: 'BUG-036. After pragma init, .pre-commit-config.yaml exists on disk but .git/hooks/{pre-commit,commit-msg,pre-push} do not. The shape-checking commit-msg hook is therefore not enforced. Fix - init runs pre-commit install and reports the outcome.'
+  touches:
+  - packages/pragma/src/pragma/cli/commands/init.py
+  - packages/pragma/src/pragma/core/greenfield.py
+  permutations:
+  - id: brownfield_installs_hooks
+    description: pragma init --brownfield in a git repo populates .git/hooks/{pre-commit,commit-msg,pre-push}
+    expected: success
+  - id: greenfield_installs_hooks
+    description: pragma init --greenfield --name X --language python in a git repo populates the same hooks
+    expected: success
+  - id: install_failure_does_not_block_init
+    description: when pre-commit binary is unavailable the init still succeeds; the JSON payload reports hooks_installed=false
+    expected: success
+  milestone: M01
+  slice: M01.S21
 milestones:
 - id: M00
   title: Implicit brownfield milestone
@@ -787,3 +805,8 @@ milestones:
     description: 'BUG-035. `pragma narrative adr` declares five required options (--context, --decision, --consequences, --alternatives, --who) plus the SLUG argument. Typer surfaces them one-at-a-time, so a user must invoke the command at least five times to discover the full required set. UX papercut, not a correctness bug. Fix - make the options optional in the CLI signature, collect missing ones, raise a single PragmaError listing every missing field with --help-style guidance.'
     requirements:
     - REQ-031
+  - id: M01.S21
+    title: pragma init installs git hooks (BUG-036)
+    description: 'BUG-036. Surfaced by README-only round-7 dogfood. `pragma init --brownfield` and `--greenfield` write `.pre-commit-config.yaml` but never run `pre-commit install`. The README example sequence (init → spec → activate → unlock → complete → `git commit -m ...`) lets a malformed commit message land silently because no commit-msg hook is wired to git. Pragma''s headline promise — "AI can''t bypass the gate" — is structurally compromised when the gate is in config but not in `.git/hooks/`. Fix - init runs `pre-commit install --install-hooks --hook-type pre-commit --hook-type commit-msg --hook-type pre-push` after writing the config, and surfaces the result in the JSON payload. If pre-commit is unavailable the init still succeeds but the payload notes it.'
+    requirements:
+    - REQ-032

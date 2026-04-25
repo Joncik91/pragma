@@ -23,6 +23,67 @@ _FILES_TO_CREATE = {
 _SETTINGS_KEY = "claude-settings.json.tpl"
 
 
+def _resolve_pre_commit_binary() -> str | None:
+    """Find pre-commit on PATH or in the running Python's sibling bin dir.
+
+    Tests run as `.venv/bin/python -m pytest` without activating the
+    venv, so PATH may not include `.venv/bin/` even when pre-commit is
+    installed there. `shutil.which` would return None and BUG-036 would
+    look unfixable. Sibling-of-sys.executable lookup catches that case.
+    """
+    import shutil
+    import sys
+
+    found = shutil.which("pre-commit")
+    if found:
+        return found
+    sibling = Path(sys.executable).parent / "pre-commit"
+    if sibling.exists():
+        return str(sibling)
+    return None
+
+
+def _install_pre_commit_hooks(cwd: Path) -> bool:
+    """Wire .pre-commit-config.yaml into .git/hooks/ via `pre-commit install`.
+
+    BUG-036 / REQ-032. pragma init writes the pre-commit config but
+    nothing forces it onto the user's .git/hooks/, so the commit-msg
+    shape gate that the README documents was never enforced. Run
+    `pre-commit install` for pre-commit + commit-msg + pre-push so
+    every layer the gate relies on is wired.
+
+    Returns True on success, False if pre-commit is not available or
+    the install fails. Init must succeed regardless — the user can
+    install hooks later with the same command.
+    """
+    import subprocess
+
+    pre_commit = _resolve_pre_commit_binary()
+    if pre_commit is None or not (cwd / ".git").exists():
+        return False
+    try:
+        subprocess.run(  # noqa: S603 — controlled pre-commit invocation
+            [
+                pre_commit,
+                "install",
+                "--install-hooks",
+                "--hook-type",
+                "pre-commit",
+                "--hook-type",
+                "commit-msg",
+                "--hook-type",
+                "pre-push",
+            ],
+            cwd=str(cwd),
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return False
+    return True
+
+
 def _emit_error_and_exit(code: str, message: str, remediation: str, exit_code: int) -> None:
     typer.echo(
         json.dumps(
@@ -69,9 +130,15 @@ def _run_greenfield(cwd: Path, name: str | None, language: str) -> None:
     except PragmaError as exc:
         typer.echo(exc.to_json())
         raise typer.Exit(code=1) from None
+    hooks_installed = _install_pre_commit_hooks(cwd)
     typer.echo(
         json.dumps(
-            {"ok": True, "created": sorted(created), "project_name": name},
+            {
+                "ok": True,
+                "created": sorted(created),
+                "project_name": name,
+                "hooks_installed": hooks_installed,
+            },
             sort_keys=True,
             separators=(",", ":"),
         )
@@ -85,9 +152,15 @@ def _run_brownfield(cwd: Path, name: str | None, force: bool) -> None:
     except PragmaError as exc:
         typer.echo(exc.to_json())
         raise typer.Exit(code=1) from None
+    hooks_installed = _install_pre_commit_hooks(cwd)
     typer.echo(
         json.dumps(
-            {"ok": True, "created": sorted(created), "project_name": project_name},
+            {
+                "ok": True,
+                "created": sorted(created),
+                "project_name": project_name,
+                "hooks_installed": hooks_installed,
+            },
             sort_keys=True,
             separators=(",", ":"),
         )
