@@ -5,6 +5,19 @@ All notable changes to Pragma are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.5] — 2026-04-25
+
+**Edge-case dogfood pass.** Probed 15 first-run-user error scenarios.
+12 surfaced clean errors; 3 had remediation-string defects (commands
+that don't exist, missing context, dishonest about flag scope). All
+fixed under one REQ.
+
+### Fixed
+
+- **BUG-049 / REQ-041** — PIL `mocked` remediation no longer points users at the nonexistent `pragma spec mark-mocked` subcommand. New text says: wrap the test body in `with set_permutation('<id>'):` so the SDK labels the trace correctly. That's the actual fix.
+- **BUG-050 / REQ-041** — `pragma init --greenfield` on an already-initialised dir now explains that greenfield does not support `--force` (would erase the manifest), and points at `pragma init --brownfield --force` as the escape hatch for refreshing hooks/templates while keeping the manifest.
+- **BUG-051 / REQ-041** — `pragma slice activate <unknown>` now lists the declared slice ids in the remediation. Mirrors what `add-requirement --slice` already does.
+
 ## [0.1.4] — 2026-04-25
 
 **Brownfield adopt-pragma commit lands cleanly.** Round-18 strict

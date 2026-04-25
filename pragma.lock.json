@@ -1,7 +1,7 @@
 {
   "version": "1",
-  "manifest_hash": "sha256:2b7ab1092a0c7ef91647b9f5108a81ae4fc4f1788ab67997de4b76a7c8e0e16e",
-  "generated_at": "2026-04-25T14:00:03Z",
+  "manifest_hash": "sha256:80f07af68b988a9421dbbd0c629ee57b4ea394e70ee2481f86bac9170fb630f8",
+  "generated_at": "2026-04-25T14:20:13Z",
   "manifest": {
     "version": "2",
     "project": {
@@ -275,6 +275,14 @@
             "description": "BUG-048 surfaced in round-18. Scaffolded brownfield project ships pytest.ini but no tests/ dir, so pytest exits 5 (no tests collected) and pre-commit treats that as a hook failure. The very first adopt-pragma commit cannot land. Fix - scaffolded pytest hook traps exit 5 to 0 while still propagating other exit codes.",
             "requirements": [
               "REQ-040"
+            ]
+          },
+          {
+            "id": "M01.S30",
+            "title": "remediation strings reference real surface (BUG-049/050/051)",
+            "description": "Round-19 edge-case dogfood: three remediation strings either pointed at fake commands, omitted available --force, or omitted declared slice ids. Fix - PIL mocked points at set_permutation, slice activate lists declared slices, greenfield already_initialised explains --force honestly.",
+            "requirements": [
+              "REQ-041"
             ]
           }
         ]
@@ -1449,6 +1457,35 @@
         ],
         "milestone": "M01",
         "slice": "M01.S29"
+      },
+      {
+        "id": "REQ-041",
+        "title": "remediation strings reference real surface",
+        "description": "Round-19 edge-case dogfood found three remediation-string defects. BUG-049 - PIL `mocked` remediation referenced nonexistent `pragma spec mark-mocked` subcommand. BUG-050 - `pragma init --greenfield` already_initialised remediation said \"Remove pragma.yaml manually\" without mentioning --force. BUG-051 - `pragma slice activate <unknown>` did not list the declared slice ids (inconsistent with add-requirement which did). Fix all three so every remediation string points at real CLI surface, lists available choices, and is honest about which flags actually work where.",
+        "touches": [
+          "packages/pragma/src/pragma/report/aggregator.py",
+          "packages/pragma/src/pragma/core/gate.py",
+          "packages/pragma/src/pragma/core/greenfield.py"
+        ],
+        "permutations": [
+          {
+            "id": "mocked_remediation_no_fake_command",
+            "description": "PIL mocked remediation references set_permutation, not nonexistent mark-mocked",
+            "expected": "success"
+          },
+          {
+            "id": "slice_not_found_lists_declared",
+            "description": "slice_not_found error remediation lists the declared slice ids",
+            "expected": "success"
+          },
+          {
+            "id": "greenfield_already_init_remediation_honest",
+            "description": "greenfield already_initialised remediation explains --force scope honestly",
+            "expected": "success"
+          }
+        ],
+        "milestone": "M01",
+        "slice": "M01.S30"
       }
     ],
     "spans_retention": null

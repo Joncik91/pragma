@@ -32,13 +32,18 @@ def _find_slice(manifest: Manifest, slice_id: str) -> tuple[str, str] | None:
 def _locate_slice_or_raise(manifest: Manifest, slice_id: str) -> str:
     location = _find_slice(manifest, slice_id)
     if location is None:
+        # BUG-051 / REQ-041: list declared slice ids in the remediation so
+        # the user does not have to open pragma.yaml or run `slice status`
+        # separately. Mirrors what spec add-requirement already does.
+        declared = [s.id for m in manifest.milestones for s in m.slices]
+        suggestion = ", ".join(declared) if declared else "(none yet)"
         raise SliceNotFound(
             message=f"Slice {slice_id!r} not declared in manifest.",
             remediation=(
                 "Add the slice under milestones[].slices[] in "
-                "pragma.yaml, or pick one of the declared slice ids."
+                f"pragma.yaml, or pick one of the declared slices: {suggestion}."
             ),
-            context={"slice": slice_id},
+            context={"slice": slice_id, "declared": declared},
         )
     return location[0]
 

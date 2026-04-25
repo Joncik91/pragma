@@ -45,7 +45,12 @@ def _refuse_if_initialised(cwd: Path, src_dir: Path) -> None:
     if manifest_path.exists():
         raise AlreadyInitialised(
             message=f"Refusing to overwrite existing pragma.yaml at {manifest_path}",
-            remediation="Remove pragma.yaml manually if you intend to re-scaffold.",
+            remediation=(
+                "Greenfield does not support --force (would erase the manifest). "
+                "Either remove pragma.yaml manually to re-scaffold from scratch, "
+                "or run `pragma init --brownfield --force` to refresh hooks/templates "
+                "while keeping your manifest."
+            ),
             context={"existing": ["pragma.yaml"]},
         )
 

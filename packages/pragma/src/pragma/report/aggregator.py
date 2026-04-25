@@ -18,7 +18,8 @@ from pragma.report.models import (
 _MOCKED_REMEDIATION = (
     "No pragma.logic_id={logic_id} span observed during this test. "
     "Either add @trace('{logic_id}') to the production path the test exercises, "
-    "or acknowledge mock-only via `pragma spec mark-mocked {logic_id} {perm_id}`."
+    "or wrap the test body in `with set_permutation('{perm_id}'):` so the SDK "
+    "labels the trace correctly."
 )
 
 
