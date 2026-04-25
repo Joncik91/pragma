@@ -92,6 +92,11 @@ pragma report --human              # Post-Implementation Log
 
 `pragma slice status` at any time. `pragma slice cancel` to abandon.
 
+> **First commit gotcha:** ruff-format may reformat your code (and
+> Pragma's scaffolded files) on first commit. Pre-commit treats that
+> as a hook failure — re-stage with `git add -A` and re-run the
+> commit. Second attempt lands.
+
 The pre-commit / commit-msg / pre-push hooks are wired by `pragma init`
 (see [`docs/reference.md`](docs/reference.md)). They enforce shape on
 the message above; a one-line subject without WHY/trailer is
