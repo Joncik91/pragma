@@ -5,6 +5,21 @@ All notable changes to Pragma are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.3] — 2026-04-25
+
+**Brownfield quick-start reaches LOCKED gate.** Round-16 strict
+brownfield walkthrough surfaced BUG-045 — the README's brownfield
+quick-start landed users in a dead end at `pragma slice activate
+M01.S1` because the brownfield manifest had no slices declared.
+
+### Fixed
+
+- **BUG-045 / REQ-038** — `pragma init --brownfield` now writes v2 schema with an implicit `M00.S0` slice (matching the `pragma migrate` precedent). `pragma spec add-requirement` defaults to the only-declared slice when the caller omits `--milestone`/`--slice`, so the literal README walkthrough lands the new REQ in `M00.S0` automatically. README's "Ship a slice" block notes brownfield uses `M00.S0` (greenfield still uses `M01.S1`).
+
+### Known issues at v0.1.3
+
+- **BUG-046** — Brownfield retroactive-REQ flow has no clean path through the gate. `pragma unlock` refuses when tests already pass (TDD red-first rule); `pragma doctor --emergency-unlock` clears the active slice, leaving `slice complete` unreachable. Workaround: edit `.pragma/state.json` manually to flip the gate to `UNLOCKED`, then `slice complete --skip-tests`. This is a real friction point, not a doc fix — likely needs a `pragma slice unlock --skip-tests` or a brownfield-import flag in a future patch.
+
 ## [0.1.2] — 2026-04-25
 
 **Closes the v0.1.0 known-issues backlog.** The BUG-023..026 entries

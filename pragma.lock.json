@@ -1,7 +1,7 @@
 {
   "version": "1",
-  "manifest_hash": "sha256:b4c55c6a9ebf36f897eb90ef45c4b0512674cd3ef5907a61e06e59ba209d40c1",
-  "generated_at": "2026-04-25T13:23:37Z",
+  "manifest_hash": "sha256:a28cee729b40f60e22494b7593ca08826fbc356071c6320d1f1d1f2f30b2ab93",
+  "generated_at": "2026-04-25T13:36:38Z",
   "manifest": {
     "version": "2",
     "project": {
@@ -251,6 +251,14 @@
             "description": "BUG-026 lingered from v0.1.0. Earlier output was mechanical - WHY counted permutations and WHAT only said \"Touched N file(s).\" Fix - WHY names REQ titles instead of permutation counts; WHAT lists each REQ with id, title, and per-permutation verdicts so a reader sees the behaviour that landed without opening the manifest. Senior-engineer voice stays compact and honest.",
             "requirements": [
               "REQ-037"
+            ]
+          },
+          {
+            "id": "M01.S27",
+            "title": "brownfield README quick-start reaches slice activate (BUG-045)",
+            "description": "BUG-045 surfaced in the round-16 brownfield README walkthrough. Before this fix, init --brownfield wrote v1 schema with no milestones/slices; add-requirement accepted milestone:null/slice:null; freeze succeeded; then `pragma slice activate M01.S1` failed because no slice existed. Fix - ship v2 brownfield template with implicit M00.S0; default add-requirement to the only-declared slice; document brownfield uses M00.S0 in the ship-a-slice section.",
+            "requirements": [
+              "REQ-038"
             ]
           }
         ]
@@ -1352,6 +1360,35 @@
         ],
         "milestone": "M01",
         "slice": "M01.S26"
+      },
+      {
+        "id": "REQ-038",
+        "title": "brownfield README quick-start works end-to-end",
+        "description": "BUG-045. The README brownfield quick-start landed users in a dead end - init wrote v1 schema, add-requirement accepted milestone:null/slice:null, then \"pragma slice activate M01.S1\" failed because no slice was declared. Fix - brownfield template ships v2 schema with an implicit M00.S0 slice (mirroring `pragma migrate` precedent); add-requirement defaults to the only-declared slice when caller omits --milestone/--slice; the README ship-a-slice block notes brownfield uses M00.S0.",
+        "touches": [
+          "packages/pragma/src/pragma/templates/pragma.yaml.tpl",
+          "packages/pragma/src/pragma/cli/commands/spec.py",
+          "README.md"
+        ],
+        "permutations": [
+          {
+            "id": "brownfield_emits_v2_schema",
+            "description": "pragma init --brownfield writes version 2 with implicit M00.S0 slice",
+            "expected": "success"
+          },
+          {
+            "id": "add_requirement_defaults_to_only_slice",
+            "description": "spec add-requirement without --slice lands the REQ in the only-declared slice",
+            "expected": "success"
+          },
+          {
+            "id": "brownfield_slice_activate_works",
+            "description": "pragma slice activate M00.S0 succeeds after init + add-requirement + freeze",
+            "expected": "success"
+          }
+        ],
+        "milestone": "M01",
+        "slice": "M01.S27"
       }
     ],
     "spans_retention": null

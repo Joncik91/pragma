@@ -63,7 +63,7 @@ def add_requirement(
     cwd = Path.cwd()
     try:
         parsed_permutations = [_parse_permutation_arg(p) for p in permutation]
-        _append_requirement(
+        resolved_milestone, resolved_slice = _append_requirement(
             cwd / "pragma.yaml",
             rid=id,
             title=title,
@@ -83,8 +83,8 @@ def add_requirement(
             title,
             list(touches),
             len(parsed_permutations),
-            milestone,
-            slice_,
+            resolved_milestone,
+            resolved_slice,
         )
     )
 
@@ -223,6 +223,30 @@ def _raise_if_slice_unknown(manifest: Manifest, slice_id: str) -> None:
     )
 
 
+def _resolve_default_slice(manifest: Manifest) -> tuple[str | None, str | None]:
+    """Return (milestone_id, slice_id) for an `add-requirement` without --slice.
+
+    BUG-045 / REQ-038. Brownfield README quick-start runs
+    `add-requirement` without --milestone or --slice, then says
+    `pragma slice activate M01.S1`. Without a default-slice rule the
+    new REQ lands with `slice: null` and the activate step fails with
+    `slice_not_found`. With this rule, when the manifest declares
+    exactly one milestone and one slice (the M00.S0 brownfield default),
+    the new REQ is assigned there and the README walkthrough works
+    end-to-end.
+
+    Returns (None, None) when the manifest has zero or more than one
+    candidate, leaving the caller to either pass --slice explicitly or
+    leave the REQ unassigned.
+    """
+    if len(manifest.milestones) != 1:
+        return None, None
+    only_m = manifest.milestones[0]
+    if len(only_m.slices) != 1:
+        return None, None
+    return only_m.id, only_m.slices[0].id
+
+
 def _patch_slice_requirements(raw: dict[str, object], slice_id: str, rid: str) -> None:
     """BUG-031 / REQ-028: keep slices[*].requirements in sync with the new REQ."""
     milestones = raw.get("milestones") or []
@@ -255,7 +279,13 @@ def _append_requirement(
     permutations: list[Permutation],
     milestone: str | None = None,
     slice_id: str | None = None,
-) -> None:
+) -> tuple[str | None, str | None]:
+    manifest = load_manifest(yaml_path)
+    # BUG-045 / REQ-038: default to the only-declared slice when caller
+    # leaves both flags unset. Lets the README brownfield quick-start
+    # work without an undocumented --slice step.
+    if milestone is None and slice_id is None:
+        milestone, slice_id = _resolve_default_slice(manifest)
     new_req = _build_requirement_or_raise(
         rid=rid,
         title=title,
@@ -265,7 +295,6 @@ def _append_requirement(
         milestone=milestone,
         slice_id=slice_id,
     )
-    manifest = load_manifest(yaml_path)
     if slice_id is not None:
         _raise_if_slice_unknown(manifest, slice_id)
     if any(r.id == rid for r in manifest.requirements):
@@ -293,3 +322,4 @@ def _append_requirement(
         width=100,
     )
     yaml_path.write_text(yaml_text, encoding="utf-8")
+    return milestone, slice_id

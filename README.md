@@ -8,7 +8,7 @@ specification, a test-first gate, and a plain-English report of what
 actually ran — so you can ship code an AI wrote and know what you're
 shipping.
 
-- **Current version:** v0.1.2 (2026-04-25)
+- **Current version:** v0.1.3 (2026-04-25)
 - **License:** Apache-2.0
 - **Status:** Alpha. Python-only. Thesis works end-to-end on a fresh greenfield; dogfood is still finding bugs. See [`CHANGELOG.md`](CHANGELOG.md) for the release cadence plan and known issues.
 
@@ -72,7 +72,7 @@ pragma freeze
 ## Ship a slice
 
 ```shell
-pragma slice activate M01.S1       # gate flips LOCKED
+pragma slice activate M01.S1       # greenfield default; brownfield uses M00.S0
 # write a failing test for each declared permutation, named
 # test_req_<id>_<permutation_id> to match what `pragma unlock` checks.
 # Run `pragma slice status` or open pragma.yaml to see the exact ids.
