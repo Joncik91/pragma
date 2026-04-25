@@ -309,6 +309,24 @@ Every failure returns `{"error": "<code>", ...}`. Common ones:
 Every error ships with a `remediation` string written to be
 copy-pasteable.
 
+## Issue ID conventions
+
+Pragma's manifest only formally models `REQ-NNN`. The other prefixes
+that appear in this repo's commits, CHANGELOG, and roadmap are
+internal conventions, not enforced by the gate.
+
+| Prefix | Meaning | Where it lives |
+|---|---|---|
+| `REQ-NNN` | A requirement declared in `pragma.yaml`. Has permutations the gate enforces. **Authoritative.** | `requirements:` array in the manifest |
+| `BUG-NNN` | A defect the team filed against a fix. Often closes a `REQ-NNN`; sometimes bundled into one. | Commit messages, CHANGELOG, this repo's issue tracker |
+| `KI-NN` | "Known Issue" — a flaw acknowledged but not yet fixed. May or may not become a `BUG-NNN` later. | CHANGELOG, roadmap, occasional code comments |
+
+Numbering is monotonic per prefix and not reused. A `BUG-NNN` cited in
+a CHANGELOG entry should also appear in the commit message that fixed
+it; the commit message in turn names the `REQ-NNN` that closes it (if
+any), so a reader can trace fix → requirement → manifest permutation
+→ test → span.
+
 ## See also
 
 - [`concepts.md`](concepts.md) — mental model and why.

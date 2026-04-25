@@ -108,7 +108,7 @@ refused.
 |---|---|
 | [`docs/concepts.md`](docs/concepts.md) | **Start here.** What Pragma is, why it exists, the mental model. |
 | [`docs/usage.md`](docs/usage.md) | Step-by-step walkthrough of brownfield and greenfield flows. |
-| [`docs/reference.md`](docs/reference.md) | Every CLI flag, manifest field, audit event, hook. |
+| [`docs/reference.md`](docs/reference.md) | Every CLI flag, manifest field, audit event, hook. Includes the `REQ-` / `BUG-` / `KI-` issue ID conventions. |
 | [`docs/doctor.md`](docs/doctor.md) | Diagnostic codes and their remediations. |
 | [`docs/migrate.md`](docs/migrate.md) | Schema versions and `pragma migrate`. |
 | [`docs/roadmap.md`](docs/roadmap.md) | Shipped versions, planned work, rationale. |
