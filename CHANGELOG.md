@@ -19,6 +19,16 @@ gate path). Fixed.
 
 None.
 
+### Dogfood
+
+Three post-fix clean walkthroughs on fresh sandboxes:
+
+- **R22** — greenfield single-REQ literal README quick-start. `1 verified, 0 flagged`. Two-attempt commit (documented BUG-043 ruff speedbump on first).
+- **R23** — brownfield literal README quick-start + new `unlock --skip-tests --reason` exercised end-to-end. Single-attempt adopt-pragma commit; `2 verified` after adding `@trace("REQ-001")` to existing code (the documented brownfield retroactive path).
+- **R24** — greenfield multi-REQ slice (REQ-001 + REQ-002, 2 perms). `2 verified, 0 flagged`. Two-attempt commit (BUG-043 documented).
+
+Zero new findings across the three rounds. Cadence rule cleared.
+
 ## [0.1.5] — 2026-04-25
 
 **Edge-case dogfood pass.** Probed 15 first-run-user error scenarios.
