@@ -18,7 +18,7 @@ repos:
       - id: gitleaks
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.15.11
+    rev: v0.15.12
     hooks:
       - id: ruff-format
       - id: ruff
@@ -27,6 +27,11 @@ repos:
     rev: v2.8.0
     hooks:
       - id: pip-audit
+        # GHSA-58qw-9mgm-455v: pip advisory, no published fix at scaffold
+        # time. Pip is a transitive tool and your code likely doesn't
+        # call the affected path. Drop this `args:` entry when pip
+        # ships a fix and re-pin v2.8.x to pick it up.
+        args: ["--ignore-vuln=GHSA-58qw-9mgm-455v"]
 
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v5.0.0
@@ -78,7 +83,7 @@ repos:
     hooks:
       - id: pytest
         name: pytest
-        entry: python3 -m pytest
+        entry: bash -c 'PY="{{ pragma_python_bin }}"; [ -x "$PY" ] || PY=".venv/bin/python3"; [ -x "$PY" ] || PY=python3; exec "$PY" -m pytest'
         language: system
         pass_filenames: false
         always_run: true

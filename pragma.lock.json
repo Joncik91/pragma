@@ -1,7 +1,7 @@
 {
   "version": "1",
-  "manifest_hash": "sha256:16b833acf5a11904761e7a6df5c0d8b26c04efce97c6855c67a6aa4e773377ed",
-  "generated_at": "2026-04-25T12:16:10Z",
+  "manifest_hash": "sha256:09bef4390175e1a31a71d2cd5a087f22e70aa6038ce675932dc3020be7ffa6de",
+  "generated_at": "2026-04-25T12:22:16Z",
   "manifest": {
     "version": "2",
     "project": {
@@ -219,6 +219,14 @@
             "description": "BUG-037. After BUG-036 fix the hooks install but the pre-commit run fires `python -m pragma` against the user's venv at `.venv/bin/python3`, falling back to system `python3` if no venv exists. A user without a project-local venv (very common during a first-run dogfood) hits \"No module named pragma.__main__\" because system Python does not have pragma installed. The hook fails on every commit. Fix - capture the pragma binary path that ran `init` and bake it into the scaffolded config so the hook always invokes whichever pragma the user used to scaffold.",
             "requirements": [
               "REQ-033"
+            ]
+          },
+          {
+            "id": "M01.S23",
+            "title": "scaffolded battery template stays in sync with project config (BUG-038/039)",
+            "description": "BUG-038 and BUG-039 surfaced together in the round-7 confirmation. The scaffolded `.pre-commit-config.yaml` template lagged behind Pragma's own `.pre-commit-config.yaml` in two ways: (a) the pytest hook bare-invoked `python3 -m pytest`, hitting \"No module named pytest\" on system python; (b) pip-audit had no `args:` entry to ignore the same pip GHSA-58qw-9mgm-455v advisory the project config ignores. New users hit both immediately. Fix - sync the relevant template fragments. Pytest now uses the same PY resolution chain as the pragma hooks; pip-audit ignores the advisory by default.",
+            "requirements": [
+              "REQ-034"
             ]
           }
         ]
@@ -1225,6 +1233,28 @@
         ],
         "milestone": "M01",
         "slice": "M01.S22"
+      },
+      {
+        "id": "REQ-034",
+        "title": "scaffolded pre-commit template matches project config",
+        "description": "BUG-038 and BUG-039. Scaffolded pytest hook used bare python3, missing pytest on systems without a project venv. Scaffolded pip-audit had no ignore for the pip advisory the project itself ignores. Both surfaced as immediate failures on a round-7 README walkthrough. Fix - template uses the PY resolution chain for pytest and adds args: [\"--ignore-vuln=GHSA-58qw-9mgm-455v\"] to pip-audit.",
+        "touches": [
+          "packages/pragma/src/pragma/templates/pre-commit-config.yaml.tpl"
+        ],
+        "permutations": [
+          {
+            "id": "pytest_hook_uses_resolution_chain",
+            "description": "scaffolded pytest hook uses the {{ pragma_python_bin }} -> .venv -> system fallback chain",
+            "expected": "success"
+          },
+          {
+            "id": "pip_audit_ignores_known_pip_advisory",
+            "description": "scaffolded pip-audit hook has args ignoring GHSA-58qw-9mgm-455v",
+            "expected": "success"
+          }
+        ],
+        "milestone": "M01",
+        "slice": "M01.S23"
       }
     ],
     "spans_retention": null
