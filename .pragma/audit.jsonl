@@ -34,3 +34,5 @@
 {"actor":"cli","context":{},"event":"slice_cancelled","from_state":"LOCKED","reason":"pragma slice cancel (slice M01.S20)","slice":"M01.S20","to_state":null,"ts":"2026-04-25T11:47:44Z"}
 {"actor":"cli","context":{},"event":"slice_activated","from_state":null,"reason":"pragma slice activate M01.S21","slice":"M01.S21","to_state":"LOCKED","ts":"2026-04-25T12:06:05Z"}
 {"actor":"cli","context":{},"event":"slice_cancelled","from_state":"LOCKED","reason":"pragma slice cancel (slice M01.S21)","slice":"M01.S21","to_state":null,"ts":"2026-04-25T12:06:05Z"}
+{"actor":"cli","context":{},"event":"slice_activated","from_state":null,"reason":"pragma slice activate M01.S22","slice":"M01.S22","to_state":"LOCKED","ts":"2026-04-25T12:16:10Z"}
+{"actor":"cli","context":{},"event":"slice_cancelled","from_state":"LOCKED","reason":"pragma slice cancel (slice M01.S22)","slice":"M01.S22","to_state":null,"ts":"2026-04-25T12:16:10Z"}

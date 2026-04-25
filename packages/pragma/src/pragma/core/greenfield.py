@@ -62,6 +62,9 @@ def _jinja_env() -> Environment:
 def _render_manifest_and_templates(
     env: Environment, cwd: Path, name: str, language: str
 ) -> list[str]:
+    import sys
+
+    pragma_python_bin = sys.executable
     created: list[str] = []
     manifest_tpl = env.get_template("greenfield-manifest.yaml.tpl")
     (cwd / "pragma.yaml").write_text(
@@ -72,7 +75,12 @@ def _render_manifest_and_templates(
     for tpl_name, dest_rel in _SHARED_TEMPLATES.items():
         dest = cwd / dest_rel
         dest.parent.mkdir(parents=True, exist_ok=True)
-        dest.write_text(env.get_template(tpl_name).render(project_name=name), encoding="utf-8")
+        dest.write_text(
+            env.get_template(tpl_name).render(
+                project_name=name, pragma_python_bin=pragma_python_bin
+            ),
+            encoding="utf-8",
+        )
         created.append(dest_rel)
     (cwd / "claude.md").write_text(
         env.get_template("claude.md.tpl").render(project_name=name),

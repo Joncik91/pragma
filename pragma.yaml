@@ -677,6 +677,21 @@ requirements:
     expected: success
   milestone: M01
   slice: M01.S21
+- id: REQ-033
+  title: scaffolded pre-commit hook resolves pragma reliably
+  description: 'BUG-037. The pre-commit-config template hardcodes `bash -c "PY=.venv/bin/python3 ... exec $PY -m pragma ..."`. On a fresh sandbox without a project venv, the fallback is system `python3` which does not have pragma installed and the hook errors with `No module named pragma.__main__`. Fix - the init pipeline records the absolute path of the pragma module (sys.executable + -m pragma) and substitutes it into the rendered config so the hook invokes whichever interpreter ran init.'
+  touches:
+  - packages/pragma/src/pragma/cli/commands/init.py
+  - packages/pragma/src/pragma/templates/pre-commit-config.yaml.tpl
+  permutations:
+  - id: hook_uses_init_python
+    description: post-init `.pre-commit-config.yaml` references the python binary that ran init
+    expected: success
+  - id: bad_commit_blocked_after_init
+    description: a `git commit` with a malformed message after fresh init exits non-zero with a commit_shape_violation message
+    expected: reject
+  milestone: M01
+  slice: M01.S22
 milestones:
 - id: M00
   title: Implicit brownfield milestone
@@ -810,3 +825,8 @@ milestones:
     description: 'BUG-036. Surfaced by README-only round-7 dogfood. `pragma init --brownfield` and `--greenfield` write `.pre-commit-config.yaml` but never run `pre-commit install`. The README example sequence (init → spec → activate → unlock → complete → `git commit -m ...`) lets a malformed commit message land silently because no commit-msg hook is wired to git. Pragma''s headline promise — "AI can''t bypass the gate" — is structurally compromised when the gate is in config but not in `.git/hooks/`. Fix - init runs `pre-commit install --install-hooks --hook-type pre-commit --hook-type commit-msg --hook-type pre-push` after writing the config, and surfaces the result in the JSON payload. If pre-commit is unavailable the init still succeeds but the payload notes it.'
     requirements:
     - REQ-032
+  - id: M01.S22
+    title: scaffolded pre-commit hook can find pragma (BUG-037)
+    description: 'BUG-037. After BUG-036 fix the hooks install but the pre-commit run fires `python -m pragma` against the user''s venv at `.venv/bin/python3`, falling back to system `python3` if no venv exists. A user without a project-local venv (very common during a first-run dogfood) hits "No module named pragma.__main__" because system Python does not have pragma installed. The hook fails on every commit. Fix - capture the pragma binary path that ran `init` and bake it into the scaffolded config so the hook always invokes whichever pragma the user used to scaffold.'
+    requirements:
+    - REQ-033

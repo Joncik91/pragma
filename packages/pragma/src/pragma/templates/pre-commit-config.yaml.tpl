@@ -54,7 +54,7 @@ repos:
   #   hooks:
   #     - id: mypy-local
   #       name: mypy --strict (project venv)
-  #       entry: bash -c 'PY=".venv/bin/python3"; [ -x "$PY" ] || PY=python3; exec "$PY" -m mypy --strict src/'
+  #       entry: bash -c 'PY="{{ pragma_python_bin }}"; [ -x "$PY" ] || PY=".venv/bin/python3"; [ -x "$PY" ] || PY=python3; exec "$PY" -m mypy --strict src/'
   #       language: system
   #       pass_filenames: false
   #       always_run: true
@@ -89,7 +89,7 @@ repos:
       # python3 (pipx installs or system-wide pragma).
       - id: pragma-verify-pre-commit
         name: pragma verify all
-        entry: bash -c 'PY=".venv/bin/python3"; [ -x "$PY" ] || PY=python3; exec "$PY" -m pragma verify all'
+        entry: bash -c 'PY="{{ pragma_python_bin }}"; [ -x "$PY" ] || PY=".venv/bin/python3"; [ -x "$PY" ] || PY=python3; exec "$PY" -m pragma verify all'
         language: system
         pass_filenames: false
         always_run: true
@@ -97,13 +97,13 @@ repos:
 
       - id: pragma-verify-commit-msg
         name: pragma verify message (commit-msg)
-        entry: bash -c 'PY=".venv/bin/python3"; [ -x "$PY" ] || PY=python3; exec "$PY" -m pragma verify message "$1"' --
+        entry: bash -c 'PY="{{ pragma_python_bin }}"; [ -x "$PY" ] || PY=".venv/bin/python3"; [ -x "$PY" ] || PY=python3; exec "$PY" -m pragma verify message "$1"' --
         language: system
         stages: [commit-msg]
 
       - id: pragma-verify-pre-push
         name: pragma verify all (pre-push)
-        entry: bash -c 'PY=".venv/bin/python3"; [ -x "$PY" ] || PY=python3; exec "$PY" -m pragma verify all --ci'
+        entry: bash -c 'PY="{{ pragma_python_bin }}"; [ -x "$PY" ] || PY=".venv/bin/python3"; [ -x "$PY" ] || PY=python3; exec "$PY" -m pragma verify all --ci'
         language: system
         pass_filenames: false
         always_run: true
@@ -111,7 +111,7 @@ repos:
 
       - id: pragma-verify-commits-pre-push
         name: pragma verify commits (pre-push range)
-        entry: bash -c 'PY=".venv/bin/python3"; [ -x "$PY" ] || PY=python3; exec "$PY" -m pragma verify commits --base=$(git merge-base HEAD origin/main 2>/dev/null || echo HEAD~1)'
+        entry: bash -c 'PY="{{ pragma_python_bin }}"; [ -x "$PY" ] || PY=".venv/bin/python3"; [ -x "$PY" ] || PY=python3; exec "$PY" -m pragma verify commits --base=$(git merge-base HEAD origin/main 2>/dev/null || echo HEAD~1)'
         language: system
         pass_filenames: false
         always_run: true

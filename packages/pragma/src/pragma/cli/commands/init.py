@@ -217,6 +217,8 @@ def _refuse_overwrite_if_needed(cwd: Path, force: bool) -> Path:
 
 
 def _render_scaffold_templates(cwd: Path, project_name: str) -> list[str]:
+    import sys
+
     env = Environment(
         loader=FileSystemLoader(TEMPLATES_DIR),
         undefined=StrictUndefined,
@@ -228,7 +230,10 @@ def _render_scaffold_templates(cwd: Path, project_name: str) -> list[str]:
         dest = cwd / dest_name
         dest.parent.mkdir(parents=True, exist_ok=True)
         dest.write_text(
-            env.get_template(tpl_name).render(project_name=project_name),
+            env.get_template(tpl_name).render(
+                project_name=project_name,
+                pragma_python_bin=sys.executable,
+            ),
             encoding="utf-8",
         )
         created.append(dest_name)
