@@ -35,13 +35,19 @@ class TestVerifyTests:
     @pytest.mark.parametrize(
         "fixture, expected_kind",
         [
-            ("gamed_tautology.py", "tautological"),
-            ("gamed_mocked_away.py", "mocked-away"),
-            ("gamed_mismatched.py", "mismatched"),
-            ("gamed_swallowed.py", "swallowed"),
-            ("gamed_skipped.py", "skipped"),
-            ("gamed_conditional.py", "conditional"),
-            ("gamed_monkeypatched.py", "monkeypatched"),
+            ("gamed_tautology.py", "python.tautological"),
+            ("gamed_mocked_away.py", "python.mocked-away"),
+            ("gamed_mismatched.py", "python.mismatched"),
+            ("gamed_swallowed.py", "python.swallowed"),
+            ("gamed_skipped.py", "python.skipped"),
+            ("gamed_conditional.py", "python.conditional"),
+            ("gamed_monkeypatched.py", "python.monkeypatched"),
+            ("vitest_tautological.test.ts", "vitest.tautological"),
+            ("vitest_mocked_away.test.ts", "vitest.mocked-away"),
+            ("vitest_skipped.test.ts", "vitest.skipped"),
+            ("vitest_swallowed.test.ts", "vitest.swallowed"),
+            ("vitest_conditional.test.ts", "vitest.conditional"),
+            ("vitest_mismatched.test.ts", "vitest.mismatched"),
         ],
     )
     def test_blocking_fixtures_exit_one(self, fixture: str, expected_kind: str) -> None:
@@ -56,8 +62,9 @@ class TestVerifyTests:
     @pytest.mark.parametrize(
         "fixture, expected_kind",
         [
-            ("gamed_parametrize_thin.py", "parametrize_thin"),
-            ("gamed_empty_body.py", "empty_body"),
+            ("gamed_parametrize_thin.py", "python.parametrize_thin"),
+            ("gamed_empty_body.py", "python.empty_body"),
+            ("vitest_empty_body.test.ts", "vitest.empty_body"),
         ],
     )
     def test_warning_fixtures_exit_zero(self, fixture: str, expected_kind: str) -> None:
@@ -75,12 +82,12 @@ class TestVerifyTests:
         payload = json.loads(result.stdout)
         assert payload["blocking"] is False
         verdicts = payload["results"][str(FIXTURE_DIR / "verified_ok.py")]
-        assert verdicts[0]["kind"] == "verified"
+        assert verdicts[0]["kind"] == "python.verified"
 
     def test_human_output_is_one_line_per_test(self) -> None:
         result = _run("verify", "tests", str(BLOCKING_DIR / "gamed_tautology.py"), "--human")
         assert "test_login_happy_path" in result.stdout
-        assert "tautological" in result.stdout
+        assert "python.tautological" in result.stdout
 
     def test_mixed_files_exits_one_when_any_blocks(self) -> None:
         result = _run(
@@ -118,3 +125,16 @@ class TestInitPrecommit:
         assert result.returncode == 0
         body = (tmp_path / ".pre-commit-config.yaml").read_text(encoding="utf-8")
         assert "pragma verify tests" in body
+
+
+class TestBlockingSubcommand:
+    def test_blocking_subcommand_prints_json(self) -> None:
+        result = _run("blocking")
+        assert result.returncode == 0
+        payload = json.loads(result.stdout)
+        assert "tautological" in payload
+        assert "skipped" in payload
+        assert "mocked-away" in payload
+        # Non-blocking suffix not in the list:
+        assert "weak" not in payload
+        assert "verified" not in payload

@@ -1,4 +1,4 @@
-"""Direct tests for the AST classifier (pragma.test_gaming.classify_test).
+"""Direct tests for the AST classifier (pragma.languages.python._compat.classify_test).
 
 Ported from packages/pragma/tests/req/test_req_046_test_gaming.py.
 The pragma_sdk @trace / set_permutation ceremony is gone with the
@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import textwrap
 
-from pragma.test_gaming import classify_test
+from pragma.languages.python._compat import classify_test
 
 
 def test_assert_true_is_tautological() -> None:
@@ -18,7 +18,7 @@ def test_assert_true_is_tautological() -> None:
             assert True
     """)
     v = classify_test(src, test_name="test_smoke", expected="success")
-    assert v.kind == "tautological"
+    assert v.kind == "python.tautological"
     assert v.evidence
 
 
@@ -29,7 +29,7 @@ def test_x_eq_x_is_tautological() -> None:
             assert x == x
     """)
     v = classify_test(src, test_name="test_smoke", expected="success")
-    assert v.kind == "tautological"
+    assert v.kind == "python.tautological"
 
 
 def test_const_eq_same_const_is_tautological() -> None:
@@ -38,7 +38,7 @@ def test_const_eq_same_const_is_tautological() -> None:
             assert 1 == 1
     """)
     v = classify_test(src, test_name="test_smoke", expected="success")
-    assert v.kind == "tautological"
+    assert v.kind == "python.tautological"
 
 
 def test_mocking_function_under_test_is_mocked_away() -> None:
@@ -58,7 +58,7 @@ def test_mocking_function_under_test_is_mocked_away() -> None:
         target_module="auth.login",
         target_symbol="login",
     )
-    assert v.kind == "mocked-away"
+    assert v.kind == "python.mocked-away"
 
 
 def test_is_not_none_is_weak_when_success() -> None:
@@ -75,7 +75,7 @@ def test_is_not_none_is_weak_when_success() -> None:
         target_module="auth.login",
         target_symbol="login",
     )
-    assert v.kind == "weak"
+    assert v.kind == "python.weak"
 
 
 def test_negative_intent_without_raise_block_is_mismatched() -> None:
@@ -92,7 +92,7 @@ def test_negative_intent_without_raise_block_is_mismatched() -> None:
         target_module="auth.login",
         target_symbol="login",
     )
-    assert v.kind == "mismatched"
+    assert v.kind == "python.mismatched"
 
 
 def test_real_assertion_on_return_is_verified() -> None:
@@ -108,7 +108,7 @@ def test_real_assertion_on_return_is_verified() -> None:
         target_module="auth.login",
         target_symbol="login",
     )
-    assert v.kind == "verified"
+    assert v.kind == "python.verified"
 
 
 def test_with_block_around_call_is_a_real_assertion() -> None:
@@ -127,12 +127,12 @@ def test_with_block_around_call_is_a_real_assertion() -> None:
         target_module="auth.login",
         target_symbol="login",
     )
-    assert v.kind == "verified"
+    assert v.kind == "python.verified"
 
 
 def test_unknown_test_name_is_mismatched() -> None:
     v = classify_test("def test_other(): pass", test_name="test_missing", expected="success")
-    assert v.kind == "mismatched"
+    assert v.kind == "python.mismatched"
     assert "no function" in v.evidence
 
 
@@ -156,7 +156,7 @@ def test_try_except_pass_around_target_call_is_swallowed() -> None:
         target_module="auth.login",
         target_symbol="login",
     )
-    assert v.kind == "swallowed"
+    assert v.kind == "python.swallowed"
     assert "swallows" in v.evidence
 
 
@@ -176,7 +176,7 @@ def test_pytest_skip_at_top_of_body_is_skipped() -> None:
         target_module="auth.login",
         target_symbol="login",
     )
-    assert v.kind == "skipped"
+    assert v.kind == "python.skipped"
 
 
 def test_assertions_only_inside_if_branch_is_conditional() -> None:
@@ -196,7 +196,7 @@ def test_assertions_only_inside_if_branch_is_conditional() -> None:
         target_module="auth.login",
         target_symbol="login",
     )
-    assert v.kind == "conditional"
+    assert v.kind == "python.conditional"
 
 
 def test_monkeypatch_setattr_on_target_is_monkeypatched() -> None:
@@ -214,7 +214,7 @@ def test_monkeypatch_setattr_on_target_is_monkeypatched() -> None:
         target_module="auth.login",
         target_symbol="login",
     )
-    assert v.kind == "monkeypatched"
+    assert v.kind == "python.monkeypatched"
 
 
 def test_parametrize_with_one_case_is_parametrize_thin() -> None:
@@ -233,7 +233,7 @@ def test_parametrize_with_one_case_is_parametrize_thin() -> None:
         target_module="auth.login",
         target_symbol="login",
     )
-    assert v.kind == "parametrize_thin"
+    assert v.kind == "python.parametrize_thin"
     assert "N=1" in v.evidence
 
 
@@ -244,4 +244,4 @@ def test_test_body_with_no_assertions_is_empty_body() -> None:
             pass
     """)
     v = classify_test(src, test_name="test_login_happy_path", expected="success")
-    assert v.kind == "empty_body"
+    assert v.kind == "python.empty_body"

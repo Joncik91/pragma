@@ -1,0 +1,52 @@
+"""AST predicates reused by multiple Python rule modules.
+
+These helpers are the building blocks. Each rule file uses one or two
+of them but never the others, so they live in their own module to keep
+each rule single-purpose.
+"""
+
+from __future__ import annotations
+
+import ast
+
+
+def has_raises_assertion(func: ast.FunctionDef) -> bool:
+    """True when the body uses `pytest.raises` (with-block) or `try/except`."""
+    for node in ast.walk(func):
+        if _is_with_raises(node):
+            return True
+        if isinstance(node, ast.Try) and node.handlers:
+            return True
+    return False
+
+
+def _is_with_raises(node: ast.AST) -> bool:
+    if not isinstance(node, ast.With):
+        return False
+    return any(_is_raises_call(item.context_expr) for item in node.items)
+
+
+def _is_raises_call(expr: ast.expr) -> bool:
+    return (
+        isinstance(expr, ast.Call)
+        and isinstance(expr.func, ast.Attribute)
+        and expr.func.attr == "raises"
+    )
+
+
+def is_docstring_stmt(stmt: ast.stmt) -> bool:
+    """True for a top-level docstring expression statement."""
+    return (
+        isinstance(stmt, ast.Expr)
+        and isinstance(stmt.value, ast.Constant)
+        and isinstance(stmt.value.value, str)
+    )
+
+
+def node_inside_any(target: ast.AST, parents: list[ast.AST]) -> bool:
+    """True when `target` is a descendant of any node in `parents`."""
+    for parent in parents:
+        for child in ast.walk(parent):
+            if child is target:
+                return True
+    return False

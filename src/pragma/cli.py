@@ -80,5 +80,16 @@ def init_precommit(
     typer.echo(json.dumps({"ok": True, "wrote": str(cfg)}, sort_keys=True))
 
 
+@app.command("blocking")
+def blocking() -> None:
+    """Print the blocking-suffix set as a JSON array.
+
+    Used by the plugin hook so it doesn't have to hardcode the suffixes.
+    """
+    from pragma.blocking import BLOCKING_SUFFIXES
+
+    typer.echo(json.dumps(sorted(BLOCKING_SUFFIXES)))
+
+
 if __name__ == "__main__":
     app()

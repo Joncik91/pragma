@@ -32,7 +32,7 @@ jobs:
 
       - name: Smoke — blocking fixtures rejected
         run: |
-          for f in tests/fixtures/blocking/gamed_*.py; do
+          for f in tests/fixtures/blocking/gamed_*.py tests/fixtures/blocking/vitest_*.test.ts; do
             if python -m pragma verify tests "$f" >/dev/null 2>&1; then
               echo "ERROR: $f should have been rejected but was accepted"
               exit 1
@@ -41,7 +41,7 @@ jobs:
 
       - name: Smoke — warning fixtures pass but surface verdict
         run: |
-          for f in tests/fixtures/warning/gamed_*.py; do
+          for f in tests/fixtures/warning/gamed_*.py tests/fixtures/warning/vitest_*.test.ts; do
             python -m pragma verify tests "$f" || {
               echo "ERROR: $f is warn-only and should not have blocked"
               exit 1

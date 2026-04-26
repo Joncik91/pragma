@@ -5,6 +5,54 @@ All notable changes to Pragma are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0] — 2026-04-26
+
+**Multi-language support — Vitest joins Python.** v2.0 refactors
+Pragma's classifier into per-language plugins so adding a language is
+a contained, additive change.
+
+### Breaking
+
+- **Verdict kinds are now language-prefixed.** Output JSON's `kind`
+  field changed from `tautological` to `python.tautological`,
+  `mocked-away` to `python.mocked-away`, etc. Anyone parsing the
+  CLI's JSON programmatically must update.
+- The `pragma.test_gaming` module is gone. Code lives under
+  `pragma.languages.python.rules.<rule>`. Tests can use
+  `pragma.languages.python._compat.classify_test` for the legacy
+  per-function call shape.
+
+### Added
+
+- **Vitest support.** PreToolUse + PostToolUse hooks now classify
+  Vitest test files (`.ts` / `.tsx` / `.js` / `.jsx` / `.mjs` / `.cjs`
+  named `*.test.*` / `*.spec.*` / under `tests/` / under `__tests__/`
+  AND importing from `vitest`). Seven verdicts ship: `vitest.tautological`,
+  `vitest.mocked-away`, `vitest.swallowed`, `vitest.skipped`,
+  `vitest.mismatched`, `vitest.conditional`, `vitest.empty_body`.
+- **`pragma blocking`** subcommand prints the blocking-suffix set as
+  JSON. The bash hook now consumes this to stay in lockstep with the
+  library — no more drift between hook and CLI.
+
+### Internal
+
+- Per-language plugins live under `src/pragma/languages/<lang>/`.
+  Each rule is its own file under `rules/<name>.py`. Adding a rule =
+  adding a file + appending to the `RULES` list. SOLID/SRP/OCP.
+- New runtime deps: `tree-sitter`, `tree-sitter-typescript`. Required
+  for Vitest support (Python still uses stdlib `ast`).
+- Single source of truth for Verdict (`pragma.verdict`), blocking
+  suffixes (`pragma.blocking`), and the language registry
+  (`pragma.languages`). DRY.
+
+### Roadmap
+
+- v2.1: Go.
+- v2.2: Rust.
+- v2.3: Kotlin.
+- v2.4: Swift.
+- v2.5+: Jest, Mocha, `node:test` (additional JS/TS frameworks).
+
 ## [1.1.0] — 2026-04-26
 
 **Six new gamed-test detectors.** v1.0.x shipped five verdicts. A

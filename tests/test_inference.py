@@ -6,7 +6,7 @@ import textwrap
 
 import pytest
 
-from pragma.inference import infer_expected, infer_target
+from pragma.languages.python.inference import infer_expected, infer_target
 
 
 class TestInferExpected:

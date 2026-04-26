@@ -27,3 +27,18 @@ assert on the actual return value (or the raised exception type via
 `pytest.raises`). If you're tempted to mock the function under test,
 write `assert True`, or skip the assertion — stop and rewrite to
 verify real behaviour.
+
+## TypeScript / JavaScript (Vitest)
+
+Same anti-gaming rules apply. Pragma blocks Edit/Write of Vitest tests
+that contain:
+
+- **tautological asserts** — `expect(true).toBe(true)`, `expect(x).toBe(x)`.
+- **mock-the-target** — `vi.mock("./auth/login")` when the test asserts on `login()`'s return.
+- **swallowed** — `try { call(); } catch (_) {}` swallows the call.
+- **skipped** — `it.skip(...)`, `it.todo(...)`, `xit(...)`.
+- **conditional** — every `expect()` inside an `if`/`for`/`while`.
+- **mismatched** — name says `*_throws_*` but no `expect(...).toThrow*()`.
+
+To pass: import the production symbol, call it, assert on the actual
+return value or thrown error using `expect(...).toThrow*()`.

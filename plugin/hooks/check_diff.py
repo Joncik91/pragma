@@ -26,15 +26,28 @@ import subprocess
 import sys
 from pathlib import Path
 
-_BLOCKING = {
-    "tautological",
-    "mocked-away",
-    "monkeypatched",
-    "swallowed",
-    "skipped",
-    "conditional",
-    "mismatched",
-}
+
+def _load_blocking_suffixes() -> set[str]:
+    """Pull the blocking-suffix set from `pragma blocking` so the hook
+    and the library share one source of truth (DRY)."""
+    for cmd in (["pragma"], [sys.executable, "-m", "pragma"]):
+        result = subprocess.run(  # noqa: S603 — fixed argv
+            [*cmd, "blocking"],
+            capture_output=True,
+            text=True,
+        )
+        if result.returncode == 0 and result.stdout.strip():
+            try:
+                return set(json.loads(result.stdout))
+            except json.JSONDecodeError:
+                continue
+    # Fail-safe: if we can't reach pragma, treat nothing as blocking.
+    # The hook will exit 0 in that case, which is the existing
+    # graceful-degrade behavior.
+    return set()
+
+
+_BLOCKING = _load_blocking_suffixes()
 
 
 def _run_pragma(file_path: Path) -> dict[str, object]:
@@ -65,7 +78,11 @@ def _blocking_names(payload: dict[str, object]) -> set[str]:
         for v in verdicts:
             if not isinstance(v, dict):
                 continue
-            if v.get("kind") in _BLOCKING:
+            kind = v.get("kind")
+            if not isinstance(kind, str):
+                continue
+            suffix = kind.rsplit(".", 1)[-1]
+            if suffix in _BLOCKING:
                 name = v.get("test_name")
                 if isinstance(name, str):
                     names.add(name)
@@ -109,8 +126,9 @@ def _human_lines_for(payload: dict[str, object], names: set[str], display_path: 
             if not isinstance(v, dict):
                 continue
             name = v.get("test_name")
-            if name in names and v.get("kind") in _BLOCKING:
-                lines.append(f"{display_path}::{name} [{v.get('kind')}] {v.get('evidence', '')}")
+            kind = v.get("kind")
+            if name in names and isinstance(kind, str) and kind.rsplit(".", 1)[-1] in _BLOCKING:
+                lines.append(f"{display_path}::{name} [{kind}] {v.get('evidence', '')}")
     return lines
 
 
