@@ -171,9 +171,27 @@ class TestLlmJudge:
         assert payload["blocking"] is False
 
     def test_with_llm_flag_shown_in_help(self) -> None:
-        result = _run("verify", "tests", "--help")
+        # Wide terminal so Typer's Rich renderer doesn't wrap the flag name.
+        env_path = str(REPO_ROOT / "src")
+        result = subprocess.run(
+            [sys.executable, "-m", "pragma", "verify", "tests", "--help"],
+            capture_output=True,
+            text=True,
+            env={
+                **__import__("os").environ,
+                "PYTHONPATH": env_path,
+                "COLUMNS": "200",
+                "TERM": "dumb",
+            },
+            check=False,
+        )
         assert result.returncode == 0
-        assert "--with-llm" in result.stdout
+        # Strip ANSI escape sequences and whitespace, then assert the flag appears.
+        import re
+
+        clean = re.sub(r"\x1b\[[0-9;]*m", "", result.stdout)
+        clean = re.sub(r"\s+", " ", clean)
+        assert "--with-llm" in clean, clean[:500]
 
     def test_semantic_gaming_not_in_blocking_suffixes(self) -> None:
         """pragma blocking must NOT include semantic_gaming."""
