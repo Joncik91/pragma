@@ -5,6 +5,38 @@ All notable changes to Pragma are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.0] — 2026-04-26
+
+**Outcome-based tier 2: coverage-of-target gate.** v2.0.x's static AST classifier kept playing whack-a-mole — every blind-subagent smoke run surfaced 3-7 new evasion patterns. v2.1 stops chasing patterns and starts checking outcomes. After the AST classifier (tier 1) marks a test as `verified`, tier 2 runs the test under coverage instrumentation and verifies the production target's lines actually executed. Every gaming pattern shares one property — production code never runs. One check kills entire classes of evasion.
+
+### Added
+
+- **Tier 2 coverage gate (Python).** `python.target_not_covered` — new blocking verdict. When tier 1 marks a test verified but the inferred production target's lines have zero hits in the test's coverage context, tier 2 emits `target_not_covered` and the verdict joins the blocking set. Uses `coverage.py`'s programmatic API + dynamic_context to get per-test attribution. Caches outcomes by `(test_hash, target_hash, target_symbol)` in `.pragma/cache.db` so re-edits with unchanged content are sub-100ms.
+- **Tier 2 coverage gate (Vitest).** `vitest.target_not_covered` — same shape for TS/JS. Spawns `npx vitest run --coverage.enabled --coverage.provider=v8` in the test's project root (walks up looking for a `package.json` declaring vitest). V8 coverage is aggregated across the whole run, not per-test, so the gate broadcasts the file-level outcome to every test in the file. Conservative-leaning: if any test in the file hits the target, all are reported as covering.
+- **`pragma verify tests --with-coverage`** — opt-in CLI flag for tier 2 (off by default for backward compat).
+- **PostToolUse hook runs tier 2 by default.** That's the v2.x usage path. Opt out via `PRAGMA_COVERAGE_DEFAULT_OFF=1` env var. PreToolUse stays AST-only — file isn't on disk yet.
+- New runtime dep: `coverage[toml]>=7.4`. New optional extras: `[coverage]` (`pytest-timeout`), `[llm]` (`anthropic`, reserved for tier 3 in v2.1.1).
+- `target_not_covered` added to `BLOCKING_SUFFIXES`. `pragma blocking` returns 13 entries.
+
+### Architecture
+
+- New module trees: `src/pragma/coverage/{gate,runner,query,target,cache}.py` (tier 2) and `src/pragma/judge/` (tier 3 scaffold, lands in v2.1.1).
+- `verify_file(path, with_coverage=False)` — orchestrator gains a flag; routes through `coverage.gate.classify_file` when true.
+- Tier 2 is fail-open everywhere: missing `coverage`, missing `npx`, runner timeout, target not on disk, query failure — all skip silently. Pragma never blocks on tier-2 infrastructure failure.
+- `gate.classify_file` only acts on tests tier 1 marked `verified`. Existing blocking verdicts (mocked-away, etc.) survive untouched — tier 1 is more specific about *what kind* of gaming.
+
+### Internal
+
+- New fixture set: `tests/fixtures/coverage_gated/` with both Python (`src/inventory.py` + 3 test variants) and Vitest (`vitest/src/charge.ts` + 2 test variants).
+- 130+ new tests across `tests/coverage/` (8 test files).
+- Test count: 232 → 360.
+- Subprocess pytest runs use `--import-mode=importlib` to avoid the `tests/coverage/` package shadowing the real `coverage` library.
+
+### Roadmap (deferred)
+
+- **v2.1.1**: Tier 3 LLM judge. Scaffolds shipped in `src/pragma/judge/` but not wired. New `python.semantic_gaming` / `vitest.semantic_gaming` warning verdicts (NOT blocking — conformal calibration deferred until we have labeled data). Opt-in via `--with-llm` and `PRAGMA_ANTHROPIC_API_KEY`.
+- **v2.2**: Conformal-prediction wrapper for tier 3 (block-capable once calibrated). Tier 2.5 mutation oracle (`mutmut` for Python, Stryker for JS). `pytest-testmon` integration for incremental whole-suite tier 2.
+
 ## [2.0.3] — 2026-04-26
 
 **Three more false-negatives from a third v2.0.x smoke run.** One regression (silent-skip), two new evasion patterns. Final patch before the v2.1 architectural shift to outcome-based verification (coverage gate + LLM judge).

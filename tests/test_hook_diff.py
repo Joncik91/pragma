@@ -10,10 +10,12 @@ from __future__ import annotations
 import shutil
 import subprocess
 from pathlib import Path
+from unittest.mock import MagicMock, patch
 
 import pytest
 
 HOOK = Path(__file__).resolve().parents[1] / "plugin" / "hooks" / "check_diff.py"
+REPO_ROOT = Path(__file__).resolve().parents[1]
 
 
 def _git(args: list[str], *, cwd: Path) -> subprocess.CompletedProcess[str]:
@@ -97,3 +99,152 @@ def test_hook_blocks_when_edit_introduces_new_gaming(repo: Path) -> None:
         f"expected block (exit 2) but got {result.returncode}; stderr:\n{result.stderr}"
     )
     assert "test_new_smoke" in result.stderr
+
+
+# ---------------------------------------------------------------------------
+# Unit tests for --with-coverage flag plumbing (step 9)
+# ---------------------------------------------------------------------------
+
+
+def _import_check_diff():
+    """Import check_diff module from plugin/hooks/check_diff.py."""
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location(
+        "check_diff",
+        REPO_ROOT / "plugin" / "hooks" / "check_diff.py",
+    )
+    mod = importlib.util.module_from_spec(spec)
+    # _load_blocking_suffixes() runs at import time; patch subprocess so it
+    # doesn't try to invoke pragma.
+    mock_result = MagicMock()
+    mock_result.returncode = 0
+    mock_result.stdout = (
+        '["tautological", "target_not_covered", "mocked_away", "assertion_mismatch"]'
+    )
+    with patch("subprocess.run", return_value=mock_result):
+        spec.loader.exec_module(mod)
+    return mod
+
+
+def test_run_pragma_includes_with_coverage_flag(tmp_path: Path) -> None:
+    """_run_pragma(path, with_coverage=True) must include --with-coverage in argv."""
+    mod = _import_check_diff()
+    fake_file = tmp_path / "test_x.py"
+    fake_file.write_text("def test_x(): pass\n")
+
+    calls = []
+
+    def fake_run(cmd, **kwargs):
+        calls.append(list(cmd))
+        r = MagicMock()
+        r.stdout = "{}"
+        return r
+
+    with patch("subprocess.run", side_effect=fake_run):
+        mod._run_pragma(fake_file, with_coverage=True)
+
+    assert calls, "subprocess.run was never called"
+    first_call = calls[0]
+    assert "--with-coverage" in first_call, f"--with-coverage not found in argv: {first_call}"
+
+
+def test_run_pragma_excludes_with_coverage_flag_when_false(tmp_path: Path) -> None:
+    """_run_pragma(path, with_coverage=False) must NOT include --with-coverage."""
+    mod = _import_check_diff()
+    fake_file = tmp_path / "test_x.py"
+    fake_file.write_text("def test_x(): pass\n")
+
+    calls = []
+
+    def fake_run(cmd, **kwargs):
+        calls.append(list(cmd))
+        r = MagicMock()
+        r.stdout = "{}"
+        return r
+
+    with patch("subprocess.run", side_effect=fake_run):
+        mod._run_pragma(fake_file, with_coverage=False)
+
+    assert calls, "subprocess.run was never called"
+    first_call = calls[0]
+    assert "--with-coverage" not in first_call, (
+        f"--with-coverage unexpectedly found in argv: {first_call}"
+    )
+
+
+def test_run_pragma_default_excludes_with_coverage_flag(tmp_path: Path) -> None:
+    """_run_pragma(path) with no kwarg must NOT include --with-coverage (backward compat)."""
+    mod = _import_check_diff()
+    fake_file = tmp_path / "test_x.py"
+    fake_file.write_text("def test_x(): pass\n")
+
+    calls = []
+
+    def fake_run(cmd, **kwargs):
+        calls.append(list(cmd))
+        r = MagicMock()
+        r.stdout = "{}"
+        return r
+
+    with patch("subprocess.run", side_effect=fake_run):
+        mod._run_pragma(fake_file)
+
+    assert calls, "subprocess.run was never called"
+    first_call = calls[0]
+    assert "--with-coverage" not in first_call, (
+        f"--with-coverage unexpectedly found in default argv: {first_call}"
+    )
+
+
+def test_main_parses_with_coverage_flag_and_forwards(tmp_path: Path) -> None:
+    """main() with --with-coverage must call _run_pragma with with_coverage=True."""
+    mod = _import_check_diff()
+    fake_file = tmp_path / "test_x.py"
+    fake_file.write_text("def test_x(): pass\n")
+
+    captured_kwargs = []
+
+    def fake_run_pragma(path, *, with_coverage=False):
+        captured_kwargs.append({"path": path, "with_coverage": with_coverage})
+        return {}
+
+    with patch.object(mod, "_run_pragma", side_effect=fake_run_pragma):
+        mod.main(["check_diff", str(fake_file), str(fake_file), "--with-coverage"])
+
+    assert captured_kwargs, "_run_pragma was never called"
+    assert captured_kwargs[0]["with_coverage"] is True, (
+        f"Expected with_coverage=True, got: {captured_kwargs[0]}"
+    )
+
+
+def test_main_without_flag_calls_run_pragma_with_coverage_false(tmp_path: Path) -> None:
+    """main() without --with-coverage must call _run_pragma with with_coverage=False."""
+    mod = _import_check_diff()
+    fake_file = tmp_path / "test_x.py"
+    fake_file.write_text("def test_x(): pass\n")
+
+    captured_kwargs = []
+
+    def fake_run_pragma(path, *, with_coverage=False):
+        captured_kwargs.append({"path": path, "with_coverage": with_coverage})
+        return {}
+
+    with patch.object(mod, "_run_pragma", side_effect=fake_run_pragma):
+        mod.main(["check_diff", str(fake_file), str(fake_file)])
+
+    assert captured_kwargs, "_run_pragma was never called"
+    assert captured_kwargs[0]["with_coverage"] is False, (
+        f"Expected with_coverage=False, got: {captured_kwargs[0]}"
+    )
+
+
+def test_post_tool_use_sh_passes_with_coverage_by_default() -> None:
+    """post-tool-use.sh must reference --with-coverage and PRAGMA_COVERAGE_DEFAULT_OFF."""
+    script = (REPO_ROOT / "plugin" / "hooks" / "post-tool-use.sh").read_text()
+    assert "--with-coverage" in script, (
+        "post-tool-use.sh must pass --with-coverage to check_diff.py by default"
+    )
+    assert "PRAGMA_COVERAGE_DEFAULT_OFF" in script, (
+        "post-tool-use.sh must respect PRAGMA_COVERAGE_DEFAULT_OFF opt-out env var"
+    )

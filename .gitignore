@@ -61,3 +61,4 @@ packages/*/.pragma/hook-crash.jsonl
 # Throwaway sandboxes — greenfield demos, scratch experiments. Fully
 # ignored so a dogfood session doesn't leak into the real repo.
 .sandbox/
+.pragma/

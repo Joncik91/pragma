@@ -150,3 +150,60 @@ class TestBlockingSubcommand:
         # Non-blocking suffix not in the list:
         assert "weak" not in payload
         assert "verified" not in payload
+
+
+class TestCoverageGate:
+    """End-to-end tests for `pragma verify tests --with-coverage`.
+
+    Uses the existing tests/fixtures/coverage_gated/ fixtures from
+    step 1. The conftest in that directory adds src/ to sys.path so
+    inference resolves `inventory` correctly.
+    """
+
+    def test_no_flag_keeps_verified_on_imports_only(self) -> None:
+        """Without --with-coverage, the orphan-import fixture stays verified."""
+        fixture = (
+            REPO_ROOT / "tests" / "fixtures" / "coverage_gated" / "test_inventory_imports_only.py"
+        )
+        result = _run("verify", "tests", str(fixture))
+        assert result.returncode == 0, result.stdout + result.stderr
+        payload = json.loads(result.stdout)
+        assert payload["blocking"] is False
+        verdicts = payload["results"][str(fixture)]
+        assert any(v["kind"] == "python.verified" for v in verdicts)
+
+    def test_with_flag_conservative_when_no_inferable_target(self) -> None:
+        """With --with-coverage, a fixture with no inferable target stays verified.
+
+        test_inventory_imports_only.py imports reserve but never calls it,
+        so infer_target returns (None, None). Gate is conservative: no
+        target inference → keep verified. This test confirms the flag is
+        accepted and forwarded, and that the gate's conservative behavior
+        is preserved end-to-end.
+        """
+        fixture = (
+            REPO_ROOT / "tests" / "fixtures" / "coverage_gated" / "test_inventory_imports_only.py"
+        )
+        result = _run("verify", "tests", "--with-coverage", str(fixture))
+        assert result.returncode == 0, result.stdout + result.stderr
+        payload = json.loads(result.stdout)
+        assert payload["blocking"] is False
+        verdicts = payload["results"][str(fixture)]
+        assert any(v["kind"] == "python.verified" for v in verdicts)
+
+    def test_with_flag_keeps_verified_on_real_test(self) -> None:
+        """The honest fixture stays verified even with --with-coverage."""
+        fixture = REPO_ROOT / "tests" / "fixtures" / "coverage_gated" / "test_inventory_real.py"
+        result = _run("verify", "tests", "--with-coverage", str(fixture))
+        assert result.returncode == 0, result.stdout + result.stderr
+        payload = json.loads(result.stdout)
+        assert payload["blocking"] is False
+        verdicts = payload["results"][str(fixture)]
+        assert any(v["kind"] == "python.verified" for v in verdicts)
+
+    def test_blocking_subcommand_includes_target_not_covered(self) -> None:
+        """`pragma blocking` returns target_not_covered in the suffix list."""
+        result = _run("blocking")
+        assert result.returncode == 0
+        payload = json.loads(result.stdout)
+        assert "target_not_covered" in payload

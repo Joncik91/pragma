@@ -26,12 +26,17 @@ def verify_tests(
         ..., exists=True, dir_okay=False, readable=True
     ),
     human: bool = typer.Option(False, "--human", help="Human-readable output."),
+    with_coverage: bool = typer.Option(
+        False,
+        "--with-coverage",
+        help="Tier 2: run tests under coverage; require target lines executed (Python only).",
+    ),
 ) -> None:
     """Classify tests in <files>; exit 1 if any are tautological/mocked-away/mismatched."""
     results: dict[str, list[dict[str, str]]] = {}
     blocking = False
     for path in files:
-        verdicts = verify_file(path)
+        verdicts = verify_file(path, with_coverage=with_coverage)
         if is_blocking(verdicts):
             blocking = True
         results[str(path)] = [asdict(v) for v in verdicts]

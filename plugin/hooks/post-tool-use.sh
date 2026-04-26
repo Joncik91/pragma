@@ -32,4 +32,10 @@ if [ ! -f "$path" ]; then
 fi
 
 # On-disk file IS the candidate post-edit. Diff against git HEAD.
-exec python3 "${CLAUDE_PLUGIN_ROOT}/hooks/check_diff.py" "$path" "$path"
+# Pass --with-coverage by default so tier 2 (coverage-based gaming detection)
+# runs on every edit. Opt out by setting PRAGMA_COVERAGE_DEFAULT_OFF=1.
+if [ "${PRAGMA_COVERAGE_DEFAULT_OFF:-}" = "1" ]; then
+    exec python3 "${CLAUDE_PLUGIN_ROOT}/hooks/check_diff.py" "$path" "$path"
+else
+    exec python3 "${CLAUDE_PLUGIN_ROOT}/hooks/check_diff.py" "$path" "$path" --with-coverage
+fi

@@ -50,11 +50,12 @@ def _load_blocking_suffixes() -> set[str]:
 _BLOCKING = _load_blocking_suffixes()
 
 
-def _run_pragma(file_path: Path) -> dict[str, object]:
+def _run_pragma(file_path: Path, *, with_coverage: bool = False) -> dict[str, object]:
     """Invoke `pragma verify tests <file>` and return parsed JSON, or {}."""
+    extra_args = ["--with-coverage"] if with_coverage else []
     for cmd in (["pragma"], [sys.executable, "-m", "pragma"]):
         result = subprocess.run(  # noqa: S603 — fixed args, no user input in argv
-            [*cmd, "verify", "tests", str(file_path)],
+            [*cmd, "verify", "tests", *extra_args, str(file_path)],
             capture_output=True,
             text=True,
         )
@@ -133,15 +134,19 @@ def _human_lines_for(payload: dict[str, object], names: set[str], display_path: 
 
 
 def main(argv: list[str]) -> int:
-    if len(argv) != 3:
-        print(f"usage: {argv[0]} <on_disk_path> <candidate_path>", file=sys.stderr)
+    if len(argv) < 3:
+        print(
+            f"usage: {argv[0]} <on_disk_path> <candidate_path> [--with-coverage]",
+            file=sys.stderr,
+        )
         return 0  # don't fail-closed on bad usage; caller logs.
     on_disk = Path(argv[1])
     candidate = Path(argv[2])
+    with_coverage = "--with-coverage" in argv[3:]
     if not candidate.exists():
         return 0
 
-    new_payload = _run_pragma(candidate)
+    new_payload = _run_pragma(candidate, with_coverage=with_coverage)
     new_blocking = _blocking_names(new_payload)
     if not new_blocking:
         return 0
@@ -160,7 +165,7 @@ def main(argv: list[str]) -> int:
         old_tmp = old_tmp_dir / on_disk.name
         old_tmp.write_text(old_src, encoding="utf-8")
         try:
-            old_payload = _run_pragma(old_tmp)
+            old_payload = _run_pragma(old_tmp, with_coverage=with_coverage)
             old_blocking = _blocking_names(old_payload)
         finally:
             old_tmp.unlink(missing_ok=True)

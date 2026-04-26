@@ -42,3 +42,24 @@ that contain:
 
 To pass: import the production symbol, call it, assert on the actual
 return value or thrown error using `expect(...).toThrow*()`.
+
+## Tier 2 — coverage check (v2.1+, Python and Vitest)
+
+After the AST patterns above, Pragma's PostToolUse hook runs your test
+under coverage instrumentation and checks whether the production
+target's lines actually executed. This catches gaming the AST can't see:
+
+- **target_not_covered** — your test imports the production target, sees
+  Pragma's tier-1 classifier as `verified`, but the production symbol's
+  lines were never hit during the test run. Common causes:
+  - The test only exercises a different symbol than the inferred target
+  - The test imports the target but only asserts on a stand-alone mock
+  - A class/function was redefined inline in the test, shadowing the production one
+
+  To pass tier 2: actually call the production function with realistic
+  inputs and assert on its return value. The coverage instrumentation
+  will see the hit and the test will be classified `verified`.
+
+Tier 2 runs by default in Claude Code sessions. Disable per-session via
+`PRAGMA_COVERAGE_DEFAULT_OFF=1` if you need to. The CLI is opt-in:
+`pragma verify tests --with-coverage <files>`.
