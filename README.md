@@ -2,190 +2,156 @@
 
 > Senior engineer on rails for AI-driven development.
 
-Pragma keeps AI-generated code honest. It sits between you (or your
-AI assistant) and git, forcing every feature through a declared
+Pragma keeps AI-generated code honest. It sits between your AI
+assistant and git, forcing every feature through a declared
 specification, a test-first gate, and a plain-English report of what
 actually ran — so you can ship code an AI wrote and know what you're
 shipping.
 
 - **Current version:** v0.2.1 (2026-04-26)
 - **License:** Apache-2.0
-- **Status:** Alpha. Python-only. Thesis works end-to-end on a fresh greenfield; dogfood is still finding bugs. See [`CHANGELOG.md`](CHANGELOG.md) for the release cadence plan and known issues.
+- **Status:** Alpha. Python-only. Open known-issues: zero. Thesis works end-to-end on greenfield and brownfield; the v0.1.x line closed every dogfood-surfaced bug, and v0.2.x ships the friction-reduction line (one-command bootstrap + Claude Code plugin).
 
-## What Pragma does in 30 seconds
+## What it looks like in Claude Code
 
-1. You declare the feature in `pragma.yaml` — requirement, permutations, files touched.
-2. `pragma slice activate` locks the gate. The AI can see what to build, but cannot commit yet.
-3. Failing tests go in first. `pragma unlock` refuses without them.
-4. Code gets written. Tests go green. `pragma slice complete` refuses if any are red.
-5. The commit goes through the safety battery (gitleaks, ruff, mypy, semgrep, pytest).
-6. `pragma report --human` produces a Post-Implementation Log: every declared behaviour, marked *exercised*, *possibly mocked*, or *never run*.
+You install Pragma once. From then on, every Claude Code session in
+any project you've Pragma-enabled drives the gate for you. The user
+types feature intent in plain English; Claude does the rest.
 
-The AI still writes the code. Pragma makes it prove what it did.
+```text
+You: build me an endpoint where users log in with email and password
+
+Claude (driven by the Pragma plugin):
+  → ran `pragma start "User can log in with email and password"`
+  → manifest scaffolded, slice M01.S1 active, gate=LOCKED
+  → wrote tests/test_req_001_happy_path.py with the failing assertion
+  → ran `pragma unlock` → gate=UNLOCKED
+  → wrote src/auth/login.py with @trace("REQ-001")
+  → tests green; ran `pragma slice complete` → status=shipped
+  → drafted commit via `pragma narrative commit`
+
+Now read the PIL: REQ-001 — happy_path — verified (1 span observed).
+```
+
+You read the Post-Implementation Log, not the diff. The AI can't
+fake the PIL because the PIL is built from OpenTelemetry spans
+captured at runtime, not from what the AI claimed it did.
 
 ## Install
+
+Two pieces — the CLI on your machine, and the plugin in Claude Code.
 
 ```shell
 pipx install pragma
 ```
 
-Or in a project venv:
-
-```shell
-python -m venv .venv
-source .venv/bin/activate
-pip install "pragma[dev]"
-```
-
-Verify:
-
-```shell
-pragma --help
-```
-
-## Use Pragma in Claude Code (v0.2.1)
-
-Pragma ships as a Claude Code plugin. Once installed, the user types
-intent in plain English; Claude calls Pragma's commands behind the
-scenes. The user never types `pragma slice activate`.
+Then in Claude Code:
 
 ```text
 /plugin install pragma@joncik91/pragma
 ```
 
-The plugin's SessionStart hook reads `.pragma/state.json`, primes
-Claude with the active slice and gate state, and an embedded skill
-teaches Claude the rules:
+That's it. Open Claude Code in any directory; the plugin's
+SessionStart hook silently reads the project's Pragma state if any
+exists, and the embedded skill teaches Claude the loop. Non-Pragma
+directories are not ambushed — the hook exits silently when there's
+no `pragma.yaml`.
 
-- On first feature ask, call `pragma start "<intent>"`.
-- Never edit `pragma.yaml` directly — use `pragma spec
-  add-requirement` and `pragma freeze`.
-- Drive the gate loop: declare → red test → unlock → implement →
-  green test → complete → narrative commit.
+## How the gate works (30 seconds)
 
-This is the intended way to use Pragma. The CLI commands below stay
-public so non-Claude-Code users (Cursor, plain terminal, CI) have the
-same surface — but the friction-reduction win lives in the plugin.
+1. **Declare** — `pragma.yaml` lists the requirement, its permutations (e.g. `valid_credentials → success`, `weak_password → reject`), and the files it touches. The plugin (or `pragma start`) writes this for you on first feature ask.
+2. **Lock** — `pragma slice activate` flips the gate to `LOCKED`. Claude can see what to build, but cannot ship yet.
+3. **Red test first** — A failing test goes in for each declared permutation. `pragma unlock` refuses to flip the gate until every required test exists *and is failing*.
+4. **Implement** — Code is written with `@trace("REQ-NNN")` on the entry function so OpenTelemetry spans label which requirement was exercised.
+5. **Green & ship** — `pragma slice complete` refuses if any test is red.
+6. **Pre-commit battery** — gitleaks, ruff, mypy, semgrep, pytest, `pragma verify all` all run; one-line commit messages are refused.
+7. **Read the PIL** — `pragma report --human` produces a Post-Implementation Log: every declared permutation, marked *exercised*, *possibly mocked*, or *never run*, with the span count as runtime proof.
 
-## One-command start (v0.2.0)
+## Why this exists
+
+AI assistants generate code fast. Fast code without a check is a
+repo you don't recognise by Tuesday. The existing guardrails — code
+review, CI, tests — assume a human wrote the code and spot-check the
+diff. Those assumptions break under AI-authored volume.
+
+Pragma is the alternative: constrain the process so every diff
+carries proof of what it claimed to build. You read the PIL, not the
+diff. The AI can't fake the PIL because the PIL is built from
+runtime evidence, not from what the AI said it did.
+
+See [`docs/concepts.md`](docs/concepts.md) for the full rationale.
+
+## Who Pragma is for
+
+- **Solo devs using Claude Code / Cursor / Copilot** who want velocity *and* legibility.
+- **Small teams adopting AI assistants** where "was the AI honest?" is the review bottleneck.
+- **Non-coder product owners pairing with an AI** — the PIL is readable without diff-diving.
+
+Not a fit (yet) for: non-Python projects, large teams with mature
+gated-merge already in place, hard-real-time or safety-critical
+work, or anyone who needs stable-release guarantees.
+
+## Manual usage (without the plugin)
+
+If you're not in Claude Code, or you want fine control, the CLI
+surface is identical. One-command bootstrap:
 
 ```shell
 pragma start "User can log in with email and password"
 ```
 
-Auto-detects greenfield (empty dir) vs brownfield (existing code or
-git history), scaffolds the manifest + lockfile + hooks, plans the
-slice, and lands at `gate=LOCKED`. The Claude Code plugin calls this
-on the user's behalf; you can also call it directly.
-
-The two manual flows below remain valid for users who want fine
-control over schema or who are wiring an existing repo with multiple
-REQs in one go.
-
-## Quick start — brownfield (existing repo)
+Auto-detects greenfield vs brownfield, scaffolds the manifest +
+lockfile + hooks, plans the slice, and lands at `gate=LOCKED`. From
+there:
 
 ```shell
-cd your-project/
-pragma init --brownfield
-pragma spec add-requirement --id REQ-001 \
-    --title "User can log in" \
-    --description "Operator signs in with email + password" \
-    --touches src/auth/login.py \
-    --permutation 'valid_credentials|Returns JWT on valid email + strong password|success' \
-    --permutation 'weak_password|Rejects weak passwords|reject'
-pragma freeze
-git add pragma.yaml pragma.lock.json .pre-commit-config.yaml PRAGMA.md .claude/ pytest.ini .pragma/claude-settings.hash
-git commit -m "$(cat <<'MSG'
-chore: adopt pragma
+# Write a failing test for each declared permutation:
+#   tests/test_req_<id>_<permutation_id>.py
+# (run `pragma slice status` or open pragma.yaml to see ids)
 
-WHY: Wire the manifest, lockfile, hooks, and Claude Code settings
-into the repo so every future commit goes through the gate.
-
-Co-Authored-By: <name> <email>
-MSG
-)"
-```
-
-The commit-msg hook enforces a WHY line and a `Co-Authored-By:` trailer,
-even on the very first commit — the gate does not exempt itself.
-
-## Quick start — greenfield (new project)
-
-```shell
-mkdir demo && cd demo
-pragma init --greenfield --name demo --language python
-# write docs/problem.md — one "# heading" per user capability
-pragma spec plan-greenfield --from docs/problem.md
-pragma freeze
-```
-
-## Ship a slice
-
-```shell
-pragma slice activate M01.S1       # greenfield default; brownfield uses M00.S0
-# write a failing test for each declared permutation, named
-# test_req_<id>_<permutation_id> to match what `pragma unlock` checks.
-# Run `pragma slice status` or open pragma.yaml to see the exact ids.
-pragma unlock                      # refuses if any permutation lacks a red test
+pragma unlock                   # refuses if any permutation lacks a red test
 # write code, tests go green
-pragma slice complete              # refuses if any test is red
-git commit -m "$(cat <<'MSG'
-feat: REQ-001 login flow
-
-WHY: <one paragraph on why this slice matters; pre-commit checks shape>
-
-Co-Authored-By: <name> <email>
-MSG
-)"
-pragma report --human              # Post-Implementation Log
+pragma slice complete           # refuses if any test is red
+pragma narrative commit --subject "feat: REQ-001 login flow" > /tmp/msg
+git commit -F /tmp/msg
+pragma report --human           # Post-Implementation Log
 ```
 
-`pragma slice status` at any time. `pragma slice cancel` to abandon.
+> **First commit gotcha:** ruff-format may reformat your code on
+> first commit. Pre-commit treats that as a hook failure — re-stage
+> with `git add -A` and re-run. Second attempt lands.
 
-> **First commit gotcha:** ruff-format may reformat your code (and
-> Pragma's scaffolded files) on first commit. Pre-commit treats that
-> as a hook failure — re-stage with `git add -A` and re-run the
-> commit. Second attempt lands.
-
-The pre-commit / commit-msg / pre-push hooks are wired by `pragma init`
-(see [`docs/reference.md`](docs/reference.md)). They enforce shape on
-the message above; a one-line subject without WHY/trailer is
-refused.
+For the lower-level commands (`pragma init`, `pragma spec
+add-requirement`, `pragma freeze`, `pragma slice activate`), see
+[`docs/usage.md`](docs/usage.md).
 
 ## Documentation
 
 | Read this | When |
 |---|---|
 | [`docs/concepts.md`](docs/concepts.md) | **Start here.** What Pragma is, why it exists, the mental model. |
-| [`docs/usage.md`](docs/usage.md) | Step-by-step walkthrough of brownfield and greenfield flows. |
+| [`docs/usage.md`](docs/usage.md) | Step-by-step walkthrough of brownfield and greenfield flows (manual). |
 | [`docs/reference.md`](docs/reference.md) | Every CLI flag, manifest field, audit event, hook. Includes the `REQ-` / `BUG-` / `KI-` issue ID conventions. |
 | [`docs/doctor.md`](docs/doctor.md) | Diagnostic codes and their remediations. |
 | [`docs/migrate.md`](docs/migrate.md) | Schema versions and `pragma migrate`. |
 | [`docs/roadmap.md`](docs/roadmap.md) | Shipped versions, planned work, rationale. |
 | [`docs/design.md`](docs/design.md) | Deeper architectural rationale. Internal-leaning. |
 | [`CHANGELOG.md`](CHANGELOG.md) | Release history. |
+| [`plugin/skills/pragma/SKILL.md`](plugin/skills/pragma/SKILL.md) | The skill Claude follows. Useful for understanding what the plugin tells the agent. |
 
-## Why this exists
+## What's shipped (v0.2.1)
 
-AI assistants generate code fast. Fast code without a check is a repo
-you don't recognise by Tuesday. The existing guardrails — code review,
-CI, tests — assume a human wrote the code and spot-check the diff. Those
-assumptions break under AI-authored volume.
+- **Claude Code plugin** (v0.2.1) — marketplace-installable. SessionStart hook + skill.
+- **`pragma start "<intent>"`** (v0.2.0) — one-command bootstrap. Auto-detects mode.
+- **Manifest + lockfile** — `pragma.yaml` + `pragma.lock.json` with SHA-256 canonical hash. v2 schema (milestones + slices). `pragma migrate` upgrades v1 idempotently.
+- **Gate** — `pragma slice activate|complete|cancel|status`, `pragma unlock` (with `--skip-tests --reason "..."` for brownfield retroactive imports). `.pragma/state.json` (atomic, flock-guarded, gitignored) + `.pragma/audit.jsonl` (append-only, fsync'd, committed).
+- **Verify** — `pragma verify manifest|gate|discipline|integrity|commits|message|all`. Pre-commit + commit-msg + pre-push hooks. Pre-Pragma history is exempt by design.
+- **Recovery** — `pragma doctor` with classifier diagnostics. `--emergency-unlock` for wedged gates, `--clean-spans` for span retention.
+- **Reports** — `pragma report --json|--human`. PIL marks each permutation *ok | mocked | missing | partial | red | skipped* with a Diagnostics banner when input artifacts are absent.
+- **SDK** — `pragma-sdk` (separate pip package): `@trace(...)`, `set_permutation(...)`, pytest plugin auto-registered. OpenTelemetry spans with `logic_id` + `permutation` attrs feed the PIL.
+- **Narrative** — `pragma narrative commit|pr|adr|remediation` drafts gate-conformant prose from the active slice and PIL.
 
-Pragma is the alternative: constrain the process so every diff carries
-proof of what it claimed to build. You read the PIL, not the diff.
-The AI can't fake the PIL because the PIL is built from runtime
-evidence, not from what the AI said it did.
-
-See [`docs/concepts.md`](docs/concepts.md) for the full rationale.
-
-## Who Pragma is for
-
-- Solo devs using Claude Code / Cursor / Copilot who want velocity *and* legibility.
-- Small teams adopting AI assistants where "was the AI honest?" is the review bottleneck.
-- Non-coder product owners pairing with an AI — the PIL is readable without diff-diving.
-
-Not a fit (yet) for: non-Python projects, large teams with mature gated-merge already in place, hard-real-time or safety-critical work, or anyone who needs stable-release guarantees — this is alpha.
+See [`CHANGELOG.md`](CHANGELOG.md) for the per-release detail.
 
 ## Upgrading an older manifest
 
@@ -195,18 +161,6 @@ pragma init --brownfield --force   # refresh .pre-commit-config.yaml
 ```
 
 See [`docs/migrate.md`](docs/migrate.md) for failure modes.
-
-## What's in v0.1
-
-- **Greenfield bootstrap** — `pragma init --greenfield` scaffolds a seed manifest + `claude.md` primer. `pragma spec plan-greenfield` turns a problem statement into REQ placeholders.
-- **Manifest + schema v2** — `pragma init --brownfield`, `pragma spec add-requirement`, `pragma freeze`, `pragma verify manifest`; dual-file integrity via SHA-256 over canonical JSON; milestones + slices hierarchy.
-- **Gate** — `pragma slice activate|complete|cancel|status`, `pragma unlock`. `.pragma/state.json` (gitignored, atomic, flock-guarded) + `.pragma/audit.jsonl` (committed, append-only, fsync'd).
-- **Verify** — `pragma verify all` runs manifest + gate + discipline + integrity + commits. Commit-msg and pre-push hooks enforce shape.
-- **Recovery** — `pragma doctor` with classifier diagnostics. `--emergency-unlock` for wedged gates, `--clean-spans` for span retention.
-- **Reports** — `pragma report --json` / `--human` (PIL). `pragma narrative commit|pr|adr|remediation` drafts copy from the active slice (prose quality is weak — BUG-026).
-- **Claude Code hooks** — SessionStart / PreToolUse / PostToolUse / Stop, sealed by hash.
-
-Known alpha bugs at v0.1.0: see [`CHANGELOG.md`](CHANGELOG.md#known-issues-at-v010).
 
 ## Contributing
 
