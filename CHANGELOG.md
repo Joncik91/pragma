@@ -5,6 +5,18 @@ All notable changes to Pragma are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.1] — 2026-04-26
+
+**Hook robustness.** v1.0.0 plugin hooks called bare `pragma verify
+tests` and emitted a misleading "gamed assertion detected" message
+when `pragma` wasn't on PATH (i.e. user hadn't run `pipx install
+pragma` yet). Honest tests got rejected the same as gamed ones.
+
+### Fixed
+
+- **Plugin hooks degrade silently when pragma is not installed.** PreToolUse and PostToolUse now probe by running `pragma verify --help` (not by `import pragma`, which a stale namespace package can satisfy without supplying a working CLI). When neither `pragma` on PATH nor `python3 -m pragma` works, the hook exits 0 silently. Users without pragma installed are no longer ambushed; users with pragma installed get the real classifier output as before.
+- Smoke-tested via blind subagent: a clean agent asked to write a test against an unimplemented module produced honest tests (call the production symbol, assert on return value, use `pytest.raises` for the reject case) and confirmed the v1.0.0 hooks were over-blocking.
+
 ## [1.0.0] — 2026-04-26
 
 **The reset.** v0.1.x and v0.2.x grew a sprawling test-first-gate
