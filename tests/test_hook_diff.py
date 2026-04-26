@@ -205,8 +205,8 @@ def test_main_parses_with_coverage_flag_and_forwards(tmp_path: Path) -> None:
 
     captured_kwargs = []
 
-    def fake_run_pragma(path, *, with_coverage=False):
-        captured_kwargs.append({"path": path, "with_coverage": with_coverage})
+    def fake_run_pragma(path, *, with_coverage=False, with_llm=False):
+        captured_kwargs.append({"path": path, "with_coverage": with_coverage, "with_llm": with_llm})
         return {}
 
     with patch.object(mod, "_run_pragma", side_effect=fake_run_pragma):
@@ -226,8 +226,8 @@ def test_main_without_flag_calls_run_pragma_with_coverage_false(tmp_path: Path) 
 
     captured_kwargs = []
 
-    def fake_run_pragma(path, *, with_coverage=False):
-        captured_kwargs.append({"path": path, "with_coverage": with_coverage})
+    def fake_run_pragma(path, *, with_coverage=False, with_llm=False):
+        captured_kwargs.append({"path": path, "with_coverage": with_coverage, "with_llm": with_llm})
         return {}
 
     with patch.object(mod, "_run_pragma", side_effect=fake_run_pragma):
@@ -247,4 +247,132 @@ def test_post_tool_use_sh_passes_with_coverage_by_default() -> None:
     )
     assert "PRAGMA_COVERAGE_DEFAULT_OFF" in script, (
         "post-tool-use.sh must respect PRAGMA_COVERAGE_DEFAULT_OFF opt-out env var"
+    )
+
+
+# ---------------------------------------------------------------------------
+# Unit tests for --with-llm flag plumbing
+# ---------------------------------------------------------------------------
+
+
+def test_run_pragma_includes_with_llm_flag(tmp_path: Path) -> None:
+    """_run_pragma(path, with_llm=True) must include --with-llm in argv."""
+    mod = _import_check_diff()
+    fake_file = tmp_path / "test_x.py"
+    fake_file.write_text("def test_x(): pass\n")
+
+    calls = []
+
+    def fake_run(cmd, **kwargs):
+        calls.append(list(cmd))
+        r = MagicMock()
+        r.stdout = "{}"
+        return r
+
+    with patch("subprocess.run", side_effect=fake_run):
+        mod._run_pragma(fake_file, with_llm=True)
+
+    assert calls, "subprocess.run was never called"
+    first_call = calls[0]
+    assert "--with-llm" in first_call, f"--with-llm not found in argv: {first_call}"
+
+
+def test_run_pragma_excludes_with_llm_flag_when_false(tmp_path: Path) -> None:
+    """_run_pragma(path, with_llm=False) must NOT include --with-llm."""
+    mod = _import_check_diff()
+    fake_file = tmp_path / "test_x.py"
+    fake_file.write_text("def test_x(): pass\n")
+
+    calls = []
+
+    def fake_run(cmd, **kwargs):
+        calls.append(list(cmd))
+        r = MagicMock()
+        r.stdout = "{}"
+        return r
+
+    with patch("subprocess.run", side_effect=fake_run):
+        mod._run_pragma(fake_file, with_llm=False)
+
+    assert calls, "subprocess.run was never called"
+    first_call = calls[0]
+    assert "--with-llm" not in first_call, (
+        f"--with-llm unexpectedly found in argv: {first_call}"
+    )
+
+
+def test_run_pragma_default_excludes_with_llm_flag(tmp_path: Path) -> None:
+    """_run_pragma(path) with no kwarg must NOT include --with-llm (backward compat)."""
+    mod = _import_check_diff()
+    fake_file = tmp_path / "test_x.py"
+    fake_file.write_text("def test_x(): pass\n")
+
+    calls = []
+
+    def fake_run(cmd, **kwargs):
+        calls.append(list(cmd))
+        r = MagicMock()
+        r.stdout = "{}"
+        return r
+
+    with patch("subprocess.run", side_effect=fake_run):
+        mod._run_pragma(fake_file)
+
+    assert calls, "subprocess.run was never called"
+    first_call = calls[0]
+    assert "--with-llm" not in first_call, (
+        f"--with-llm unexpectedly found in default argv: {first_call}"
+    )
+
+
+def test_main_parses_with_llm_flag_and_forwards(tmp_path: Path) -> None:
+    """main() with --with-llm must call _run_pragma with with_llm=True."""
+    mod = _import_check_diff()
+    fake_file = tmp_path / "test_x.py"
+    fake_file.write_text("def test_x(): pass\n")
+
+    captured_kwargs = []
+
+    def fake_run_pragma(path, *, with_coverage=False, with_llm=False):
+        captured_kwargs.append({"path": path, "with_coverage": with_coverage, "with_llm": with_llm})
+        return {}
+
+    with patch.object(mod, "_run_pragma", side_effect=fake_run_pragma):
+        mod.main(["check_diff", str(fake_file), str(fake_file), "--with-llm"])
+
+    assert captured_kwargs, "_run_pragma was never called"
+    assert captured_kwargs[0]["with_llm"] is True, (
+        f"Expected with_llm=True, got: {captured_kwargs[0]}"
+    )
+
+
+def test_main_without_llm_flag_calls_run_pragma_with_llm_false(tmp_path: Path) -> None:
+    """main() without --with-llm must call _run_pragma with with_llm=False."""
+    mod = _import_check_diff()
+    fake_file = tmp_path / "test_x.py"
+    fake_file.write_text("def test_x(): pass\n")
+
+    captured_kwargs = []
+
+    def fake_run_pragma(path, *, with_coverage=False, with_llm=False):
+        captured_kwargs.append({"path": path, "with_coverage": with_coverage, "with_llm": with_llm})
+        return {}
+
+    with patch.object(mod, "_run_pragma", side_effect=fake_run_pragma):
+        mod.main(["check_diff", str(fake_file), str(fake_file)])
+
+    assert captured_kwargs, "_run_pragma was never called"
+    assert captured_kwargs[0]["with_llm"] is False, (
+        f"Expected with_llm=False, got: {captured_kwargs[0]}"
+    )
+
+
+def test_post_tool_use_sh_supports_pragma_hook_with_llm() -> None:
+    """post-tool-use.sh must reference PRAGMA_HOOK_WITH_LLM and --with-llm."""
+    script = (REPO_ROOT / "plugin" / "hooks" / "post-tool-use.sh").read_text()
+    assert "PRAGMA_HOOK_WITH_LLM" in script, (
+        "post-tool-use.sh must respect PRAGMA_HOOK_WITH_LLM opt-in env var"
+    )
+    assert "--with-llm" in script, (
+        "post-tool-use.sh must pass --with-llm to check_diff.py when PRAGMA_HOOK_WITH_LLM=1"
     )

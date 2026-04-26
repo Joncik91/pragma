@@ -31,12 +31,17 @@ def verify_tests(
         "--with-coverage",
         help="Tier 2: run tests under coverage; require target lines executed (Python only).",
     ),
+    with_llm: bool = typer.Option(
+        False,
+        "--with-llm",
+        help="Tier 3 (warning): LLM judge via Haiku. Requires PRAGMA_ANTHROPIC_API_KEY.",
+    ),
 ) -> None:
     """Classify tests in <files>; exit 1 if any are tautological/mocked-away/mismatched."""
     results: dict[str, list[dict[str, str]]] = {}
     blocking = False
     for path in files:
-        verdicts = verify_file(path, with_coverage=with_coverage)
+        verdicts = verify_file(path, with_coverage=with_coverage, with_llm=with_llm)
         if is_blocking(verdicts):
             blocking = True
         results[str(path)] = [asdict(v) for v in verdicts]

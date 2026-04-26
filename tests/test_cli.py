@@ -152,6 +152,37 @@ class TestBlockingSubcommand:
         assert "verified" not in payload
 
 
+class TestLlmJudge:
+    """CLI tests for `pragma verify tests --with-llm`.
+
+    With no API key set, tier 3 skips silently — so results are identical
+    to running without --with-llm. This validates the flag is wired correctly
+    and doesn't crash when the key is absent.
+    """
+
+    def test_with_llm_flag_accepted_no_crash_when_key_missing(self) -> None:
+        """--with-llm with no PRAGMA_ANTHROPIC_API_KEY exits 0 on a verified fixture."""
+        fixture = FIXTURE_DIR / "verified_ok.py"
+        env = {**__import__("os").environ, "PYTHONPATH": str(REPO_ROOT / "src")}
+        env.pop("PRAGMA_ANTHROPIC_API_KEY", None)  # ensure key is absent
+        result = _run("verify", "tests", "--with-llm", str(fixture))
+        assert result.returncode == 0, f"expected exit 0; got {result.returncode}\n{result.stderr}"
+        payload = __import__("json").loads(result.stdout)
+        assert payload["blocking"] is False
+
+    def test_with_llm_flag_shown_in_help(self) -> None:
+        result = _run("verify", "tests", "--help")
+        assert result.returncode == 0
+        assert "--with-llm" in result.stdout
+
+    def test_semantic_gaming_not_in_blocking_suffixes(self) -> None:
+        """pragma blocking must NOT include semantic_gaming."""
+        result = _run("blocking")
+        assert result.returncode == 0
+        payload = __import__("json").loads(result.stdout)
+        assert "semantic_gaming" not in payload
+
+
 class TestCoverageGate:
     """End-to-end tests for `pragma verify tests --with-coverage`.
 
