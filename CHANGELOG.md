@@ -5,6 +5,30 @@ All notable changes to Pragma are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.2] — 2026-04-26
+
+**Seven new false-negatives surfaced by 8 fresh blind-subagent sandboxes.** Same evening as v2.0.1. All seven fixed.
+
+### Fixed
+
+- **BUG-023 — `vitest.mocked-away` missed `vi.mock` + intermediate-variable expect.** Rule required `expect(symbol(...)).toXxx(...)` (call directly inside expect). Models routinely write `const r = symbol(...); expect(r).toEqual(...)` — sailed through. Two of eight sandboxes used this exact pattern. Now: walk for `variable_declarator` binding `<symbol>(...)`, collect bound names, then `expect(<bound_name>).toXxx(...)` satisfies the rule.
+- **BUG-024 — `vitest.mismatched` stub-phrase set too narrow.** v2.0.1 caught `"not implemented"` etc. but missed `"backend offline"`, `"not connected"`, `"service unavailable"`, `"not initialized"`, `"backend down"`, `"not configured"`, `"no api key"`. Same SWE-bench gaming style with different vocabulary. Substring match catches `"payments backend offline"` via `"offline"`, `"api not connected"` via `"not connected"`.
+
+### Added (new rules)
+
+- **`vitest.mocked-away` extended with `vi.spyOn` (BUG-019).** `vi.spyOn(<module>, "<sym>").mockReturnValue(...)` (and the `mockImplementation` / `mockResolvedValue` / `mockRejectedValue` siblings — including the `Once` variants) replaces the production function exactly like `vi.mock`. Rule now resolves `import * as M from "..."` namespace imports and walks the body for `vi.spyOn(M, "fn").mock*(...)` chains. Member-expression calls `M.fn(args)` are recognized.
+- **`python.xfail_gaming` (BUG-022, blocking).** `@pytest.mark.xfail(strict=True)` on every test of an unimplemented stub makes the suite go green: each test predictably fails, `xfail`'s expectation is satisfied, nothing verified. Plain `xfail()` and `xfail(strict=False)` stay clean — those are legitimate known-failure markers.
+- **`python.module_shimmed` (BUG-018, blocking).** Top-level `sys.modules["target"] = types.ModuleType("target")` (or `.setdefault` / `.update` variants) replaces the production module before the test imports it. Bypasses both `mocked-away` (no `mock.patch`) and `monkeypatched` (no `monkeypatch.setattr`). Rule walks the test file's module body for `sys.modules` subscript-assign / setdefault / update calls, plus `types.ModuleType(...)` constructor calls.
+- **`vitest.orphan_mock` (BUG-020, blocking).** Stand-alone `const m = vi.fn().mockResolvedValue(L); const r = await m(); expect(r).toEqual(L)` — the mock is never wired to a production symbol; the assertion checks the mock returns its configured value. Structurally tautological but the existing `vitest.tautological` rule missed it. Fires only when the asserted literal byte-matches the mock's return literal.
+- **`python.orphan_test` (BUG-021, blocking).** `tests/test_<name>.py` that never imports `<name>` and instead redefines a class named `PascalCase(<name>)` or a function named `<name>` inline. Fires conservatively — requires a *local module-level definition* in the test file with the matching name. Pragma's own test files do not trip it (verified end-to-end).
+
+### Internal
+
+- Rule classifiers now receive `tree` (the parsed AST) and `file_path` (the path of the file being classified) via the orchestrator's ctx kwargs. Existing rules accept `**_` so they ignore the additions.
+- New fixtures: `vitest_mocked_away_intermediate.test.ts`, `vitest_mismatched_backend_offline.test.ts`, `vitest_spyon_mocked_away.test.ts`, `gamed_xfail_strict.py`, `gamed_module_shimmed.py`, `vitest_orphan_mock.test.ts`, `test_orphan_target.py`. All wired into `tests/test_cli.py` parametrize and the CI smoke loops.
+- `BLOCKING_SUFFIXES` extended with `xfail_gaming`, `module_shimmed`, `orphan_mock`, `orphan_test` (the new blocking kinds).
+- Test count: 148 → 211.
+
 ## [2.0.1] — 2026-04-26
 
 **Three false-negatives surfaced in v2.0 blind-subagent smoke testing.** All three caught the same week v2.0 shipped, all three fixed in this patch.

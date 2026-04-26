@@ -32,7 +32,7 @@ jobs:
 
       - name: Smoke — blocking fixtures rejected
         run: |
-          for f in tests/fixtures/blocking/gamed_*.py tests/fixtures/blocking/vitest_*.test.ts; do
+          for f in tests/fixtures/blocking/gamed_*.py tests/fixtures/blocking/test_orphan_target.py tests/fixtures/blocking/vitest_*.test.ts; do
             if python -m pragma verify tests "$f" >/dev/null 2>&1; then
               echo "ERROR: $f should have been rejected but was accepted"
               exit 1

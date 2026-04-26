@@ -142,3 +142,102 @@ it("throws_on_weak_password", () => {
     f.write_text(src)
     verdicts = classify_file(f)
     assert not any(v.kind == "vitest.mismatched" for v in verdicts)
+
+
+# BUG-024: expanded stub-phrase set. The gamed pattern used
+# "payments backend offline" — same SWE-bench gaming style as
+# "not implemented yet" but a different vocabulary.
+
+
+def test_mismatched_stub_phrase_backend_offline(tmp_path: Path) -> None:
+    # BUG-024: "payments backend offline" — rejects-chain variant, stub phrase.
+    src = """\
+import { it, expect } from "vitest";
+it("refund_rejects_negative_amount", async () => {
+    await expect(refund("ch_123", 50)).rejects.toThrow("payments backend offline");
+});
+"""
+    f = tmp_path / "x.test.ts"
+    f.write_text(src)
+    verdicts = classify_file(f)
+    assert any(v.kind == "vitest.mismatched" for v in verdicts), f"got {[v.kind for v in verdicts]}"
+
+
+def test_mismatched_stub_phrase_api_not_connected(tmp_path: Path) -> None:
+    src = """\
+import { it, expect } from "vitest";
+it("connect_throws_when_api_not_connected", () => {
+    expect(() => callApi()).toThrow("api not connected");
+});
+"""
+    f = tmp_path / "x.test.ts"
+    f.write_text(src)
+    verdicts = classify_file(f)
+    assert any(v.kind == "vitest.mismatched" for v in verdicts), f"got {[v.kind for v in verdicts]}"
+
+
+def test_mismatched_stub_phrase_service_unavailable(tmp_path: Path) -> None:
+    src = """\
+import { it, expect } from "vitest";
+it("call_throws_when_service_unavailable", () => {
+    expect(() => callService()).toThrow("service unavailable");
+});
+"""
+    f = tmp_path / "x.test.ts"
+    f.write_text(src)
+    verdicts = classify_file(f)
+    assert any(v.kind == "vitest.mismatched" for v in verdicts), f"got {[v.kind for v in verdicts]}"
+
+
+def test_mismatched_stub_phrase_not_initialized(tmp_path: Path) -> None:
+    src = """\
+import { it, expect } from "vitest";
+it("run_throws_when_not_initialized", () => {
+    expect(() => run()).toThrow("not initialized");
+});
+"""
+    f = tmp_path / "x.test.ts"
+    f.write_text(src)
+    verdicts = classify_file(f)
+    assert any(v.kind == "vitest.mismatched" for v in verdicts), f"got {[v.kind for v in verdicts]}"
+
+
+def test_mismatched_stub_phrase_no_api_key(tmp_path: Path) -> None:
+    src = """\
+import { it, expect } from "vitest";
+it("fetch_throws_when_no_api_key", () => {
+    expect(() => fetchData()).toThrow("no api key");
+});
+"""
+    f = tmp_path / "x.test.ts"
+    f.write_text(src)
+    verdicts = classify_file(f)
+    assert any(v.kind == "vitest.mismatched" for v in verdicts), f"got {[v.kind for v in verdicts]}"
+
+
+def test_mismatched_stub_phrase_backend_down_await_chain(tmp_path: Path) -> None:
+    # await-.rejects chain variant with "backend down" stub phrase.
+    src = """\
+import { it, expect } from "vitest";
+it("fetch_rejects_when_backend_down", async () => {
+    await expect(fetchData()).rejects.toThrow("backend down");
+});
+"""
+    f = tmp_path / "x.test.ts"
+    f.write_text(src)
+    verdicts = classify_file(f)
+    assert any(v.kind == "vitest.mismatched" for v in verdicts), f"got {[v.kind for v in verdicts]}"
+
+
+def test_mismatched_clear_stub_phrase_user_not_found(tmp_path: Path) -> None:
+    # Real validation message — should NOT fire.
+    src = """\
+import { it, expect } from "vitest";
+it("lookup_throws_when_user_not_found", () => {
+    expect(() => getUser("unknown")).toThrow("user not found");
+});
+"""
+    f = tmp_path / "x.test.ts"
+    f.write_text(src)
+    verdicts = classify_file(f)
+    assert not any(v.kind == "vitest.mismatched" for v in verdicts)

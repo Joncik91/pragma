@@ -6,43 +6,71 @@ from tree_sitter import Node
 
 from pragma.verdict import Verdict
 
+_MOCK_METHODS: frozenset[str] = frozenset(
+    {
+        "mockReturnValue",
+        "mockReturnValueOnce",
+        "mockImplementation",
+        "mockImplementationOnce",
+        "mockResolvedValue",
+        "mockResolvedValueOnce",
+        "mockRejectedValue",
+        "mockRejectedValueOnce",
+    }
+)
+
 
 def classify(test_node: Node, *, source: bytes, test_name: str) -> Verdict | None:
-    """Flag when all four conditions hold:
-    1. vi.mock("./path") at module level
-    2. import { X } from "./path" for the same path
-    3. test body calls X(...)
-    4. test body has expect(X(...)).toXxx(...)
+    """Flag when the test body calls and asserts on a mocked symbol.
+
+    Two detection paths:
+    1. vi.mock("./path") at module level + import { X } from "./path"
+    2. vi.spyOn(<alias>, "<sym>").mock*(...) where alias is from
+       ``import * as <alias> from "./path"``
     """
     root = _find_program_root(test_node)
     if root is None:
         return None
-
-    # Collect top-level vi.mock paths
-    mocked_paths = _collect_vi_mock_paths(root)
-    if not mocked_paths:
-        return None
-
-    # Collect imports per module path
-    imports_by_path = _collect_imports(root)
 
     # Find the callback
     callback = _get_callback(test_node)
     if callback is None:
         return None
 
-    # For each mocked path that is also imported, check if the test uses + asserts on it
-    for path in mocked_paths:
-        if path not in imports_by_path:
-            continue
-        imported_names = imports_by_path[path]
-        for symbol in imported_names:
-            if _body_calls_and_asserts_symbol(callback, symbol):
+    # --- Path 1: vi.mock(...) at module level ---
+    mocked_paths = _collect_vi_mock_paths(root)
+    if mocked_paths:
+        imports_by_path = _collect_imports(root)
+        for path in mocked_paths:
+            if path not in imports_by_path:
+                continue
+            imported_names = imports_by_path[path]
+            for symbol in imported_names:
+                if _body_calls_and_asserts_symbol(callback, symbol):
+                    evidence = (
+                        f"vi.mock on '{path}' + assertion on {symbol}(...)"
+                        f" — testing the mock, not the implementation"
+                    )
+                    return Verdict(
+                        kind="vitest.mocked-away", evidence=evidence, test_name=test_name
+                    )
+
+    # --- Path 2: vi.spyOn(<alias>, "<sym>").mock*(...) ---
+    namespace_imports = _collect_namespace_imports(root)
+    if namespace_imports:
+        spyon_targets = _collect_spyon_replacements(callback)
+        for alias, symbol in spyon_targets:
+            if alias not in namespace_imports:
+                continue
+            module_path = namespace_imports[alias]
+            if _body_calls_and_asserts_member(callback, alias, symbol):
                 evidence = (
-                    f"vi.mock on '{path}' + assertion on {symbol}(...)"
+                    f"vi.spyOn({alias}, '{symbol}').mock*(...) on '{module_path}'"
+                    f" + assertion on {alias}.{symbol}(...)"
                     f" — testing the mock, not the implementation"
                 )
                 return Verdict(kind="vitest.mocked-away", evidence=evidence, test_name=test_name)
+
     return None
 
 
@@ -153,8 +181,42 @@ def _get_callback(test_node: Node) -> Node | None:
     return actual_args[1]
 
 
+def _collect_bound_names(callback: Node, symbol: str) -> set[str]:
+    """Return variable names bound to a call of <symbol>(...) in the callback.
+
+    Walks the callback for:
+      - ``lexical_declaration``  (const / let)
+      - ``variable_declaration`` (var)
+    containing a ``variable_declarator`` whose ``value`` is a
+    ``call_expression`` whose ``function`` text equals ``symbol``.
+    """
+    bound: set[str] = set()
+    for node in _walk(callback):
+        if node.type not in {"lexical_declaration", "variable_declaration"}:
+            continue
+        for child in node.children:
+            if child.type != "variable_declarator":
+                continue
+            name_node = child.child_by_field_name("name")
+            value_node = child.child_by_field_name("value")
+            if name_node is None or value_node is None:
+                continue
+            if value_node.type != "call_expression":
+                continue
+            fn = value_node.child_by_field_name("function")
+            if fn is None:
+                continue
+            if fn.text.decode("utf-8") == symbol:
+                bound.add(name_node.text.decode("utf-8"))
+    return bound
+
+
 def _body_calls_and_asserts_symbol(callback: Node, symbol: str) -> bool:
-    """Return True if the callback body contains expect(symbol(...)).toXxx(...)."""
+    """Return True if the callback body contains expect(symbol(...)).toXxx(...)
+    or const/let/var result = symbol(...); expect(result).toXxx(...)."""
+    # Pass 1: collect variable names bound to symbol(...)
+    bound_names = _collect_bound_names(callback, symbol)
+
     for node in _walk(callback):
         if node.type != "call_expression":
             continue
@@ -168,7 +230,7 @@ def _body_calls_and_asserts_symbol(callback: Node, symbol: str) -> bool:
         callee = obj.child_by_field_name("function")
         if callee is None or callee.text.decode("utf-8") != "expect":
             continue
-        # The arg to expect should be symbol(...)
+        # The arg to expect should be symbol(...) directly, or a bound name
         expect_args = obj.child_by_field_name("arguments")
         if expect_args is None:
             continue
@@ -176,12 +238,180 @@ def _body_calls_and_asserts_symbol(callback: Node, symbol: str) -> bool:
         if not actual:
             continue
         inner = actual[0]
-        if inner.type != "call_expression":
+        # Case A: expect(symbol(...)).toXxx(...)  — original behaviour
+        if inner.type == "call_expression":
+            inner_func = inner.child_by_field_name("function")
+            if inner_func is not None and inner_func.text.decode("utf-8") == symbol:
+                return True
+        # Case B: expect(result).toXxx(...) where result was bound to symbol(...)
+        if inner.type == "identifier" and inner.text.decode("utf-8") in bound_names:
+            return True
+    return False
+
+
+def _collect_namespace_imports(root: Node) -> dict[str, str]:
+    """Map namespace alias -> module path for ``import * as <alias> from "..."``."""
+    result: dict[str, str] = {}
+    for child in root.children:
+        if child.type != "import_statement":
             continue
-        inner_func = inner.child_by_field_name("function")
-        if inner_func is None:
+        # Find the from-string
+        module_path: str | None = None
+        for node in child.children:
+            if node.type == "string":
+                for frag in node.children:
+                    if frag.type == "string_fragment":
+                        module_path = frag.text.decode("utf-8")
+        if module_path is None:
             continue
-        if inner_func.text.decode("utf-8") == symbol:
+        # Find namespace_import: import_clause > namespace_import > identifier
+        import_clause = child.child_by_field_name("import")
+        if import_clause is None:
+            for node in child.children:
+                if node.type == "import_clause":
+                    import_clause = node
+                    break
+        if import_clause is None:
+            continue
+        for node in _walk(import_clause):
+            if node.type == "namespace_import":
+                for sub in node.children:
+                    if sub.type == "identifier":
+                        result[sub.text.decode("utf-8")] = module_path
+                        break
+                break
+    return result
+
+
+def _collect_spyon_replacements(callback: Node) -> set[tuple[str, str]]:
+    """Walk callback for ``vi.spyOn(<alias>, "<sym>").<mock*>(...)`` chains.
+
+    Returns a set of (alias, symbol) pairs where a mock* method is chained.
+    Plain ``vi.spyOn(...)`` without a mock* chain is excluded (observation only).
+    """
+    targets: set[tuple[str, str]] = set()
+    for node in _walk(callback):
+        # Looking for: call_expression whose function is a member_expression
+        # with property in _MOCK_METHODS, and whose object is the vi.spyOn call.
+        if node.type != "call_expression":
+            continue
+        func = node.child_by_field_name("function")
+        if func is None or func.type != "member_expression":
+            continue
+        prop = func.child_by_field_name("property")
+        if prop is None or prop.text.decode("utf-8") not in _MOCK_METHODS:
+            continue
+        # The object of the member_expression must be the vi.spyOn(...) call
+        obj = func.child_by_field_name("object")
+        if obj is None or obj.type != "call_expression":
+            continue
+        spyon_pair = _extract_spyon_args(obj)
+        if spyon_pair is not None:
+            targets.add(spyon_pair)
+    return targets
+
+
+def _extract_spyon_args(call_node: Node) -> tuple[str, str] | None:
+    """If call_node is ``vi.spyOn(<alias>, "<sym>")``, return (alias, sym)."""
+    spyon_func = call_node.child_by_field_name("function")
+    if spyon_func is None or spyon_func.type != "member_expression":
+        return None
+    vi_obj = spyon_func.child_by_field_name("object")
+    vi_prop = spyon_func.child_by_field_name("property")
+    if vi_obj is None or vi_prop is None:
+        return None
+    if vi_obj.text.decode("utf-8") != "vi":
+        return None
+    if vi_prop.text.decode("utf-8") != "spyOn":
+        return None
+    args = call_node.child_by_field_name("arguments")
+    if args is None:
+        return None
+    actual = [c for c in args.children if c.type not in {"(", ")", ","}]
+    if len(actual) < 2:
+        return None
+    alias_node = actual[0]
+    sym_node = actual[1]
+    if alias_node.type != "identifier":
+        return None
+    alias = alias_node.text.decode("utf-8")
+    # sym_node is a string literal
+    if sym_node.type != "string":
+        return None
+    sym: str | None = None
+    for child in sym_node.children:
+        if child.type == "string_fragment":
+            sym = child.text.decode("utf-8")
+    if sym is None:
+        return None
+    return alias, sym
+
+
+def _collect_bound_names_member(callback: Node, alias: str, symbol: str) -> set[str]:
+    """Return variable names bound to ``<alias>.<symbol>(...)`` calls.
+
+    Also handles ``await <alias>.<symbol>(...)`` (async tests).
+    """
+    bound: set[str] = set()
+    member_text = f"{alias}.{symbol}"
+    for node in _walk(callback):
+        if node.type not in {"lexical_declaration", "variable_declaration"}:
+            continue
+        for child in node.children:
+            if child.type != "variable_declarator":
+                continue
+            name_node = child.child_by_field_name("name")
+            value_node = child.child_by_field_name("value")
+            if name_node is None or value_node is None:
+                continue
+            # Unwrap await_expression if present
+            actual_value = value_node
+            if actual_value.type == "await_expression":
+                # The child after the 'await' keyword is the expression
+                non_await = [c for c in actual_value.children if c.type != "await"]
+                actual_value = non_await[0] if non_await else actual_value
+            if actual_value.type != "call_expression":
+                continue
+            fn = actual_value.child_by_field_name("function")
+            if fn is None:
+                continue
+            if fn.text.decode("utf-8") == member_text:
+                bound.add(name_node.text.decode("utf-8"))
+    return bound
+
+
+def _body_calls_and_asserts_member(callback: Node, alias: str, symbol: str) -> bool:
+    """Return True if callback has expect(<alias>.<symbol>(...)).toXxx(...)
+    or const r = <alias>.<symbol>(...); expect(r).toXxx(...)."""
+    member_text = f"{alias}.{symbol}"
+    bound_names = _collect_bound_names_member(callback, alias, symbol)
+
+    for node in _walk(callback):
+        if node.type != "call_expression":
+            continue
+        func = node.child_by_field_name("function")
+        if func is None or func.type != "member_expression":
+            continue
+        obj = func.child_by_field_name("object")
+        if obj is None or obj.type != "call_expression":
+            continue
+        callee = obj.child_by_field_name("function")
+        if callee is None or callee.text.decode("utf-8") != "expect":
+            continue
+        expect_args = obj.child_by_field_name("arguments")
+        if expect_args is None:
+            continue
+        actual = [c for c in expect_args.children if c.type not in {"(", ")", ","}]
+        if not actual:
+            continue
+        inner = actual[0]
+        # Case A: expect(<alias>.<symbol>(...)).toXxx(...)
+        if inner.type == "call_expression":
+            inner_func = inner.child_by_field_name("function")
+            if inner_func is not None and inner_func.text.decode("utf-8") == member_text:
+                return True
+        # Case B: expect(result).toXxx(...) where result was bound to <alias>.<symbol>(...)
+        if inner.type == "identifier" and inner.text.decode("utf-8") in bound_names:
             return True
     return False
 

@@ -8,11 +8,13 @@ from pragma.languages.vitest.rules import conditional as _conditional
 from pragma.languages.vitest.rules import empty_body as _empty_body
 from pragma.languages.vitest.rules import mismatched as _mismatched
 from pragma.languages.vitest.rules import mocked_away as _mocked_away
+from pragma.languages.vitest.rules import orphan_mock as _orphan_mock
 from pragma.languages.vitest.rules import skipped as _skipped
 from pragma.languages.vitest.rules import swallowed as _swallowed
 from pragma.languages.vitest.rules import tautological as _tautological
 
 RULES: list[Callable] = [
+    _orphan_mock.classify,
     _tautological.classify,
     _mocked_away.classify,
     _skipped.classify,

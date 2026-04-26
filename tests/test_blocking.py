@@ -26,15 +26,35 @@ def test_kind_without_dot_uses_whole_string():
     assert is_blocking_kind("verified") is False
 
 
-def test_blocking_suffixes_includes_all_seven():
+def test_python_xfail_gaming_is_blocking():
+    assert is_blocking_kind("python.xfail_gaming") is True
+
+
+def test_python_module_shimmed_is_blocking():
+    assert is_blocking_kind("python.module_shimmed") is True
+
+
+def test_vitest_orphan_mock_is_blocking():
+    assert is_blocking_kind("vitest.orphan_mock") is True
+
+
+def test_python_orphan_test_is_blocking():
+    assert is_blocking_kind("python.orphan_test") is True
+
+
+def test_blocking_suffixes_includes_all_eleven():
     assert (
         frozenset(
             {
                 "tautological",
                 "mocked-away",
                 "monkeypatched",
+                "module_shimmed",
+                "orphan_mock",
+                "orphan_test",
                 "swallowed",
                 "skipped",
+                "xfail_gaming",
                 "conditional",
                 "mismatched",
             }

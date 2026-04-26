@@ -39,6 +39,8 @@ def classify_test(
         "expected": expected,
         "target_module": target_module,
         "target_symbol": target_symbol,
+        "tree": tree,
+        "file_path": None,
     }
     for rule in RULES:
         verdict = rule(func, **ctx)

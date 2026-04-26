@@ -31,10 +31,10 @@ def classify_file(path: Path) -> list[Verdict]:
     """Classify every `test_*` function in `path`."""
     source = path.read_text(encoding="utf-8")
     tree = ast.parse(source)
-    return [_classify_one(source, tree, func.name) for func in walk_test_functions(tree)]
+    return [_classify_one(source, tree, func.name, path) for func in walk_test_functions(tree)]
 
 
-def _classify_one(source: str, tree: ast.AST, test_name: str) -> Verdict:
+def _classify_one(source: str, tree: ast.AST, test_name: str, path: Path) -> Verdict:
     func = next(
         (n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef) and n.name == test_name),
         None,
@@ -47,6 +47,8 @@ def _classify_one(source: str, tree: ast.AST, test_name: str) -> Verdict:
         "expected": expected,
         "target_module": target_module,
         "target_symbol": target_symbol,
+        "tree": tree,
+        "file_path": path,
     }
     for rule in RULES:
         verdict = rule(func, **ctx)

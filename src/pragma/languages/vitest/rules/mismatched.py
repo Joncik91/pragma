@@ -26,6 +26,14 @@ _STUB_PHRASES: frozenset[str] = frozenset(
         "no-op",
         "noop",
         "placeholder",
+        # BUG-024: infrastructure/connectivity stub phrases
+        "not connected",
+        "offline",
+        "not configured",
+        "backend down",
+        "service unavailable",
+        "no api key",
+        "not initialized",
     }
 )
 
