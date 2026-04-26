@@ -5,6 +5,24 @@ All notable changes to Pragma are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.1] — 2026-04-26
+
+**The thesis-completing release.** v0.2.0 shipped `pragma start` as
+the API; v0.2.1 ships the Claude Code plugin that calls it. Now
+Pragma is genuinely invisible to the user — they type intent in
+plain English, Claude drives the gate.
+
+### Added
+
+- **REQ-045 / Claude Code plugin** — marketplace-installable via `/plugin install pragma@joncik91/pragma`. Ships under `plugin/` at the repo root with `.claude-plugin/marketplace.json` at the same level, per the Claude Code plugin convention.
+  - **SessionStart hook** (`plugin/hooks/session-start.sh`): reads `$CLAUDE_PROJECT_DIR/.pragma/state.json`, surfaces active slice + gate state to Claude. Silent on non-Pragma directories.
+  - **Skill** (`plugin/skills/pragma/SKILL.md`): concise rules teaching Claude the loop. On feature ask → `pragma start "<intent>"`. Never edit `pragma.yaml` directly. Drive the test-first cycle. Use `pragma narrative commit` for gate-conformant messages.
+  - **Plugin manifest** (`plugin/.claude-plugin/plugin.json`): name, version, author, license.
+
+### Methodology
+
+M02.S2 shipped through the full TDD gate (activate → 4 red tests → unlock → implement plugin files → 4 green tests → complete) without `--skip-tests`. Second feature in Pragma's history shipped this way; the pattern holds.
+
 ## [0.2.0] — 2026-04-26
 
 **Friction reduction line.** First minor version after the

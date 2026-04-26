@@ -1,0 +1,14 @@
+{
+  "name": "pragma-marketplace",
+  "owner": {
+    "name": "Joncik91"
+  },
+  "plugins": [
+    {
+      "name": "pragma",
+      "source": "./plugin",
+      "description": "Drive Pragma's test-first gate invisibly from Claude Code. SessionStart primes Claude with active slice + gate state; the skill teaches Claude to call `pragma start \"<intent>\"` on first feature ask and never edit pragma.yaml directly.",
+      "version": "0.2.0"
+    }
+  ]
+}

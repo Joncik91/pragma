@@ -1,0 +1,11 @@
+{
+  "name": "pragma",
+  "version": "0.2.0",
+  "description": "Senior engineer on rails for AI-driven development. Drives Pragma's manifest+gate from Claude Code so the user types intent in plain English and the gate handles the bookkeeping.",
+  "author": {
+    "name": "Pragma contributors"
+  },
+  "license": "Apache-2.0",
+  "homepage": "https://github.com/Joncik91/pragma",
+  "repository": "https://github.com/Joncik91/pragma"
+}

@@ -854,6 +854,30 @@ requirements:
     expected: reject
   milestone: M02
   slice: M02.S1
+- id: REQ-045
+  title: Claude Code plugin distributes Pragma invisibly
+  description: 'v0.2.0 thesis. The point of pragma start is that a coding agent calls it - not a human typing it at a terminal. REQ-045 ships a Claude Code plugin (marketplace-installable via `/plugin install pragma@joncik91/pragma`) that drives the gate from agent prompts. SessionStart reads .pragma/state.json and primes Claude with active slice + gate state. A skill teaches Claude the rules - call pragma start on first feature ask, never edit pragma.yaml directly, never bypass unlock. Hooks and skill ship under plugin/ at repo root with a .claude-plugin/marketplace.json pointing at it.'
+  touches:
+  - plugin/.claude-plugin/plugin.json
+  - plugin/hooks/hooks.json
+  - plugin/hooks/session-start.sh
+  - plugin/skills/pragma/SKILL.md
+  - .claude-plugin/marketplace.json
+  permutations:
+  - id: plugin_manifest_valid
+    description: plugin/.claude-plugin/plugin.json declares name pragma and a non-empty version
+    expected: success
+  - id: marketplace_manifest_present
+    description: .claude-plugin/marketplace.json at repo root references the plugin source
+    expected: success
+  - id: session_start_hook_emits_state
+    description: SessionStart hook script runs against a Pragma project and emits active-slice context
+    expected: success
+  - id: skill_md_present
+    description: plugin/skills/pragma/SKILL.md exists and instructs Claude to call pragma start
+    expected: success
+  milestone: M02
+  slice: M02.S2
 milestones:
 - id: M00
   title: Implicit brownfield milestone
@@ -1047,3 +1071,8 @@ milestones:
     description: 'Auto-detects greenfield vs brownfield, writes problem.md, plans, freezes, activates the only slice. Single command from intent string to gate=LOCKED.'
     requirements:
     - REQ-043
+  - id: M02.S2
+    title: Claude Code plugin (REQ-045)
+    description: 'The thesis-completing slice. Marketplace-installable plugin that drives the gate from Claude Code, so the user never types pragma commands directly. Hooks + skill ship under plugin/ at repo root.'
+    requirements:
+    - REQ-045

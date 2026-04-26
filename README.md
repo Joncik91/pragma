@@ -8,7 +8,7 @@ specification, a test-first gate, and a plain-English report of what
 actually ran — so you can ship code an AI wrote and know what you're
 shipping.
 
-- **Current version:** v0.2.0 (2026-04-26)
+- **Current version:** v0.2.1 (2026-04-26)
 - **License:** Apache-2.0
 - **Status:** Alpha. Python-only. Thesis works end-to-end on a fresh greenfield; dogfood is still finding bugs. See [`CHANGELOG.md`](CHANGELOG.md) for the release cadence plan and known issues.
 
@@ -43,6 +43,30 @@ Verify:
 pragma --help
 ```
 
+## Use Pragma in Claude Code (v0.2.1)
+
+Pragma ships as a Claude Code plugin. Once installed, the user types
+intent in plain English; Claude calls Pragma's commands behind the
+scenes. The user never types `pragma slice activate`.
+
+```text
+/plugin install pragma@joncik91/pragma
+```
+
+The plugin's SessionStart hook reads `.pragma/state.json`, primes
+Claude with the active slice and gate state, and an embedded skill
+teaches Claude the rules:
+
+- On first feature ask, call `pragma start "<intent>"`.
+- Never edit `pragma.yaml` directly — use `pragma spec
+  add-requirement` and `pragma freeze`.
+- Drive the gate loop: declare → red test → unlock → implement →
+  green test → complete → narrative commit.
+
+This is the intended way to use Pragma. The CLI commands below stay
+public so non-Claude-Code users (Cursor, plain terminal, CI) have the
+same surface — but the friction-reduction win lives in the plugin.
+
 ## One-command start (v0.2.0)
 
 ```shell
@@ -51,10 +75,8 @@ pragma start "User can log in with email and password"
 
 Auto-detects greenfield (empty dir) vs brownfield (existing code or
 git history), scaffolds the manifest + lockfile + hooks, plans the
-slice, and lands at `gate=LOCKED`. From here, write a failing test,
-`pragma unlock`, write code, `pragma slice complete`. The five
-ceremonial bootstrap commands are gone — the user types intent, the
-tool handles the bookkeeping.
+slice, and lands at `gate=LOCKED`. The Claude Code plugin calls this
+on the user's behalf; you can also call it directly.
 
 The two manual flows below remain valid for users who want fine
 control over schema or who are wiring an existing repo with multiple
