@@ -1,23 +1,23 @@
 #!/usr/bin/env bash
-# Pragma PostToolUse hook — final gate after Claude lands an edit.
+# Pragma PostToolUse hook — block when an edit introduces NEW gaming.
 #
-# Catches Edit/MultiEdit cases where PreToolUse couldn't see post-state
-# content. Hook contract: exit 0 allow, exit 2 block, other non-zero
-# error (proceeds). Silent when pragma isn't installed.
+# Catches Edit/MultiEdit cases. Blocks only when the edit added new
+# blocking verdicts; pre-existing gaming in the file is not the user's
+# problem right now. Hook contract: 0 allow, 2 block.
 
 set -uo pipefail
 
-PRAGMA_CMD=()
-if command -v pragma >/dev/null 2>&1 && pragma verify --help >/dev/null 2>&1; then
-    PRAGMA_CMD=(pragma)
-elif command -v python3 >/dev/null 2>&1 && python3 -m pragma verify --help >/dev/null 2>&1; then
-    PRAGMA_CMD=(python3 -m pragma)
-else
+# Detect a working pragma invocation; degrade silently if missing.
+if ! command -v python3 >/dev/null 2>&1; then
     exit 0
+fi
+if ! command -v pragma >/dev/null 2>&1 || ! pragma verify --help >/dev/null 2>&1; then
+    if ! python3 -m pragma verify --help >/dev/null 2>&1; then
+        exit 0
+    fi
 fi
 
 payload=$(cat)
-
 tool=$(printf '%s' "$payload" | python3 -c "import json,sys;print(json.load(sys.stdin).get('tool_name',''))" 2>/dev/null || true)
 case "$tool" in Edit|Write|MultiEdit) ;; *) exit 0 ;; esac
 
@@ -31,18 +31,5 @@ if [ ! -f "$path" ]; then
     exit 0
 fi
 
-if "${PRAGMA_CMD[@]}" verify tests "$path" >/dev/null 2>&1; then
-    exit 0
-fi
-
-human=$("${PRAGMA_CMD[@]}" verify tests "$path" --human 2>/dev/null || true)
-{
-    echo "Pragma rejected this test file: gamed assertions detected on disk."
-    echo "$human"
-    echo ""
-    echo "Edit the file again to fix the flagged assertions. Each test must:"
-    echo "  - Call the real production symbol (don't mock the function under test)."
-    echo "  - Assert on its actual return value (not 'assert True', not '== same constant')."
-    echo "  - Use 'with pytest.raises(...):' when the name says rejects/raises/refuses/denies."
-} >&2
-exit 2
+# On-disk file IS the candidate post-edit. Diff against git HEAD.
+exec python3 "${CLAUDE_PLUGIN_ROOT}/hooks/check_diff.py" "$path" "$path"

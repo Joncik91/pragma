@@ -1,6 +1,6 @@
 [project]
 name = "pragma"
-version = "1.0.1"
+version = "1.0.2"
 description = "Claude Code plugin that catches AI test-gaming."
 readme = "README.md"
 requires-python = ">=3.11"

@@ -5,6 +5,29 @@ All notable changes to Pragma are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.2] — 2026-04-26
+
+**Diff-mode hooks.** v1.0.1 hooks scanned the entire test file and
+blocked when *any* test had a blocking verdict — pre-existing or
+not. That meant any file with a historical gaming pattern was
+permanently locked from edits, even legitimate ones. Live test in
+the original session immediately surfaced this: editing a clean
+test in a file containing one historic mismatched-flagged test
+got blocked.
+
+### Fixed
+
+- **Hooks block only when an edit *introduces* new gaming.** Compare blocking-verdict test names before vs. after the edit (using `git show HEAD:<path>` for the previous version). Block only if the post-edit set contains a name that wasn't in the pre-edit set. Pre-existing gaming is the user's history — the hook's job is to catch the new stuff.
+- **Logic moved to `plugin/hooks/check_diff.py`** so PreToolUse and PostToolUse stay tiny shell wrappers. Helper handles the no-git-repo case (treats previous as empty), graceful pragma-missing degradation, and clean error reporting that names only the new gamed tests.
+
+### Verified
+
+Smoke-tested all four cases:
+- Clean file → gamed: BLOCKED ✓
+- Pre-existing gamed test left alone, real test edited: ALLOWED ✓
+- Pre-existing gamed test removed: ALLOWED ✓
+- No-git-repo + new gamed test: BLOCKED ✓
+
 ## [1.0.1] — 2026-04-26
 
 **Hook robustness.** v1.0.0 plugin hooks called bare `pragma verify
