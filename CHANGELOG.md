@@ -5,6 +5,25 @@ All notable changes to Pragma are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.1] — 2026-04-26
+
+**Three false-negatives surfaced in v2.0 blind-subagent smoke testing.** All three caught the same week v2.0 shipped, all three fixed in this patch.
+
+### Fixed
+
+- **BUG-016 — diff-mode hook false-blocks edits to files with pre-existing gaming.** `_get_old_source` wrote the prior version to `tempfile.NamedTemporaryFile(suffix=".py")`, which produced `/tmp/tmpXXXX.py`. That path doesn't satisfy `python.matches()` (no `test_` prefix, no `_test.py` suffix, no `tests/` segment) — same blind spot for `vitest.matches()`. The classifier returned `[]`, the old-blocking set was empty, and every blocking verdict in the new file was treated as new gaming. Any edit to a file with historic gamed tests false-blocked. Fix: write the old source under its **original filename** in a fresh tempdir so both language matchers recognize it.
+- **BUG-014 — `python.monkeypatched` blind to lazy `import X` + attribute access.** `infer_target` only walked `from X import Y`. The gamed pattern from blind-subagent testing was `import tasks` (plain `ast.Import`) inside a try/except, paired with `monkeypatch.setattr(tasks, "schedule_task", _fake)`. With no `(target_module, target_symbol)` pair, the rule short-circuited and pragma classified the file as `python.verified`. Fix: as a fallback, collect plain-import module names (skipping stdlib + test-only) and pair each with attribute access in the body — `<root>.<attr>(...)` and `monkeypatch.setattr(<root>, "<attr>", …)`.
+- **BUG-015 — `vitest.mismatched` lets stub-error and bare-`Error` `.toThrow(...)` pass.** The rule treated any `.toThrow(...)` as a real assertion. `expect(() => login(...)).toThrow("not implemented yet")` matches the production stub's `throw new Error("not implemented yet")` rather than asserting validation; same with `.toThrow(Error)` (matches anything). Both passed. Fix: when the test name implies an error and the body's `.toThrow(...)` arg is either a string literal containing a stub phrase (`not implemented`, `todo`, `stub`, `fixme`, `tbd`, `unimplemented`, `placeholder`, `no-op`, `noop`) or the bare `Error` identifier, the call doesn't count as a real assertion and the rule fires. Genuine validation messages and custom error classes stay clean. Same logic applies to `.rejects.toThrow*` chains.
+
+### Added
+
+- Two new fixtures exercising the fixed patterns end-to-end: `tests/fixtures/blocking/gamed_lazy_import_monkeypatched.py` and `tests/fixtures/blocking/vitest_mismatched_stub_error.test.ts`. Both wired into `tests/test_cli.py` parametrize and the CI smoke loops.
+- `tests/test_hook_diff.py` — first end-to-end regression suite for the diff-mode hook against a fabricated git repo.
+
+### Internal
+
+- Test count: 137 → 148.
+
 ## [2.0.0] — 2026-04-26
 
 **Multi-language support — Vitest joins Python.** v2.0 refactors

@@ -151,14 +151,20 @@ def main(argv: list[str]) -> int:
     if old_src is not None:
         import tempfile
 
-        with tempfile.NamedTemporaryFile("w", suffix=".py", delete=False) as f:
-            f.write(old_src)
-            old_tmp = Path(f.name)
+        # Preserve the original filename so the language matchers
+        # (python.matches, vitest.matches) recognize it as a test file.
+        # A bare /tmp/tmpXXXX.py wouldn't match python's `test_*` /
+        # `*_test.py` / contains-`tests/` rules and the file would
+        # silently classify as "no language" → empty blocking set.
+        old_tmp_dir = Path(tempfile.mkdtemp(prefix="pragma-diff-tests-"))
+        old_tmp = old_tmp_dir / on_disk.name
+        old_tmp.write_text(old_src, encoding="utf-8")
         try:
             old_payload = _run_pragma(old_tmp)
             old_blocking = _blocking_names(old_payload)
         finally:
             old_tmp.unlink(missing_ok=True)
+            old_tmp_dir.rmdir()
 
     new_only = new_blocking - old_blocking
     if not new_only:

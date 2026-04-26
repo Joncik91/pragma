@@ -94,13 +94,21 @@ def infer_target(source: str, test_name: str) -> tuple[str | None, str | None]:
     if func is None:
         return None, None
     imports = _collect_module_level_imports(tree) + _collect_imports_in(func)
-    if not imports:
-        return None, None
     called = _called_names(func)
-    # Walk imports in *reverse* so the most-recently-declared one wins.
+    # Walk `from`-style imports in reverse so the most-recently-declared wins.
     for module, symbol in reversed(imports):
         if symbol in called:
             return module, symbol
+    # Plain `import X` doesn't give us a (module, symbol) pair on its own.
+    # Pair it with attribute access on the same name in the body:
+    # `import tasks` + `tasks.schedule_task(...)` → ("tasks", "schedule_task").
+    # Same shape covers `monkeypatch.setattr(tasks, "schedule_task", ...)`.
+    plain = _collect_plain_module_imports(tree, func)
+    if plain:
+        for module in reversed(plain):
+            symbol = _attr_used_on(func, module)
+            if symbol is not None:
+                return module, symbol
     return None, None
 
 
@@ -140,6 +148,85 @@ def _is_excluded_module(module: str) -> bool:
     if head in _STDLIB_PREFIXES or head in _TEST_ONLY_PREFIXES:
         return True
     return module.startswith("tests") or head.startswith("test_")
+
+
+def _collect_plain_module_imports(tree: ast.AST, func: ast.FunctionDef) -> list[str]:
+    """Return module names from plain `import X` / `import X.Y` (not `from`).
+
+    Skips stdlib and test-only modules so we don't claim those are the
+    production target. Order is module-level-first, then in-function,
+    mirroring `_collect_module_level_imports + _collect_imports_in`.
+    """
+    out: list[str] = []
+    for node in ast.iter_child_nodes(tree):
+        if isinstance(node, ast.Import):
+            out.extend(_plain_modules_from(node))
+    for node in ast.walk(func):
+        if isinstance(node, ast.Import):
+            out.extend(_plain_modules_from(node))
+    return out
+
+
+def _plain_modules_from(node: ast.Import) -> list[str]:
+    return [alias.name for alias in node.names if not _is_excluded_module(alias.name)]
+
+
+def _attr_used_on(func: ast.FunctionDef, module: str) -> str | None:
+    """Return the attribute name when the test body uses `<module>.<attr>(...)`
+    or `setattr(<module>, "<attr>", ...)`. Picks the first match seen.
+
+    The bare module name (last segment of dotted path) is what appears
+    as the receiver — `import auth.login` is bound as `auth` in the
+    namespace, but real code does `auth.login.X`. Match the dotted root.
+    """
+    root = module.split(".", 1)[0]
+    for node in ast.walk(func):
+        if not isinstance(node, ast.Call):
+            continue
+        # Attribute call: <root>.<attr>(...)
+        if isinstance(node.func, ast.Attribute):
+            sym = _attr_chain_symbol(node.func, module, root)
+            if sym is not None:
+                return sym
+        # setattr-style: monkeypatch.setattr(<root>, "<attr>", ...)
+        if isinstance(node.func, ast.Attribute) and node.func.attr == "setattr":
+            sym = _setattr_symbol(node, root)
+            if sym is not None:
+                return sym
+    return None
+
+
+def _attr_chain_symbol(attr: ast.Attribute, module: str, root: str) -> str | None:
+    """For `<root>.<x>.<y>(...)`, walk the chain and pick the attr that lives
+    immediately under the module. Most calls are simple `<root>.<x>` so we
+    return `<x>`; for `import a.b` + `a.b.foo(...)`, return `foo`."""
+    chain: list[str] = []
+    node: ast.expr = attr
+    while isinstance(node, ast.Attribute):
+        chain.insert(0, node.attr)
+        node = node.value
+    if not isinstance(node, ast.Name) or node.id != root:
+        return None
+    if module == root:
+        return chain[0] if chain else None
+    # `import a.b`, body uses `a.b.foo` → drop the dotted-suffix prefix.
+    suffix = module.split(".")[1:]
+    if chain[: len(suffix)] != suffix:
+        return None
+    rest = chain[len(suffix) :]
+    return rest[0] if rest else None
+
+
+def _setattr_symbol(node: ast.Call, root: str) -> str | None:
+    """For `<owner>.setattr(<root>, "<attr>", <stub>)`, return `<attr>`."""
+    if len(node.args) < 2:
+        return None
+    first, second = node.args[0], node.args[1]
+    if not (isinstance(first, ast.Name) and first.id == root):
+        return None
+    if isinstance(second, ast.Constant) and isinstance(second.value, str):
+        return second.value
+    return None
 
 
 def _called_names(func: ast.FunctionDef) -> set[str]:

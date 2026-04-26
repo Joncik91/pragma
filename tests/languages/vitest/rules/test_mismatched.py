@@ -77,3 +77,68 @@ it("rejects_bad_input", async () => {
     f.write_text(src)
     verdicts = classify_file(f)
     assert not any(v.kind == "vitest.mismatched" for v in verdicts)
+
+
+# BUG-015: .toThrow("not implemented yet") satisfies the toThrow check, but
+# the message matches the production stub's error rather than a real
+# validation rejection. The test passes because the implementation isn't
+# done — exactly the SWE-bench gaming pattern pragma exists to catch.
+
+
+def test_mismatched_fires_when_toThrow_matches_stub_error_message(tmp_path: Path) -> None:
+    src = """\
+import { expect, it } from "vitest";
+it("throws_on_weak_password", () => {
+    expect(() => login("u@e.com", "x")).toThrow("not implemented yet");
+});
+"""
+    f = tmp_path / "x.test.ts"
+    f.write_text(src)
+    verdicts = classify_file(f)
+    assert any(v.kind == "vitest.mismatched" for v in verdicts), f"got {[v.kind for v in verdicts]}"
+
+
+def test_mismatched_fires_when_toThrow_takes_bare_Error(tmp_path: Path) -> None:
+    # `.toThrow(Error)` matches any Error subclass, including the unimplemented
+    # stub's `throw new Error(...)`. Too generic to count as a real assertion.
+    src = """\
+import { expect, it } from "vitest";
+it("throws_on_bad_input", () => {
+    expect(() => doThing("bad")).toThrow(Error);
+});
+"""
+    f = tmp_path / "x.test.ts"
+    f.write_text(src)
+    verdicts = classify_file(f)
+    assert any(v.kind == "vitest.mismatched" for v in verdicts), f"got {[v.kind for v in verdicts]}"
+
+
+def test_mismatched_clear_when_toThrow_uses_specific_validation_message(
+    tmp_path: Path,
+) -> None:
+    # Real validation messages stay clean — `.toThrow("password too weak")`
+    # is a meaningful contract assertion.
+    src = """\
+import { expect, it } from "vitest";
+it("throws_on_weak_password", () => {
+    expect(() => login("u@e.com", "x")).toThrow("password too weak");
+});
+"""
+    f = tmp_path / "x.test.ts"
+    f.write_text(src)
+    verdicts = classify_file(f)
+    assert not any(v.kind == "vitest.mismatched" for v in verdicts)
+
+
+def test_mismatched_clear_when_toThrow_uses_custom_error_class(tmp_path: Path) -> None:
+    # `.toThrow(WeakPasswordError)` is specific (not bare `Error`) — clean.
+    src = """\
+import { expect, it } from "vitest";
+it("throws_on_weak_password", () => {
+    expect(() => login("u@e.com", "x")).toThrow(WeakPasswordError);
+});
+"""
+    f = tmp_path / "x.test.ts"
+    f.write_text(src)
+    verdicts = classify_file(f)
+    assert not any(v.kind == "vitest.mismatched" for v in verdicts)

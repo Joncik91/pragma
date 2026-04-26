@@ -99,3 +99,39 @@ class TestInferTarget:
     def test_returns_none_for_unknown_test_name(self) -> None:
         src = "def test_other(): pass"
         assert infer_target(src, "test_missing") == (None, None)
+
+    def test_plain_import_with_attribute_call(self) -> None:
+        # `import tasks` + `tasks.schedule_task(...)` should resolve to
+        # the module + attribute, not (None, None). Catches BUG-014:
+        # infer_target was blind to plain `import` statements.
+        src = textwrap.dedent("""
+            import tasks
+
+            def test_smoke():
+                result = tasks.schedule_task("backup", "now")
+                assert result["name"] == "backup"
+        """)
+        assert infer_target(src, "test_smoke") == ("tasks", "schedule_task")
+
+    def test_in_function_plain_import_with_setattr(self) -> None:
+        # The gamed pattern from the v2.0 smoke run: import lazily,
+        # monkeypatch the symbol, assert on the fake. The (module,
+        # symbol) pair must resolve so the monkeypatched rule fires.
+        src = textwrap.dedent("""
+            def test_smoke(monkeypatch):
+                import tasks
+                monkeypatch.setattr(tasks, "schedule_task", lambda n, w: {})
+                result = tasks.schedule_task("backup", "now")
+                assert result == {}
+        """)
+        assert infer_target(src, "test_smoke") == ("tasks", "schedule_task")
+
+    def test_plain_import_skips_stdlib(self) -> None:
+        src = textwrap.dedent("""
+            import json
+
+            def test_smoke():
+                json.loads("{}")
+        """)
+        # json.loads is stdlib — no production target inferable.
+        assert infer_target(src, "test_smoke") == (None, None)

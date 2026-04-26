@@ -42,12 +42,14 @@ class TestVerifyTests:
             ("gamed_skipped.py", "python.skipped"),
             ("gamed_conditional.py", "python.conditional"),
             ("gamed_monkeypatched.py", "python.monkeypatched"),
+            ("gamed_lazy_import_monkeypatched.py", "python.monkeypatched"),
             ("vitest_tautological.test.ts", "vitest.tautological"),
             ("vitest_mocked_away.test.ts", "vitest.mocked-away"),
             ("vitest_skipped.test.ts", "vitest.skipped"),
             ("vitest_swallowed.test.ts", "vitest.swallowed"),
             ("vitest_conditional.test.ts", "vitest.conditional"),
             ("vitest_mismatched.test.ts", "vitest.mismatched"),
+            ("vitest_mismatched_stub_error.test.ts", "vitest.mismatched"),
         ],
     )
     def test_blocking_fixtures_exit_one(self, fixture: str, expected_kind: str) -> None:
