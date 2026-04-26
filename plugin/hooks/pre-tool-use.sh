@@ -1,16 +1,29 @@
 #!/usr/bin/env bash
 # Pragma PreToolUse hook — early gate before Claude lands an edit.
 #
-# Reads the tool call payload from stdin. If Claude is writing/editing a
-# test file with content that contains gamed assertions, refuse the
-# tool call and emit a message Claude can read so it rewrites instead.
-#
 # Hook contract (Claude Code):
-#   - exit 0: allow tool call, no output to user.
-#   - exit 2: BLOCK tool call. stderr is shown to Claude (will be re-prompted).
-#   - other non-zero: error in the hook itself; tool call proceeds.
+#   exit 0 → allow tool call.
+#   exit 2 → BLOCK tool call; stderr is shown to Claude so it can rewrite.
+#   other non-zero → hook errored; tool call proceeds (graceful degradation).
+#
+# Hook is silent when pragma isn't on PATH so the user sees no spurious
+# blocks before they've installed `pipx install pragma`.
 
 set -uo pipefail
+
+# Resolve a working `pragma` invocation. Prefer the binary on PATH; fall
+# back to `python3 -m pragma`. Probe each by running `verify --help`, not
+# by import-checking — a stale `src/pragma/` on sys.path can satisfy
+# `import pragma` without supplying a working CLI.
+PRAGMA_CMD=()
+if command -v pragma >/dev/null 2>&1 && pragma verify --help >/dev/null 2>&1; then
+    PRAGMA_CMD=(pragma)
+elif command -v python3 >/dev/null 2>&1 && python3 -m pragma verify --help >/dev/null 2>&1; then
+    PRAGMA_CMD=(python3 -m pragma)
+else
+    # Pragma not installed (or not callable) in this environment — degrade silently.
+    exit 0
+fi
 
 payload=$(cat)
 
@@ -23,12 +36,9 @@ case "$path" in
     *) exit 0 ;;
 esac
 
-# Extract the post-edit content from the tool input. For Write: tool_input.content.
-# For Edit: we approximate by applying tool_input.new_string into the existing file
-# in memory — but the simpler-and-still-correct path is to wait for PostToolUse to
-# scan the on-disk file. PreToolUse here only catches `Write` (full-file replacements)
-# where we have the candidate content directly; for Edit we exit 0 and rely on
-# PostToolUse.
+# PreToolUse can only see candidate content for Write (full-file). For
+# Edit/MultiEdit we exit 0 and rely on PostToolUse scanning the on-disk
+# result.
 content=$(printf '%s' "$payload" | python3 -c "
 import json, sys
 d = json.load(sys.stdin)
@@ -41,17 +51,15 @@ if [ -z "$content" ]; then
     exit 0
 fi
 
-# Run the classifier against a tempfile containing the candidate content.
 tmp=$(mktemp --suffix=.py)
 trap 'rm -f "$tmp"' EXIT
 printf '%s' "$content" > "$tmp"
 
-if pragma verify tests "$tmp" >/dev/null 2>&1; then
+if "${PRAGMA_CMD[@]}" verify tests "$tmp" >/dev/null 2>&1; then
     exit 0
 fi
 
-# Block. Build a friendly message for Claude.
-human=$(pragma verify tests "$tmp" --human 2>/dev/null || true)
+human=$("${PRAGMA_CMD[@]}" verify tests "$tmp" --human 2>/dev/null || true)
 {
     echo "Pragma rejected this test file: gamed assertions detected."
     echo "$human" | sed "s|$tmp|$path|g"

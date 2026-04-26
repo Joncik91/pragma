@@ -1,12 +1,20 @@
 #!/usr/bin/env bash
 # Pragma PostToolUse hook — final gate after Claude lands an edit.
 #
-# After Claude writes or edits a test file, scan the on-disk file. If the
-# classifier finds gamed tests, block and tell Claude what to fix. The
-# block here forces Claude to redo the edit, similar to PreToolUse but
-# catches the Edit case where we don't have post-state content in stdin.
+# Catches Edit/MultiEdit cases where PreToolUse couldn't see post-state
+# content. Hook contract: exit 0 allow, exit 2 block, other non-zero
+# error (proceeds). Silent when pragma isn't installed.
 
 set -uo pipefail
+
+PRAGMA_CMD=()
+if command -v pragma >/dev/null 2>&1 && pragma verify --help >/dev/null 2>&1; then
+    PRAGMA_CMD=(pragma)
+elif command -v python3 >/dev/null 2>&1 && python3 -m pragma verify --help >/dev/null 2>&1; then
+    PRAGMA_CMD=(python3 -m pragma)
+else
+    exit 0
+fi
 
 payload=$(cat)
 
@@ -23,11 +31,11 @@ if [ ! -f "$path" ]; then
     exit 0
 fi
 
-if pragma verify tests "$path" >/dev/null 2>&1; then
+if "${PRAGMA_CMD[@]}" verify tests "$path" >/dev/null 2>&1; then
     exit 0
 fi
 
-human=$(pragma verify tests "$path" --human 2>/dev/null || true)
+human=$("${PRAGMA_CMD[@]}" verify tests "$path" --human 2>/dev/null || true)
 {
     echo "Pragma rejected this test file: gamed assertions detected on disk."
     echo "$human"
