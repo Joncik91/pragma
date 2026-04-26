@@ -30,14 +30,23 @@ jobs:
       - name: Tests
         run: python -m pytest tests/ -q
 
-      - name: Smoke — gamed fixtures rejected, verified fixture passes
+      - name: Smoke — blocking fixtures rejected
         run: |
-          # Exit-1 expected: any of the gamed fixtures.
-          for f in tests/fixtures/gamed_*.py; do
+          for f in tests/fixtures/blocking/gamed_*.py; do
             if python -m pragma verify tests "$f" >/dev/null 2>&1; then
               echo "ERROR: $f should have been rejected but was accepted"
               exit 1
             fi
           done
-          # Exit-0 expected: the verified fixture.
-          python -m pragma verify tests tests/fixtures/verified_ok.py
+
+      - name: Smoke — warning fixtures pass but surface verdict
+        run: |
+          for f in tests/fixtures/warning/gamed_*.py; do
+            python -m pragma verify tests "$f" || {
+              echo "ERROR: $f is warn-only and should not have blocked"
+              exit 1
+            }
+          done
+
+      - name: Smoke — verified fixture passes
+        run: python -m pragma verify tests tests/fixtures/verified_ok.py

@@ -26,7 +26,15 @@ import subprocess
 import sys
 from pathlib import Path
 
-_BLOCKING = {"tautological", "mocked-away", "mismatched"}
+_BLOCKING = {
+    "tautological",
+    "mocked-away",
+    "monkeypatched",
+    "swallowed",
+    "skipped",
+    "conditional",
+    "mismatched",
+}
 
 
 def _run_pragma(file_path: Path) -> dict[str, object]:

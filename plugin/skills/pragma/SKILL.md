@@ -5,17 +5,25 @@ description: Pragma rejects gamed tests on Edit/Write of *.py files in tests/ or
 
 # Pragma — anti-gaming rules for tests
 
-Pragma is watching every test file you Edit/Write. It will block the
-tool call when it sees:
+Pragma is watching every test file you Edit/Write. It will **block** the
+tool call when it sees any of these patterns:
 
 - **tautological asserts** — `assert True`, `assert 1 == 1`, `assert x == x`.
-- **mock-the-target** — `mock.patch("auth.login.login")` *inside* a test that imports and claims to test `auth.login.login`. Mock the dependencies, not the symbol under test.
-- **name/body mismatch** — a test named `test_*_rejects_*`, `_raises_*`, `_refuses_*`, or `_denies_*` must use `with pytest.raises(...):` (or an `except` block). Asserting on a return value contradicts the name.
+- **mock-the-target** — `mock.patch("auth.login.login")` inside a test of `auth.login.login`. Mock dependencies, not the symbol under test.
+- **monkeypatched-target** — `monkeypatch.setattr` whose target is the function under test. Same problem as `mock.patch` on the SUT.
+- **swallowed** — `try: target_call(); except: pass`. The exception was the test signal; swallowing it deletes the verification.
+- **skipped** — `pytest.skip(...)` or `pytest.xfail` smuggled at the top of a test body to dodge a failing assertion.
+- **name/body mismatch** — a test named `test_*_rejects_*`, `_raises_*`, `_refuses_*`, or `_denies_*` must use `with pytest.raises(...):` (or an `except` block).
+- **conditional** — every assertion lives inside an `if`/`for`/`while` branch that the test inputs never enter. Assertions that may not run can't catch bugs.
+
+It will **warn** (not block) on:
+
+- **empty_body** — test body has no assertion and no `pytest.raises`. Placeholder tests are fine during refactors but should be filled in.
+- **parametrize_thin** — `@pytest.mark.parametrize` with 0 or 1 case values claiming multi-case breadth. Use real cases or drop the decorator.
+- **weak** — `assert x is not None` / `len(x) > 0` when the spec implies a specific return value.
 
 To pass: import the production symbol, call it with realistic inputs,
-assert on the actual return value (or the raised exception type). If
-you're tempted to mock the function under test or write `assert True`
-to make a test pass — stop and rewrite the test to verify behaviour.
-
-`weak` verdicts (`assert x is not None` when an exact value was
-expected) are warnings, not blocks. Tighten when the spec is clear.
+assert on the actual return value (or the raised exception type via
+`pytest.raises`). If you're tempted to mock the function under test,
+write `assert True`, or skip the assertion — stop and rewrite to
+verify real behaviour.

@@ -11,6 +11,8 @@ import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 FIXTURE_DIR = REPO_ROOT / "tests" / "fixtures"
+BLOCKING_DIR = FIXTURE_DIR / "blocking"
+WARNING_DIR = FIXTURE_DIR / "warning"
 
 
 def _run(*args: str, cwd: Path | None = None) -> subprocess.CompletedProcess[str]:
@@ -36,14 +38,34 @@ class TestVerifyTests:
             ("gamed_tautology.py", "tautological"),
             ("gamed_mocked_away.py", "mocked-away"),
             ("gamed_mismatched.py", "mismatched"),
+            ("gamed_swallowed.py", "swallowed"),
+            ("gamed_skipped.py", "skipped"),
+            ("gamed_conditional.py", "conditional"),
+            ("gamed_monkeypatched.py", "monkeypatched"),
         ],
     )
     def test_blocking_fixtures_exit_one(self, fixture: str, expected_kind: str) -> None:
-        result = _run("verify", "tests", str(FIXTURE_DIR / fixture))
+        result = _run("verify", "tests", str(BLOCKING_DIR / fixture))
         assert result.returncode == 1, f"expected exit 1; got {result.returncode}\n{result.stdout}"
         payload = json.loads(result.stdout)
         assert payload["blocking"] is True
-        verdicts = payload["results"][str(FIXTURE_DIR / fixture)]
+        verdicts = payload["results"][str(BLOCKING_DIR / fixture)]
+        kinds = [v["kind"] for v in verdicts]
+        assert expected_kind in kinds, f"expected {expected_kind} in {kinds}"
+
+    @pytest.mark.parametrize(
+        "fixture, expected_kind",
+        [
+            ("gamed_parametrize_thin.py", "parametrize_thin"),
+            ("gamed_empty_body.py", "empty_body"),
+        ],
+    )
+    def test_warning_fixtures_exit_zero(self, fixture: str, expected_kind: str) -> None:
+        result = _run("verify", "tests", str(WARNING_DIR / fixture))
+        assert result.returncode == 0, f"expected exit 0; got {result.returncode}\n{result.stdout}"
+        payload = json.loads(result.stdout)
+        assert payload["blocking"] is False
+        verdicts = payload["results"][str(WARNING_DIR / fixture)]
         kinds = [v["kind"] for v in verdicts]
         assert expected_kind in kinds, f"expected {expected_kind} in {kinds}"
 
@@ -56,7 +78,7 @@ class TestVerifyTests:
         assert verdicts[0]["kind"] == "verified"
 
     def test_human_output_is_one_line_per_test(self) -> None:
-        result = _run("verify", "tests", str(FIXTURE_DIR / "gamed_tautology.py"), "--human")
+        result = _run("verify", "tests", str(BLOCKING_DIR / "gamed_tautology.py"), "--human")
         assert "test_login_happy_path" in result.stdout
         assert "tautological" in result.stdout
 
@@ -65,7 +87,7 @@ class TestVerifyTests:
             "verify",
             "tests",
             str(FIXTURE_DIR / "verified_ok.py"),
-            str(FIXTURE_DIR / "gamed_tautology.py"),
+            str(BLOCKING_DIR / "gamed_tautology.py"),
         )
         assert result.returncode == 1
         payload = json.loads(result.stdout)

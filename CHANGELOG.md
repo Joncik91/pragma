@@ -5,6 +5,36 @@ All notable changes to Pragma are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] — 2026-04-26
+
+**Six new gamed-test detectors.** v1.0.x shipped five verdicts. A
+research brief grounded in Bavota's test-smell taxonomy and METR /
+SWE-bench agent-eval reports identified six more high-evidence
+patterns. v1.1.0 ships them all in a single release. Verdict surface
+grows from 5 to 11.
+
+### Added (blocking)
+
+- **`monkeypatched`** — `monkeypatch.setattr` targeting the production module/symbol. Sibling of `mocked-away`. Cited: Spadini et al., *"Mock Objects for Testing"* (ICSME 2017) — mocking the SUT correlates with low fault detection.
+- **`swallowed`** — `try: target_call(); except: pass` swallows the call under test. Cited: Bavota's Exception Handling test smell + ruff `S110`. Conservative: only fires when no `assert` exists outside the swallowing try.
+- **`skipped`** — `pytest.skip(...)` / `pytest.xfail` smuggled at the top of a test body. Cited: METR / SWE-bench agent transcripts where models add `skip` to dodge failing tests.
+- **`conditional`** — every assertion lives inside an `if` / `for` / `while` branch the inputs never enter. Cited: Bavota's Conditional Test Logic; van Deursen *"Refactoring Test Code"* (XP 2001). Conservative: requires *every* assertion to be guarded.
+
+### Added (warning, not blocking)
+
+- **`empty_body`** — test body has no assertion and no `pytest.raises`. Cited: Bavota's Assertion Roulette / Empty Test smell. Warn-only because real codebases have placeholder tests during incremental development.
+- **`parametrize_thin`** — `@pytest.mark.parametrize` with 0 or 1 case values. No prior literature; speculative but cheap to detect.
+
+### Internal
+
+- Test fixtures moved into `tests/fixtures/blocking/` and `tests/fixtures/warning/` subdirs to make the CI smoke step's expectations explicit.
+- `_BLOCKING_KINDS` set extended in both `verify.py` and `plugin/hooks/check_diff.py` to keep verdict semantics in sync between the CLI and the hook.
+- Plugin SKILL.md lists all 11 verdicts so Claude knows what to avoid.
+
+### Reuse decisions
+
+Per `decisions/never-reinvent.md` (vault): an OSS survey was run before writing pattern code. Ruff covers `S110` / `BLE001` / `PIE790`, but bringing it in as a runtime dep doubled the install tree for ~15 lines of detection — kept ruff as a dev-only dep, wrote the bare-except detector natively. PyNose's Kotlin code was a candidate to port but the patterns are simple enough fresh; cross-language port wasn't worth the attribution overhead.
+
 ## [1.0.2] — 2026-04-26
 
 **Diff-mode hooks.** v1.0.1 hooks scanned the entire test file and

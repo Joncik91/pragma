@@ -8,7 +8,17 @@ from pathlib import Path
 from pragma.inference import infer_expected, infer_target
 from pragma.test_gaming import Verdict, classify_test
 
-_BLOCKING_KINDS: frozenset[str] = frozenset({"tautological", "mocked-away", "mismatched"})
+_BLOCKING_KINDS: frozenset[str] = frozenset(
+    {
+        "tautological",
+        "mocked-away",
+        "monkeypatched",
+        "swallowed",
+        "skipped",
+        "conditional",
+        "mismatched",
+    }
+)
 
 
 def verify_file(path: Path) -> list[Verdict]:

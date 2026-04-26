@@ -134,3 +134,114 @@ def test_unknown_test_name_is_mismatched() -> None:
     v = classify_test("def test_other(): pass", test_name="test_missing", expected="success")
     assert v.kind == "mismatched"
     assert "no function" in v.evidence
+
+
+# v1.1.0 detectors --------------------------------------------------------
+
+
+def test_try_except_pass_around_target_call_is_swallowed() -> None:
+    src = textwrap.dedent("""
+        from auth.login import login
+
+        def test_login_happy_path():
+            try:
+                login("u@e.com", "weak")
+            except Exception:
+                pass
+    """)
+    v = classify_test(
+        src,
+        test_name="test_login_happy_path",
+        expected="success",
+        target_module="auth.login",
+        target_symbol="login",
+    )
+    assert v.kind == "swallowed"
+    assert "swallows" in v.evidence
+
+
+def test_pytest_skip_at_top_of_body_is_skipped() -> None:
+    src = textwrap.dedent("""
+        import pytest
+        from auth.login import login
+
+        def test_login_happy_path():
+            pytest.skip("known issue")
+            assert login("u@e.com", "Strong-Password-1") == "JWT"
+    """)
+    v = classify_test(
+        src,
+        test_name="test_login_happy_path",
+        expected="success",
+        target_module="auth.login",
+        target_symbol="login",
+    )
+    assert v.kind == "skipped"
+
+
+def test_assertions_only_inside_if_branch_is_conditional() -> None:
+    src = textwrap.dedent("""
+        from auth.login import login
+
+        def test_login_happy_path():
+            result = login("u@e.com", "Strong-Password-1")
+            enable_strict = False
+            if enable_strict:
+                assert result == "JWT"
+    """)
+    v = classify_test(
+        src,
+        test_name="test_login_happy_path",
+        expected="success",
+        target_module="auth.login",
+        target_symbol="login",
+    )
+    assert v.kind == "conditional"
+
+
+def test_monkeypatch_setattr_on_target_is_monkeypatched() -> None:
+    src = textwrap.dedent("""
+        from auth.login import login
+
+        def test_login_happy_path(monkeypatch):
+            monkeypatch.setattr("auth.login.login", lambda *a, **k: "JWT")
+            assert login("u", "p") == "JWT"
+    """)
+    v = classify_test(
+        src,
+        test_name="test_login_happy_path",
+        expected="success",
+        target_module="auth.login",
+        target_symbol="login",
+    )
+    assert v.kind == "monkeypatched"
+
+
+def test_parametrize_with_one_case_is_parametrize_thin() -> None:
+    src = textwrap.dedent("""
+        import pytest
+        from auth.login import login
+
+        @pytest.mark.parametrize("password", ["Strong-Password-1"])
+        def test_login_with_passwords(password):
+            assert login("u@e.com", password) == "JWT"
+    """)
+    v = classify_test(
+        src,
+        test_name="test_login_with_passwords",
+        expected="success",
+        target_module="auth.login",
+        target_symbol="login",
+    )
+    assert v.kind == "parametrize_thin"
+    assert "N=1" in v.evidence
+
+
+def test_test_body_with_no_assertions_is_empty_body() -> None:
+    src = textwrap.dedent("""
+        def test_login_happy_path():
+            \"\"\"TODO: write the real test.\"\"\"
+            pass
+    """)
+    v = classify_test(src, test_name="test_login_happy_path", expected="success")
+    assert v.kind == "empty_body"
