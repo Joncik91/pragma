@@ -30,5 +30,14 @@ jobs:
       - name: Tests
         run: python -m pytest tests/ -q
 
-      - name: Dogfood
-        run: python -m pragma verify tests tests/test_inference.py tests/test_classifier.py tests/test_cli.py
+      - name: Smoke — gamed fixtures rejected, verified fixture passes
+        run: |
+          # Exit-1 expected: any of the gamed fixtures.
+          for f in tests/fixtures/gamed_*.py; do
+            if python -m pragma verify tests "$f" >/dev/null 2>&1; then
+              echo "ERROR: $f should have been rejected but was accepted"
+              exit 1
+            fi
+          done
+          # Exit-0 expected: the verified fixture.
+          python -m pragma verify tests tests/fixtures/verified_ok.py
