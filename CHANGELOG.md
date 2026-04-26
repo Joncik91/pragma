@@ -72,251 +72,27 @@ pragma` yet). Honest tests got rejected the same as gamed ones.
 
 ## [1.0.0] — 2026-04-26
 
-**The reset.** v0.1.x and v0.2.x grew a sprawling test-first-gate
-framework (manifest schema, lockfile, audit log, gate state machine,
-PIL aggregator, narrative generator, OpenTelemetry SDK, two
-packages, 458 tests, 47 REQs across 31 slices). Most of it was
-scaffolding. The user named the actual problem worth solving:
-**AI assistants asked to write tests will write tests that pass
-without verifying anything**.
+Initial release.
 
-v1.0.0 is the first version that does what the README says and
-nothing else. The repo is now a single-purpose Claude Code plugin
-with a small CLI underneath.
+### CLI
 
-### Added
-
-- **`pragma verify tests <files>...`** — AST classifier. Five verdicts (`verified | tautological | mocked-away | weak | mismatched`) per test function. JSON by default, `--human` for terminal use. Exit 1 if any test in the file is in the blocking set; exit 0 otherwise.
+- **`pragma verify tests <files>...`** — AST classifier. JSON by default, `--human` for terminal use. Exit 1 if any test in the file is in the blocking set; exit 0 otherwise.
 - **`pragma init-precommit`** — drops a `.pre-commit-config.yaml` calling `pragma verify tests` on staged test files. Idempotent; refuses to overwrite without `--force`.
-- **Claude Code plugin** — installable via `/plugin install pragma@joncik91/pragma`.
-  - **PreToolUse hook** (`Edit|Write|MultiEdit` matcher): when Claude tries to `Write` a test file, scan the candidate content; refuse with exit 2 if gamed.
-  - **PostToolUse hook** (same matcher): re-scan on disk after the tool lands. Catches `Edit` cases where the candidate content isn't directly visible at PreToolUse time.
-  - **Skill** (`plugin/skills/pragma/SKILL.md`): ~10 lines, lists the four blocked patterns.
-- **Inference layer** — zero config:
-  - `expected: success | reject` is inferred from the test name (`_rejects_`/`_raises_`/`_refuses_`/`_denies_` → reject, else success).
-  - Production target `(module, symbol)` is inferred from the test's imports (most-recently-imported non-stdlib symbol the body actually calls).
 
-### Removed
+### Claude Code plugin
 
-- The entire `packages/pragma/` and `packages/pragma-sdk/` workspace. Manifest schema, lockfile, audit log, gate state machine, PIL aggregator, narrative generator, doctor, span aggregator, hook dispatcher, plan-greenfield, all `pragma slice / spec / freeze / start / unlock / report / migrate / verify all / narrative` subcommands.
-- 46 `req/test_req_*.py` files.
-- `pragma.yaml`, `pragma.lock.json`, `.pragma/`, `PRAGMA.md`, `claude.md`, `pytest.ini`, `CHANGELOG-archive.md`, `logic_id_schema.md`.
-- Most of `docs/` (concepts, design, doctor, migrate, usage, reference, roadmap).
-- The plugin's prior SessionStart hook + the SKILL.md that drove it.
+Installable via `/plugin install pragma@joncik91/pragma`.
 
-### Methodology note
+- **PreToolUse hook** (`Edit|Write|MultiEdit` matcher): when Claude tries to write a test file, scan the candidate content; refuse with exit 2 if gamed.
+- **PostToolUse hook** (same matcher): re-scan on disk after the tool lands. Catches `Edit` cases where the candidate content isn't directly visible at PreToolUse time.
+- **Skill** (`plugin/skills/pragma/SKILL.md`): teaches Claude what patterns to avoid.
 
-Prior tags (v0.1.0 through v0.3.0) remain pinned for history, but the repo at HEAD only contains the v1.0.0 surface. Anyone tracking development before this commit should pin to a v0.x tag.
+### Inference (zero config)
 
-## [0.3.0] — 2026-04-26 (archived — see v1.0.0 reset)
+- `expected: success | reject` is inferred from the test name (`_rejects_` / `_raises_` / `_refuses_` / `_denies_` → reject, else success).
+- Production target `(module, symbol)` is inferred from the test's imports (most-recently-imported non-stdlib symbol the body actually calls).
 
-**The anti-gaming layer.** v0.3.0 reframes Pragma around the
-problem it actually solves: AI assistants write tests that *pass*
-without verifying anything. Earlier versions built the manifest +
-gate + PIL infrastructure — necessary scaffolding, but a gate is
-only as good as the tests behind it. This release ships the
-detector that catches the gaming.
+### Verdicts
 
-### Added
+Five at v1.0.0: `tautological`, `mocked-away`, `mismatched`, `weak`, `verified`.
 
-- **REQ-046 / `pragma.core.test_gaming`** — AST-based test classifier. Five verdicts:
-  - `verified` — assertion calls the production target, asserts on its return value or raised exception.
-  - `tautological` — `assert True`, `x == x`, `1 == 1`, constants.
-  - `mocked-away` — `mock.patch()` targeting the function under test (not its dependencies).
-  - `weak` — `is not None`, `len(...) > 0`, bare truthy when the manifest says `expected=success`. Warning only — judgment call.
-  - `mismatched` — manifest says `expected=reject` but body has no `pytest.raises` / `except` block.
-
-  Five permutations green: `detects_tautological_assertion`, `detects_mocked_away_function`, `detects_weak_assertion`, `detects_name_body_mismatch`, `passes_real_test`.
-
-  Pure Python, no dependencies. Detector is conservative: false positives (real tests flagged) surface as warnings; false negatives (gamed tests passing) defeat the whole point.
-
-### Methodology
-
-M03.S1 shipped through the full TDD gate (5 red tests → unlock → implement → 5 green tests → complete) without `--skip-tests`. Third feature this release line shipped this way.
-
-## [0.2.1] — 2026-04-26
-
-**The thesis-completing release.** v0.2.0 shipped `pragma start` as
-the API; v0.2.1 ships the Claude Code plugin that calls it. Now
-Pragma is genuinely invisible to the user — they type intent in
-plain English, Claude drives the gate.
-
-### Added
-
-- **REQ-045 / Claude Code plugin** — marketplace-installable via `/plugin install pragma@joncik91/pragma`. Ships under `plugin/` at the repo root with `.claude-plugin/marketplace.json` at the same level, per the Claude Code plugin convention.
-  - **SessionStart hook** (`plugin/hooks/session-start.sh`): reads `$CLAUDE_PROJECT_DIR/.pragma/state.json`, surfaces active slice + gate state to Claude. Silent on non-Pragma directories.
-  - **Skill** (`plugin/skills/pragma/SKILL.md`): concise rules teaching Claude the loop. On feature ask → `pragma start "<intent>"`. Never edit `pragma.yaml` directly. Drive the test-first cycle. Use `pragma narrative commit` for gate-conformant messages.
-  - **Plugin manifest** (`plugin/.claude-plugin/plugin.json`): name, version, author, license.
-
-### Methodology
-
-M02.S2 shipped through the full TDD gate (activate → 4 red tests → unlock → implement plugin files → 4 green tests → complete) without `--skip-tests`. Second feature in Pragma's history shipped this way; the pattern holds.
-
-## [0.2.0] — 2026-04-26
-
-**Friction reduction line.** First minor version after the
-v0.1.x bug-sweep alphas. Begins the M02 milestone — making Pragma
-invisible to the user, especially in Claude Code. v0.2.0 ships the
-first piece: one-command bootstrap.
-
-### Added
-
-- **REQ-043 / `pragma start "<intent>"`** — single-command orchestrator. Auto-detects greenfield (empty cwd, no git history) vs brownfield (existing src/ or git commits). Greenfield: runs init → writes `docs/problem.md` from the intent → runs `plan-greenfield` → freezes → activates `M01.S1`. Brownfield: runs init → freezes → activates `M00.S0` (the implicit slice from REQ-038). Either way the user lands at `gate=LOCKED` in one call. JSON output is plugin-friendly (`{ok, mode, slice, gate, intent}`).
-
-### Methodology note
-
-This is the first feature in Pragma's history that shipped through
-the full TDD gate flow without `--skip-tests`. M02.S1 was activated
-on a clean state, three red tests written, `pragma unlock` accepted
-them, the implementation followed, and `pragma slice complete`
-green-shipped. Pragma now genuinely dogfoods its own thesis.
-
-## [0.1.6] — 2026-04-25
-
-**Last open known-issue closed.** BUG-046 was logged at v0.1.3 as a
-real friction point (brownfield retroactive REQ flow had no clean
-gate path). Fixed.
-
-### Fixed
-
-- **BUG-046 / REQ-042** — `pragma unlock --skip-tests --reason "..."` is the brownfield-import escape hatch. The TDD red-first rule still applies by default; `--skip-tests` requires a non-empty `--reason` and audit-logs the bypass to `.pragma/audit.jsonl` so the trail is honest. Use case: existing code that you're retroactively wrapping in a manifest REQ — tests already pass, hand-editing `.pragma/state.json` is no longer necessary. Documented in `docs/reference.md`.
-
-### Open known-issues at v0.1.6
-
-None.
-
-### Dogfood
-
-Three post-fix clean walkthroughs on fresh sandboxes:
-
-- **R22** — greenfield single-REQ literal README quick-start. `1 verified, 0 flagged`. Two-attempt commit (documented BUG-043 ruff speedbump on first).
-- **R23** — brownfield literal README quick-start + new `unlock --skip-tests --reason` exercised end-to-end. Single-attempt adopt-pragma commit; `2 verified` after adding `@trace("REQ-001")` to existing code (the documented brownfield retroactive path).
-- **R24** — greenfield multi-REQ slice (REQ-001 + REQ-002, 2 perms). `2 verified, 0 flagged`. Two-attempt commit (BUG-043 documented).
-
-Zero new findings across the three rounds. Cadence rule cleared.
-
-## [0.1.5] — 2026-04-25
-
-**Edge-case dogfood pass.** Probed 15 first-run-user error scenarios.
-12 surfaced clean errors; 3 had remediation-string defects (commands
-that don't exist, missing context, dishonest about flag scope). All
-fixed under one REQ.
-
-### Fixed
-
-- **BUG-049 / REQ-041** — PIL `mocked` remediation no longer points users at the nonexistent `pragma spec mark-mocked` subcommand. New text says: wrap the test body in `with set_permutation('<id>'):` so the SDK labels the trace correctly. That's the actual fix.
-- **BUG-050 / REQ-041** — `pragma init --greenfield` on an already-initialised dir now explains that greenfield does not support `--force` (would erase the manifest), and points at `pragma init --brownfield --force` as the escape hatch for refreshing hooks/templates while keeping the manifest.
-- **BUG-051 / REQ-041** — `pragma slice activate <unknown>` now lists the declared slice ids in the remediation. Mirrors what `add-requirement --slice` already does.
-
-## [0.1.4] — 2026-04-25
-
-**Brownfield adopt-pragma commit lands cleanly.** Round-18 strict
-brownfield walkthrough surfaced two more dead-ends after BUG-045:
-the commit-shape check rejected pre-Pragma history (BUG-047) and
-the scaffolded pytest hook treated "no tests yet" as a hook failure
-(BUG-048). Both fixed.
-
-### Fixed
-
-- **BUG-047 / REQ-039** — `pragma verify commits` skips pre-Pragma history. When `--base` (default `main`) does not exist, the range scopes to commits that touched `pragma.yaml` instead of walking full HEAD. When `pragma.yaml` is staged but uncommitted (the first adopt commit), the range yields zero commits so the check trivially passes. Pre-Pragma commits are exempt by definition.
-- **BUG-048 / REQ-040** — scaffolded pre-commit pytest hook traps pytest exit code 5 ("no tests collected") to 0. A freshly-adopted brownfield repo with no `tests/` dir can now land its first commit. Other exit codes still propagate.
-- **README** — brownfield "chore: adopt pragma" example now uses the multi-line WHY/Co-Authored-By shape that the gate actually enforces.
-
-## [0.1.3] — 2026-04-25
-
-**Brownfield quick-start reaches LOCKED gate.** Round-16 strict
-brownfield walkthrough surfaced BUG-045 — the README's brownfield
-quick-start landed users in a dead end at `pragma slice activate
-M01.S1` because the brownfield manifest had no slices declared.
-
-### Fixed
-
-- **BUG-045 / REQ-038** — `pragma init --brownfield` now writes v2 schema with an implicit `M00.S0` slice (matching the `pragma migrate` precedent). `pragma spec add-requirement` defaults to the only-declared slice when the caller omits `--milestone`/`--slice`, so the literal README walkthrough lands the new REQ in `M00.S0` automatically. README's "Ship a slice" block notes brownfield uses `M00.S0` (greenfield still uses `M01.S1`).
-
-### Known issues at v0.1.3
-
-- **BUG-046** — Brownfield retroactive-REQ flow has no clean path through the gate. `pragma unlock` refuses when tests already pass (TDD red-first rule); `pragma doctor --emergency-unlock` clears the active slice, leaving `slice complete` unreachable. Workaround: edit `.pragma/state.json` manually to flip the gate to `UNLOCKED`, then `slice complete --skip-tests`. This is a real friction point, not a doc fix — likely needs a `pragma slice unlock --skip-tests` or a brownfield-import flag in a future patch.
-
-## [0.1.2] — 2026-04-25
-
-**Closes the v0.1.0 known-issues backlog.** The BUG-023..026 entries
-that the v0.1.0 CHANGELOG flagged as open were re-checked. Three of
-the four were already fixed in earlier patches and the CHANGELOG was
-stale; the fourth (BUG-026, narrative prose) is now fixed.
-
-### Fixed
-
-- **BUG-026 / REQ-037** — `pragma narrative commit` now produces senior-engineer prose. WHY names the REQ titles in the active slice instead of "<slice>: N permutations declared." WHAT lists each REQ with id, title, and per-permutation verdicts (e.g. `valid=success, weak_pw=reject`) inline, so a reader sees the behaviour that landed without opening the manifest.
-
-### Documented (already fixed, CHANGELOG was stale)
-
-- **BUG-023** — single-permutation REQ courtesy was implemented in 2116db3 (`fix: BUG-023 — single-permutation courtesy in PIL`). PIL now reports `ok` when a one-perm REQ test omits `set_permutation`. Verified by sandbox repro.
-- **BUG-024** — `pragma slice activate` on a shipped slice was made refusable in 87273b7 (`fix: BUG-024 — slice activate refuses to un-ship a shipped slice`). `--force` is the explicit opt-in to re-open. Verified by sandbox repro.
-- **BUG-025** — `span_count` multiplier was already accurate. Sandbox showed `span_count` matches the count of non-empty span files on disk. CHANGELOG entry was speculative.
-
-## [0.1.1] — 2026-04-25
-
-**First post-v0.1.0 patch.** Three consecutive clean strict-README
-walkthroughs (rounds 12, 13, 14) cleared the cadence rule for an
-alpha bump.
-
-### Fixed
-
-- **BUG-036 / REQ-032** — `pragma init` now runs `pre-commit install --hook-type pre-commit --hook-type commit-msg --hook-type pre-push`. Previously the hooks were never wired so the gate enforcement the README advertises was structurally bypassable on a fresh project.
-- **BUG-037 / REQ-033** — scaffolded pre-commit `pragma verify all` hook resolves the pragma binary via the same `{{ pragma_python_bin }} → .venv/bin/python3 → python3` chain init was launched with, instead of bare `python -m pragma`. First-run users without a project venv no longer hit "No module named pragma.__main__".
-- **BUG-038 / BUG-039 / REQ-034** — scaffolded pytest hook uses the same PY resolution chain; scaffolded pip-audit ignores GHSA-58qw-9mgm-455v by default. Brought the scaffolded battery template back in sync with Pragma's own `.pre-commit-config.yaml`.
-- **BUG-040** — README's slice-activate example used a stale test-name placeholder; now points at `pragma slice status` / `pragma.yaml` to discover the right ids.
-- **BUG-042 / REQ-035** — scaffolded `.gitignore` covers `.pragma/state.json`, `.pragma/state.json.lock`, `__pycache__/`, and `*.pyc`. First `git add -A` no longer accidentally stages bytecode + flock files; ruff-format and pytest no longer "modify" cache files on every commit.
-- **BUG-043** — README warns about the ruff-format first-commit speedbump (re-stage with `git add -A` and re-run; second attempt lands).
-- **BUG-044 / REQ-036** — `pragma init --greenfield` runs `git init -q` when the cwd has no repo, so the README quick-start (`mkdir demo && cd demo && pragma init --greenfield`) actually wires the pre-commit / commit-msg / pre-push hooks. Previously `hooks_installed: false` shipped silently. Brownfield is unaffected.
-
-### Cadence
-
-The strict-README dogfood passed three rounds in a row with zero
-findings under varied project shapes (1-REQ/1-perm, 2-REQ/2-perm,
-multiple project names). v0.1.x patch cycle continues until the
-known issues below either ship a fix or the workarounds remain
-stable through three more rounds.
-
-## [0.1.0] — 2026-04-24
-
-**First alpha.** Pragma is a senior-engineer-on-rails framework for
-AI-driven Python development: manifest-declared permutations, a
-test-first gate, a Claude Code hook integration, a pre-commit safety
-battery, and a Post-Implementation Log that shows which declared
-behaviours were actually exercised at runtime.
-
-This is alpha. The thesis works end-to-end on a fresh greenfield
-project (docs-only flow produces a populated PIL with zero manual
-`pytest` steps), and the author's own repo dogfoods the whole gate.
-But the dogfood is still finding bugs per pass. v0.1.x patches will
-continue until three consecutive clean dogfoods — that's when v0.2
-starts.
-
-### What's here
-
-- **Manifest + lockfile** — `pragma.yaml` + `pragma.lock.json` with SHA-256 canonical hash. `pragma init --brownfield` or `--greenfield`, `pragma spec add-requirement`, `pragma freeze`, `pragma verify manifest`.
-- **Schema v2** — milestones + slices. `pragma migrate` upgrades v1 manifests idempotently.
-- **Gate** — `pragma slice activate|complete|cancel|status`, `pragma unlock`. `.pragma/state.json` (atomic, flock-guarded, gitignored) + `.pragma/audit.jsonl` (append-only, fsync'd, committed).
-- **Verify** — `pragma verify manifest|gate|discipline|integrity|commits|message|all`. Pre-commit enforces shape + gate; commit-msg enforces WHY/trailer; pre-push runs the full battery.
-- **Recovery** — `pragma doctor` with classifier diagnostics. `--emergency-unlock` for wedged gates, `--clean-spans` for span retention.
-- **Reports** — `pragma report --json|--human` produce byte-identical output from the same inputs; Markdown PIL shows `ok|mocked|missing|partial|red|skipped` per permutation with a Diagnostics banner when input artifacts are absent.
-- **SDK** — `pragma-sdk` (separate pip package): `@trace(...)`, `set_permutation(...)`, pytest plugin auto-registered via `pytest11`. OpenTelemetry spans with `logic_id` + `permutation` attrs feed the PIL.
-- **Claude Code hooks** — SessionStart / PreToolUse / PostToolUse / Stop, sealed by hash, integrity-verifiable.
-- **Narrative** — `pragma narrative commit|pr|adr|remediation` drafts copy from the active slice and PIL. **Content quality is weak** (known); the template is in place but the prose generation is a placeholder.
-- **Docs** — README, `docs/concepts.md`, `docs/usage.md`, `docs/reference.md`, `docs/doctor.md`, `docs/migrate.md`, `docs/roadmap.md`.
-
-### Known issues at v0.1.0
-
-All v0.1.0 known-issues (BUG-023, BUG-024, BUG-025, BUG-026) closed
-in v0.1.2. See that entry for details.
-
-### Pre-v0.1.0 history
-
-The git log contains the iterative development path from the first
-commit through this release. Old release tags (v0.1.0 through v1.1.2)
-were consolidated into this single v0.1.0 during release-cadence
-cleanup on 2026-04-24 — they represented a 3-day patch sequence on
-what was really an alpha, not a stable 1.x. See
-`CHANGELOG-archive.md` for the detailed per-version notes if you
-need the history.
