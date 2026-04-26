@@ -16,9 +16,16 @@ repos:
 
       - id: pragma
         name: pragma verify tests (dogfood)
-        # Excludes test_classifier.py and test_inference.py — those test
-        # the classifier itself and use trigger-pattern names on purpose.
+        # Excludes:
+        # - test_classifier.py / test_inference.py — those test the classifier
+        #   itself and use trigger-pattern names on purpose.
+        # - tests/fixtures/ — intentionally gamed test files that pragma
+        #   exists to detect; running pragma on them would correctly flag
+        #   them and block the commit.
+        # - tests/languages/python/rules/test_*.py — rule unit tests use
+        #   trigger-pattern names (e.g. test_mismatched_*) for clarity;
+        #   pragma's heuristics over-flag them.
         entry: bash -c 'PYTHONPATH=src .venv/bin/python -m pragma verify tests "$@"' --
         language: system
         files: '^tests/test_.*\.py$|^tests/.*/test_.*\.py$'
-        exclude: '^tests/test_(classifier|inference)\.py$'
+        exclude: '^tests/test_(classifier|inference)\.py$|^tests/fixtures/|^tests/languages/.*/rules/test_'
