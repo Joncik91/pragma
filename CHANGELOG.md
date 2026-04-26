@@ -5,6 +5,27 @@ All notable changes to Pragma are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.1] — 2026-04-26
+
+**Tier 3 LLM judge (warning-only).** Closes the v2.1 three-tier defense. After tier 1 (AST) and tier 2 (coverage), tier 3 asks Anthropic Haiku 4.5 whether each remaining `verified` test actually verifies the production function's behavior. Emits `<lang>.semantic_gaming` as a warning verdict (NOT in `BLOCKING_SUFFIXES`) — conformal calibration is deferred to v2.2 before tier 3 can block.
+
+### Added
+
+- **Tier 3 LLM judge.** Scaffolds shipped in v2.1.0 are now wired. Reads `PRAGMA_ANTHROPIC_API_KEY` from env; uses `claude-haiku-4-5` with prompt caching on the system message (saves cost dramatically across multiple tests in one file). Skips silently when the key is missing, the API call fails, or the response is malformed.
+- **`pragma verify tests --with-llm`** — opt-in CLI flag. Off by default everywhere.
+- **`PRAGMA_HOOK_WITH_LLM=1`** — opt-in env var for the PostToolUse hook. Off by default.
+- New optional dep: `[llm]` extra (`anthropic>=0.40`). Required only when `--with-llm` is enabled.
+
+### Internal
+
+- `src/pragma/judge/{classify,prompt,client}.py` — full implementations.
+- New verdict: `<lang>.semantic_gaming` (warning, NOT blocking).
+- Test count: 360 → 391.
+
+### Roadmap
+
+- **v2.2**: Conformal-prediction calibration to make tier 3 block-capable. Tier 2.5 mutation oracle (`mutmut`/Stryker).
+
 ## [2.1.0] — 2026-04-26
 
 **Outcome-based tier 2: coverage-of-target gate.** v2.0.x's static AST classifier kept playing whack-a-mole — every blind-subagent smoke run surfaced 3-7 new evasion patterns. v2.1 stops chasing patterns and starts checking outcomes. After the AST classifier (tier 1) marks a test as `verified`, tier 2 runs the test under coverage instrumentation and verifies the production target's lines actually executed. Every gaming pattern shares one property — production code never runs. One check kills entire classes of evasion.

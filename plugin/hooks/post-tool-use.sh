@@ -34,8 +34,22 @@ fi
 # On-disk file IS the candidate post-edit. Diff against git HEAD.
 # Pass --with-coverage by default so tier 2 (coverage-based gaming detection)
 # runs on every edit. Opt out by setting PRAGMA_COVERAGE_DEFAULT_OFF=1.
-if [ "${PRAGMA_COVERAGE_DEFAULT_OFF:-}" = "1" ]; then
-    exec python3 "${CLAUDE_PLUGIN_ROOT}/hooks/check_diff.py" "$path" "$path"
-else
+# Pass --with-llm when PRAGMA_HOOK_WITH_LLM=1 is set (opt-in, off by default).
+COVERAGE_FLAG=""
+LLM_FLAG=""
+if [ "${PRAGMA_COVERAGE_DEFAULT_OFF:-}" != "1" ]; then
+    COVERAGE_FLAG="--with-coverage"
+fi
+if [ "${PRAGMA_HOOK_WITH_LLM:-}" = "1" ]; then
+    LLM_FLAG="--with-llm"
+fi
+
+if [ -n "$COVERAGE_FLAG" ] && [ -n "$LLM_FLAG" ]; then
+    exec python3 "${CLAUDE_PLUGIN_ROOT}/hooks/check_diff.py" "$path" "$path" --with-coverage --with-llm
+elif [ -n "$COVERAGE_FLAG" ]; then
     exec python3 "${CLAUDE_PLUGIN_ROOT}/hooks/check_diff.py" "$path" "$path" --with-coverage
+elif [ -n "$LLM_FLAG" ]; then
+    exec python3 "${CLAUDE_PLUGIN_ROOT}/hooks/check_diff.py" "$path" "$path" --with-llm
+else
+    exec python3 "${CLAUDE_PLUGIN_ROOT}/hooks/check_diff.py" "$path" "$path"
 fi

@@ -9,7 +9,9 @@ from pragma.languages import REGISTRY
 from pragma.verdict import Verdict
 
 
-def verify_file(path: Path, *, with_coverage: bool = False) -> list[Verdict]:
+def verify_file(
+    path: Path, *, with_coverage: bool = False, with_llm: bool = False
+) -> list[Verdict]:
     """Classify every test function in `path` using the matching language module."""
     for lang in REGISTRY:
         if lang.matches(path):
@@ -19,6 +21,11 @@ def verify_file(path: Path, *, with_coverage: bool = False) -> list[Verdict]:
                 from pragma.coverage import gate  # noqa: PLC0415
 
                 verdicts = gate.classify_file(path, verdicts, lang)
+            if with_llm:
+                # Local import — avoids pulling tier-3 deps unless needed.
+                from pragma.judge import classify  # noqa: PLC0415
+
+                verdicts = classify.classify_file(path, verdicts, lang)
             return verdicts
     return []
 
