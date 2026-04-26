@@ -854,6 +854,30 @@ requirements:
     expected: reject
   milestone: M02
   slice: M02.S1
+- id: REQ-046
+  title: Detect AI test-gaming patterns (tautological, mocked-away, weak)
+  description: 'The real Pragma thesis. AI assistants asked to "write tests" tend to do whatever it takes to make tests pass, including writing tests that do not actually verify behaviour - tautological asserts (assert True, x == x), asserting on test setup not output, mocking the function under test, weak assertions (is not None when the spec called for an exact value), name/body mismatch (test_rejects_X that does not raise). pragma verify tests parses each test file with AST and classifies every test by verdict (verified, tautological, mocked-away, weak, mismatched). Pre-commit calls it; PostToolUse hook in the plugin calls it on test edits. This is the layer that makes the gate actually mean something.'
+  touches:
+  - packages/pragma/src/pragma/core/test_gaming.py
+  - packages/pragma/src/pragma/cli/commands/verify.py
+  permutations:
+  - id: detects_tautological_assertion
+    description: assert True / x == x / 1 == 1 are flagged tautological
+    expected: success
+  - id: detects_mocked_away_function
+    description: mock.patch on the function under test is flagged mocked-away
+    expected: success
+  - id: detects_weak_assertion
+    description: assert x is not None where success demands a specific value is flagged weak
+    expected: success
+  - id: detects_name_body_mismatch
+    description: test_rejects_X without an exception assertion is flagged mismatched
+    expected: success
+  - id: passes_real_test
+    description: a test that calls the real function and asserts on the return value is verified
+    expected: success
+  milestone: M03
+  slice: M03.S1
 - id: REQ-045
   title: Claude Code plugin distributes Pragma invisibly
   description: 'v0.2.0 thesis. The point of pragma start is that a coding agent calls it - not a human typing it at a terminal. REQ-045 ships a Claude Code plugin (marketplace-installable via `/plugin install pragma@joncik91/pragma`) that drives the gate from agent prompts. SessionStart reads .pragma/state.json and primes Claude with active slice + gate state. A skill teaches Claude the rules - call pragma start on first feature ask, never edit pragma.yaml directly, never bypass unlock. Hooks and skill ship under plugin/ at repo root with a .claude-plugin/marketplace.json pointing at it.'
@@ -1076,3 +1100,13 @@ milestones:
     description: 'The thesis-completing slice. Marketplace-installable plugin that drives the gate from Claude Code, so the user never types pragma commands directly. Hooks + skill ship under plugin/ at repo root.'
     requirements:
     - REQ-045
+- id: M03
+  title: Anti-gaming layer — detect AI test-gaming patterns
+  description: 'The real Pragma thesis. AI tends to write tests that pass without actually verifying behaviour. M03 ships the detector that classifies each test as verified, tautological, mocked-away, weak, or mismatched, and refuses to ship slices with gamed tests.'
+  depends_on: []
+  slices:
+  - id: M03.S1
+    title: AST test-gaming detector (REQ-046)
+    description: 'Parse test files, classify each test, surface verdict per test in the PIL. Pre-commit calls pragma verify tests on the slice tests; refuses on tautological/mocked-away/mismatched. Weak is warning-only (judgment call).'
+    requirements:
+    - REQ-046

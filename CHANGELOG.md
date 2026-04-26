@@ -5,6 +5,32 @@ All notable changes to Pragma are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] — 2026-04-26
+
+**The anti-gaming layer.** v0.3.0 reframes Pragma around the
+problem it actually solves: AI assistants write tests that *pass*
+without verifying anything. Earlier versions built the manifest +
+gate + PIL infrastructure — necessary scaffolding, but a gate is
+only as good as the tests behind it. This release ships the
+detector that catches the gaming.
+
+### Added
+
+- **REQ-046 / `pragma.core.test_gaming`** — AST-based test classifier. Five verdicts:
+  - `verified` — assertion calls the production target, asserts on its return value or raised exception.
+  - `tautological` — `assert True`, `x == x`, `1 == 1`, constants.
+  - `mocked-away` — `mock.patch()` targeting the function under test (not its dependencies).
+  - `weak` — `is not None`, `len(...) > 0`, bare truthy when the manifest says `expected=success`. Warning only — judgment call.
+  - `mismatched` — manifest says `expected=reject` but body has no `pytest.raises` / `except` block.
+
+  Five permutations green: `detects_tautological_assertion`, `detects_mocked_away_function`, `detects_weak_assertion`, `detects_name_body_mismatch`, `passes_real_test`.
+
+  Pure Python, no dependencies. Detector is conservative: false positives (real tests flagged) surface as warnings; false negatives (gamed tests passing) defeat the whole point.
+
+### Methodology
+
+M03.S1 shipped through the full TDD gate (5 red tests → unlock → implement → 5 green tests → complete) without `--skip-tests`. Third feature this release line shipped this way.
+
 ## [0.2.1] — 2026-04-26
 
 **The thesis-completing release.** v0.2.0 shipped `pragma start` as

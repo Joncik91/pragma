@@ -1,16 +1,23 @@
 # Pragma
 
-> Senior engineer on rails for AI-driven development.
+> The pragmatic gate that catches AI test-gaming.
 
-Pragma keeps AI-generated code honest. It sits between your AI
-assistant and git, forcing every feature through a declared
-specification, a test-first gate, and a plain-English report of what
-actually ran — so you can ship code an AI wrote and know what you're
-shipping.
+Pragma is a Claude Code plugin that catches the thing AI assistants
+do most often when asked to "write tests": write tests that pass
+without actually verifying anything. The detector parses every test,
+classifies the assertion shape, and refuses commits that contain:
 
-- **Current version:** v0.2.1 (2026-04-26)
+- **`tautological`** — `assert True`, `x == x`, `1 == 1`, asserts on test setup not output.
+- **`mocked-away`** — `mock.patch()` on the very function the test claims to test.
+- **`mismatched`** — manifest says `expected=reject` but the body has no `pytest.raises`.
+- **`weak`** *(warning)* — `assert x is not None` when the spec called for an exact value.
+
+Real tests pass. Gamed tests get rejected at commit time, so the AI
+can't fake the proof.
+
+- **Current version:** v0.3.0 (2026-04-26)
 - **License:** Apache-2.0
-- **Status:** Alpha. Python-only. Open known-issues: zero. Thesis works end-to-end on greenfield and brownfield; the v0.1.x line closed every dogfood-surfaced bug, and v0.2.x ships the friction-reduction line (one-command bootstrap + Claude Code plugin).
+- **Status:** Alpha. Python-only. v0.3.0 ships the **anti-gaming detector** — the layer that classifies AI-written tests as `verified | tautological | mocked-away | weak | mismatched` so the gate can refuse tests that pass without verifying anything.
 
 ## What it looks like in Claude Code
 
