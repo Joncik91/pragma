@@ -25,7 +25,11 @@ def classify_test(
 ) -> Verdict:
     tree = ast.parse(source)
     func = next(
-        (n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef) and n.name == test_name),
+        (
+            n
+            for n in ast.walk(tree)
+            if isinstance(n, ast.FunctionDef | ast.AsyncFunctionDef) and n.name == test_name
+        ),
         None,
     )
     if func is None:

@@ -7,6 +7,7 @@ BLOCKING_SUFFIXES: frozenset[str] = frozenset(
         "tautological",
         "mocked-away",
         "monkeypatched",
+        "module_attr_reassignment",
         "module_shimmed",
         "orphan_mock",
         "orphan_test",

@@ -260,3 +260,134 @@ it("chargeCard_spy_only", () => {
     f.write_text(src)
     verdicts = classify_file(f)
     assert not any(v.kind == "vitest.mocked-away" for v in verdicts)
+
+
+# ---------------------------------------------------------------------------
+# BUG-026: vi.mock + namespace import flavor
+# ---------------------------------------------------------------------------
+
+
+def test_mocked_away_namespace_import_vi_mock_direct_assert(tmp_path: Path) -> None:
+    """import * as M + vi.mock on same path + expect(M.foo(...)).toXxx(...)."""
+    src = """\
+import { it, expect, vi } from "vitest";
+import * as searchModule from "../src/search";
+
+vi.mock("../src/search", () => ({
+    searchProducts: vi.fn(),
+}));
+
+it("searchProducts_direct_assert", () => {
+    searchModule.searchProducts.mockReturnValue([{ id: "1" }]);
+    expect(searchModule.searchProducts("widget", 10)).toEqual([{ id: "1" }]);
+});
+"""
+    f = tmp_path / "search.test.ts"
+    f.write_text(src)
+    verdicts = classify_file(f)
+    assert any(v.kind == "vitest.mocked-away" for v in verdicts)
+
+
+def test_mocked_away_namespace_import_vi_mock_intermediate(tmp_path: Path) -> None:
+    """Combines BUG-026 + BUG-023: const r = M.foo(...); expect(r).toXxx(...)."""
+    src = """\
+import { it, expect, vi } from "vitest";
+import * as searchModule from "../src/search";
+
+vi.mock("../src/search", () => ({
+    searchProducts: vi.fn(),
+}));
+
+it("searchProducts_intermediate", () => {
+    vi.mocked(searchModule.searchProducts).mockReturnValue([{ id: "1", name: "Widget" }]);
+    const results = searchModule.searchProducts("widget", 10);
+    expect(results).toHaveLength(2);
+});
+"""
+    f = tmp_path / "search.test.ts"
+    f.write_text(src)
+    verdicts = classify_file(f)
+    assert any(v.kind == "vitest.mocked-away" for v in verdicts)
+
+
+def test_mocked_away_namespace_import_vi_mock_await_intermediate(tmp_path: Path) -> None:
+    """Combines BUG-026 + BUG-023: const r = await M.foo(...); expect(r).toXxx(...)."""
+    src = """\
+import { it, expect, vi } from "vitest";
+import * as searchModule from "../src/search";
+
+vi.mock("../src/search", () => ({
+    searchProducts: vi.fn(),
+}));
+
+it("searchProducts_await_intermediate", async () => {
+    vi.mocked(searchModule.searchProducts).mockResolvedValue([{ id: "1" }]);
+    const results = await searchModule.searchProducts("widget", 10);
+    expect(results).toEqual([{ id: "1" }]);
+});
+"""
+    f = tmp_path / "search.test.ts"
+    f.write_text(src)
+    verdicts = classify_file(f)
+    assert any(v.kind == "vitest.mocked-away" for v in verdicts)
+
+
+def test_mocked_away_namespace_import_no_vi_mock_does_not_flag(tmp_path: Path) -> None:
+    """import * as M but NO vi.mock — must NOT flag."""
+    src = """\
+import { it, expect, vi } from "vitest";
+import * as searchModule from "../src/search";
+
+it("searchProducts_real", () => {
+    const results = searchModule.searchProducts("widget", 10);
+    expect(results).toEqual([{ id: "1" }]);
+});
+"""
+    f = tmp_path / "search.test.ts"
+    f.write_text(src)
+    verdicts = classify_file(f)
+    assert not any(v.kind == "vitest.mocked-away" for v in verdicts)
+
+
+def test_mocked_away_namespace_import_vi_mock_different_path_does_not_flag(
+    tmp_path: Path,
+) -> None:
+    """import * as M + vi.mock on a DIFFERENT path — must NOT flag."""
+    src = """\
+import { it, expect, vi } from "vitest";
+import * as searchModule from "../src/search";
+
+vi.mock("../src/other", () => ({ otherFn: vi.fn() }));
+
+it("searchProducts_unrelated_mock", () => {
+    const results = searchModule.searchProducts("widget", 10);
+    expect(results).toEqual([{ id: "1" }]);
+});
+"""
+    f = tmp_path / "search.test.ts"
+    f.write_text(src)
+    verdicts = classify_file(f)
+    assert not any(v.kind == "vitest.mocked-away" for v in verdicts)
+
+
+def test_mocked_away_namespace_import_vi_mock_no_result_assert_does_not_flag(
+    tmp_path: Path,
+) -> None:
+    """import * as M + vi.mock matches + M.foo() called but no assertion on result."""
+    src = """\
+import { it, expect, vi } from "vitest";
+import * as searchModule from "../src/search";
+
+vi.mock("../src/search", () => ({
+    searchProducts: vi.fn(),
+}));
+
+it("searchProducts_no_result_assert", () => {
+    searchModule.searchProducts("widget", 10);
+    expect(true).toBe(true);
+});
+"""
+    f = tmp_path / "search.test.ts"
+    f.write_text(src)
+    verdicts = classify_file(f)
+    assert not any(v.kind == "vitest.mocked-away" for v in verdicts)

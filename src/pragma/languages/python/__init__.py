@@ -36,7 +36,11 @@ def classify_file(path: Path) -> list[Verdict]:
 
 def _classify_one(source: str, tree: ast.AST, test_name: str, path: Path) -> Verdict:
     func = next(
-        (n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef) and n.name == test_name),
+        (
+            n
+            for n in ast.walk(tree)
+            if isinstance(n, ast.FunctionDef | ast.AsyncFunctionDef) and n.name == test_name
+        ),
         None,
     )
     assert func is not None  # walk_test_functions just gave it to us

@@ -71,6 +71,25 @@ def classify(test_node: Node, *, source: bytes, test_name: str) -> Verdict | Non
                 )
                 return Verdict(kind="vitest.mocked-away", evidence=evidence, test_name=test_name)
 
+    # --- Path 3: vi.mock(<path>) + import * as <alias> (namespace import) ---
+    if mocked_paths:
+        if not namespace_imports:
+            namespace_imports = _collect_namespace_imports(root)
+        path_to_aliases: dict[str, list[str]] = {}
+        for alias, path in namespace_imports.items():
+            path_to_aliases.setdefault(path, []).append(alias)
+        for path in mocked_paths:
+            for alias in path_to_aliases.get(path, []):
+                for symbol in _collect_member_calls_on(callback, alias):
+                    if _body_calls_and_asserts_member(callback, alias, symbol):
+                        evidence = (
+                            f"vi.mock on {path!r} + assertion on {alias}.{symbol}(...)"
+                            f" — testing the mock, not the implementation"
+                        )
+                        return Verdict(
+                            kind="vitest.mocked-away", evidence=evidence, test_name=test_name
+                        )
+
     return None
 
 
@@ -414,6 +433,32 @@ def _body_calls_and_asserts_member(callback: Node, alias: str, symbol: str) -> b
         if inner.type == "identifier" and inner.text.decode("utf-8") in bound_names:
             return True
     return False
+
+
+def _collect_member_calls_on(callback: Node, alias: str) -> set[str]:
+    """Return the set of property names called as ``<alias>.<prop>(...)`` in callback.
+
+    Walks the callback for ``call_expression`` nodes whose ``function`` is a
+    ``member_expression`` with ``object`` equal to the identifier ``alias``.
+    Only direct calls (not chained ones like ``foo.bar.baz()``) are collected.
+    """
+    symbols: set[str] = set()
+    for node in _walk(callback):
+        if node.type != "call_expression":
+            continue
+        func = node.child_by_field_name("function")
+        if func is None or func.type != "member_expression":
+            continue
+        obj = func.child_by_field_name("object")
+        prop = func.child_by_field_name("property")
+        if obj is None or prop is None:
+            continue
+        if obj.type != "identifier":
+            continue
+        if obj.text.decode("utf-8") != alias:
+            continue
+        symbols.add(prop.text.decode("utf-8"))
+    return symbols
 
 
 def _walk(node: Node):

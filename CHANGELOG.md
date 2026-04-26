@@ -5,6 +5,29 @@ All notable changes to Pragma are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.3] — 2026-04-26
+
+**Three more false-negatives from a third v2.0.x smoke run.** One regression (silent-skip), two new evasion patterns. Final patch before the v2.1 architectural shift to outcome-based verification (coverage gate + LLM judge).
+
+### Fixed
+
+- **BUG-028 — async test functions silently skipped.** `walk_test_functions` and `_find_test_func` only matched `ast.FunctionDef`. Files containing only `async def test_*` came back with **zero verdicts** — the file looked clean even when every test mocked the production target. Worse than a false negative; the file was a black hole. Fix walks both `ast.FunctionDef` and `ast.AsyncFunctionDef` at every parser/orchestrator boundary; downstream rules duck-type without union annotations.
+
+### Added (new rules)
+
+- **`python.module_attr_reassignment` (BUG-025, blocking).** Top-level `import pricing; pricing.discount = stub` (or the same inside a test body) replaces the production function via direct attribute assignment after import. Bypasses `mocked-away` (no `mock.patch`), `monkeypatched` (no `monkeypatch.setattr`), and `module_shimmed` (no `sys.modules`). Rule walks both the enclosing module body and the test function body for `Assign(target=Attribute(...))` whose attribute path matches `(target_module, target_symbol)`. Identity assignments (`pricing.discount = pricing.discount`) are skipped.
+- **`vitest.mocked-away` extended for namespace imports (BUG-026).** v2.0.2's BUG-023 fix added intermediate-variable detection (`const r = X(); expect(r).toEqual(...)`) but only for **named** imports. The namespace flavor — `import * as M from "..."; vi.mock("..."); const r = M.foo(); expect(r).toEqual(L)` — slipped through. Rule now adds a third pass: for each `vi.mock`'d path, reverse-look-up namespace aliases via `_collect_namespace_imports` and run the existing BUG-019 member-expression check.
+
+### Internal
+
+- Two new fixtures: `gamed_async_mocked_away.py`, `gamed_module_attr_reassignment.py`, `vitest_mocked_away_namespace.test.ts`. Wired into CLI parametrize and CI smoke loops.
+- `BLOCKING_SUFFIXES` extended with `module_attr_reassignment`.
+- Test count: 211 → 232.
+
+### Roadmap
+
+v2.1.0 is the architectural shift. Static AST whack-a-mole reached its ceiling: every smoke run surfaces 3-7 new evasion patterns. v2.1 adds a **coverage-of-target** gate (`--with-coverage`) and an optional **LLM judge** (`--with-llm`) on top of the existing AST classifier. Three-tier defense, one signal per gaming class, no more rule-by-rule chasing.
+
 ## [2.0.2] — 2026-04-26
 
 **Seven new false-negatives surfaced by 8 fresh blind-subagent sandboxes.** Same evening as v2.0.1. All seven fixed.

@@ -34,6 +34,10 @@ def test_python_module_shimmed_is_blocking():
     assert is_blocking_kind("python.module_shimmed") is True
 
 
+def test_python_module_attr_reassignment_is_blocking():
+    assert is_blocking_kind("python.module_attr_reassignment") is True
+
+
 def test_vitest_orphan_mock_is_blocking():
     assert is_blocking_kind("vitest.orphan_mock") is True
 
@@ -42,13 +46,14 @@ def test_python_orphan_test_is_blocking():
     assert is_blocking_kind("python.orphan_test") is True
 
 
-def test_blocking_suffixes_includes_all_eleven():
+def test_blocking_suffixes_includes_all_twelve():
     assert (
         frozenset(
             {
                 "tautological",
                 "mocked-away",
                 "monkeypatched",
+                "module_attr_reassignment",
                 "module_shimmed",
                 "orphan_mock",
                 "orphan_test",

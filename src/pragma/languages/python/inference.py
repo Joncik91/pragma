@@ -114,8 +114,8 @@ def infer_target(source: str, test_name: str) -> tuple[str | None, str | None]:
 
 def _find_test_func(tree: ast.AST, name: str) -> ast.FunctionDef | None:
     for node in ast.walk(tree):
-        if isinstance(node, ast.FunctionDef) and node.name == name:
-            return node
+        if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef) and node.name == name:
+            return node  # type: ignore[return-value]
     return None
 
 

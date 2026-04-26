@@ -16,6 +16,7 @@ from pragma.languages.python.rules import conditional as _conditional
 from pragma.languages.python.rules import empty_body as _empty_body
 from pragma.languages.python.rules import mismatched as _mismatched
 from pragma.languages.python.rules import mocked_away as _mocked_away
+from pragma.languages.python.rules import module_attr_reassignment as _module_attr_reassignment
 from pragma.languages.python.rules import module_shimmed as _module_shimmed
 from pragma.languages.python.rules import monkeypatched as _monkeypatched
 from pragma.languages.python.rules import orphan_test as _orphan_test
@@ -30,6 +31,7 @@ from pragma.languages.python.rules import xfail_gaming as _xfail_gaming
 RULES: list[Callable] = [
     _mocked_away.classify,
     _monkeypatched.classify,
+    _module_attr_reassignment.classify,
     _module_shimmed.classify,
     _swallowed.classify,
     _skipped.classify,
