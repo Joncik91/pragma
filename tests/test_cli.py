@@ -1,0 +1,98 @@
+"""End-to-end tests for the `pragma` CLI."""
+
+from __future__ import annotations
+
+import json
+import subprocess
+import sys
+from pathlib import Path
+
+import pytest
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+FIXTURE_DIR = REPO_ROOT / "tests" / "fixtures"
+
+
+def _run(*args: str, cwd: Path | None = None) -> subprocess.CompletedProcess[str]:
+    """Invoke the CLI as a subprocess. Uses `python -m pragma` so we
+    don't depend on `pragma` being on PATH (the package may be source-only
+    in CI, before `pip install -e .`)."""
+    env_path = str(REPO_ROOT / "src")
+    cmd = [sys.executable, "-m", "pragma", *args]
+    return subprocess.run(
+        cmd,
+        cwd=str(cwd) if cwd is not None else None,
+        capture_output=True,
+        text=True,
+        env={**__import__("os").environ, "PYTHONPATH": env_path},
+        check=False,
+    )
+
+
+class TestVerifyTests:
+    @pytest.mark.parametrize(
+        "fixture, expected_kind",
+        [
+            ("gamed_tautology.py", "tautological"),
+            ("gamed_mocked_away.py", "mocked-away"),
+            ("gamed_mismatched.py", "mismatched"),
+        ],
+    )
+    def test_blocking_fixtures_exit_one(self, fixture: str, expected_kind: str) -> None:
+        result = _run("verify", "tests", str(FIXTURE_DIR / fixture))
+        assert result.returncode == 1, f"expected exit 1; got {result.returncode}\n{result.stdout}"
+        payload = json.loads(result.stdout)
+        assert payload["blocking"] is True
+        verdicts = payload["results"][str(FIXTURE_DIR / fixture)]
+        kinds = [v["kind"] for v in verdicts]
+        assert expected_kind in kinds, f"expected {expected_kind} in {kinds}"
+
+    def test_verified_fixture_exits_zero(self) -> None:
+        result = _run("verify", "tests", str(FIXTURE_DIR / "verified_ok.py"))
+        assert result.returncode == 0, f"expected exit 0; got {result.returncode}\n{result.stdout}"
+        payload = json.loads(result.stdout)
+        assert payload["blocking"] is False
+        verdicts = payload["results"][str(FIXTURE_DIR / "verified_ok.py")]
+        assert verdicts[0]["kind"] == "verified"
+
+    def test_human_output_is_one_line_per_test(self) -> None:
+        result = _run("verify", "tests", str(FIXTURE_DIR / "gamed_tautology.py"), "--human")
+        assert "test_login_happy_path" in result.stdout
+        assert "tautological" in result.stdout
+
+    def test_mixed_files_exits_one_when_any_blocks(self) -> None:
+        result = _run(
+            "verify",
+            "tests",
+            str(FIXTURE_DIR / "verified_ok.py"),
+            str(FIXTURE_DIR / "gamed_tautology.py"),
+        )
+        assert result.returncode == 1
+        payload = json.loads(result.stdout)
+        assert payload["blocking"] is True
+
+
+class TestInitPrecommit:
+    def test_writes_config_in_fresh_dir(self, tmp_path: Path) -> None:
+        result = _run("init-precommit", cwd=tmp_path)
+        assert result.returncode == 0, result.stdout
+        cfg = tmp_path / ".pre-commit-config.yaml"
+        assert cfg.exists()
+        body = cfg.read_text(encoding="utf-8")
+        assert "pragma verify tests" in body
+        assert "id: pragma" in body
+
+    def test_existing_config_blocks_overwrite_without_force(self, tmp_path: Path) -> None:
+        (tmp_path / ".pre-commit-config.yaml").write_text("repos: []\n", encoding="utf-8")
+        result = _run("init-precommit", cwd=tmp_path)
+        assert result.returncode == 1
+        payload = json.loads(result.stdout)
+        assert payload["error"] == "exists"
+        assert "--force" in payload["remediation"]
+
+    def test_force_overwrites(self, tmp_path: Path) -> None:
+        (tmp_path / ".pre-commit-config.yaml").write_text("repos: []\n", encoding="utf-8")
+        result = _run("init-precommit", "--force", cwd=tmp_path)
+        assert result.returncode == 0
+        body = (tmp_path / ".pre-commit-config.yaml").read_text(encoding="utf-8")
+        assert "pragma verify tests" in body

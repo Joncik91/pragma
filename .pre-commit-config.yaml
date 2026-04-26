@@ -1,122 +1,24 @@
 repos:
-  - repo: https://github.com/gitleaks/gitleaks
-    rev: v8.21.2
-    hooks:
-      - id: gitleaks
-
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.15.12
     hooks:
       - id: ruff-format
       - id: ruff
 
-  # mypy runs against the project venv (language: system) rather than
-  # pre-commit's isolated env, because the latter can't import pragma-sdk
-  # as an installed editable package. v1.0.4 closes the class of "local
-  # pre-commit SKIP'd mypy, CI caught a type error" by actually running
-  # mypy on every commit. Matches what the CI "test + lint + types +
-  # verify" job does.
-  - repo: local
-    hooks:
-      - id: mypy-pragma
-        name: mypy --strict (pragma)
-        entry: bash -c 'ROOT="$(git rev-parse --show-toplevel)"; PY="$ROOT/.venv/bin/python3"; [ -x "$PY" ] || PY=python3; cd "$ROOT/packages/pragma" && exec "$PY" -m mypy --strict src/'
-        language: system
-        pass_filenames: false
-        always_run: true
-        stages: [pre-commit]
-      - id: mypy-pragma-sdk
-        name: mypy --strict (pragma-sdk)
-        entry: bash -c 'ROOT="$(git rev-parse --show-toplevel)"; PY="$ROOT/.venv/bin/python3"; [ -x "$PY" ] || PY=python3; cd "$ROOT/packages/pragma-sdk" && exec "$PY" -m mypy --strict src/'
-        language: system
-        pass_filenames: false
-        always_run: true
-        stages: [pre-commit]
-
-  - repo: https://github.com/returntocorp/semgrep
-    rev: v1.99.0
-    hooks:
-      - id: semgrep
-        # semgrep pulls opentelemetry, which imports `pkg_resources`.
-        # Setuptools 81+ dropped that module entirely; pin <81 inside
-        # this hook env until semgrep or opentelemetry drops the legacy
-        # call. Adding `setuptools` without a pin pulls 82, which has
-        # the offending API removed.
-        additional_dependencies: ["setuptools<81"]
-
-  - repo: https://github.com/pypa/pip-audit
-    rev: v2.8.0
-    hooks:
-      - id: pip-audit
-        # GHSA-58qw-9mgm-455v is a pip advisory with no published fix
-        # version at the time of v1.0.5. pip is a transitive tool — we
-        # don't call the affected code path from Pragma. Revisit the
-        # ignore when pip ships a fix.
-        args: ["--ignore-vuln=GHSA-58qw-9mgm-455v"]
-
-  - repo: local
-    hooks:
-      - id: deptry
-        name: deptry (all packages)
-        # Top-level pyproject is a uv workspace with no [project]; the
-        # upstream deptry hook fails on it. Runs per-package through
-        # the project venv (same pattern as mypy-pragma). v1.0.6
-        # (BUG-019 / REQ-015) closes the prior single-package
-        # workaround by configuring `[tool.deptry]
-        # pep621_dev_dependency_groups = ["dev"]` in the pragma
-        # pyproject so deptry treats optional-dependencies.dev as
-        # dev-only.
-        entry: bash -c 'ROOT="$(git rev-parse --show-toplevel)"; PY="$ROOT/.venv/bin/python3"; [ -x "$PY" ] || PY=python3; for pkg in packages/pragma packages/pragma-sdk; do echo "=== deptry $pkg ==="; (cd "$ROOT/$pkg" && "$PY" -m deptry src) || exit $?; done'
-        language: system
-        pass_filenames: false
-        always_run: true
-        stages: [pre-commit]
-
-  - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v5.0.0
-    hooks:
-      - id: check-added-large-files
-      - id: check-merge-conflict
-
   - repo: local
     hooks:
       - id: pytest
         name: pytest
-        entry: bash -c 'PY=".venv/bin/python3"; [ -x "$PY" ] || PY=python3; "$PY" -m pytest packages/pragma/tests -q && "$PY" -m pytest packages/pragma-sdk/tests -q'
+        entry: bash -c 'PYTHONPATH=src .venv/bin/python -m pytest tests/ -q'
         language: system
         pass_filenames: false
         always_run: true
-        stages: [pre-commit]
 
-      - id: pragma-verify-pre-commit
-        name: pragma verify all
-        entry: bash -c 'PY=".venv/bin/python3"; [ -x "$PY" ] || PY=python3; exec "$PY" -m pragma verify all'
+      - id: pragma
+        name: pragma verify tests (dogfood)
+        # Excludes test_classifier.py and test_inference.py — those test
+        # the classifier itself and use trigger-pattern names on purpose.
+        entry: bash -c 'PYTHONPATH=src .venv/bin/python -m pragma verify tests "$@"' --
         language: system
-        pass_filenames: false
-        always_run: true
-        stages: [pre-commit]
-
-      - id: pragma-verify-commit-msg
-        name: pragma verify message (commit-msg)
-        # Prefer repo-local venv python so git push from a non-activated shell
-        # still finds pragma. Falls back to PATH python3.
-        # `--` terminates bash options so $1 = pre-commit's commit-msg filename.
-        entry: bash -c 'PY=".venv/bin/python3"; [ -x "$PY" ] || PY=python3; exec "$PY" -m pragma verify message "$1"' --
-        language: system
-        stages: [commit-msg]
-
-      - id: pragma-verify-pre-push
-        name: pragma verify all (pre-push)
-        entry: bash -c 'PY=".venv/bin/python3"; [ -x "$PY" ] || PY=python3; exec "$PY" -m pragma verify all --ci'
-        language: system
-        pass_filenames: false
-        always_run: true
-        stages: [pre-push]
-
-      - id: pragma-verify-commits-pre-push
-        name: pragma verify commits (pre-push range)
-        entry: bash -c 'PY=".venv/bin/python3"; [ -x "$PY" ] || PY=python3; exec "$PY" -m pragma verify commits --base=$(git merge-base HEAD origin/main 2>/dev/null || echo HEAD~1)'
-        language: system
-        pass_filenames: false
-        always_run: true
-        stages: [pre-push]
+        files: '^tests/test_.*\.py$|^tests/.*/test_.*\.py$'
+        exclude: '^tests/test_(classifier|inference)\.py$'

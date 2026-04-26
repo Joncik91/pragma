@@ -1,7 +1,7 @@
 {
   "name": "pragma",
-  "version": "0.2.0",
-  "description": "Senior engineer on rails for AI-driven development. Drives Pragma's manifest+gate from Claude Code so the user types intent in plain English and the gate handles the bookkeeping.",
+  "version": "1.0.0",
+  "description": "Catches AI test-gaming. Blocks Edit/Write of test files when Claude writes assertions that pass without verifying anything (assert True, mocking the function under test, name/body mismatches).",
   "author": {
     "name": "Pragma contributors"
   },

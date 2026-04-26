@@ -1,1 +1,0 @@
-"""One file per subcommand."""

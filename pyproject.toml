@@ -1,6 +1,42 @@
-[tool.uv.workspace]
-members = ["packages/pragma-sdk", "packages/pragma"]
+[project]
+name = "pragma"
+version = "1.0.0"
+description = "Claude Code plugin that catches AI test-gaming."
+readme = "README.md"
+requires-python = ">=3.11"
+license = "Apache-2.0"
+authors = [{ name = "Pragma contributors" }]
+dependencies = ["typer>=0.12"]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0", "ruff>=0.6", "mypy>=1.10"]
+
+[project.scripts]
+pragma = "pragma.cli:app"
+
+[project.urls]
+Homepage = "https://github.com/Joncik91/pragma"
+Repository = "https://github.com/Joncik91/pragma"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/pragma"]
 
 [tool.pytest.ini_options]
-testpaths = ["packages/pragma/tests", "packages/pragma-sdk/tests"]
-addopts = "-q --strict-markers --junit-xml=.pragma/pytest-junit.xml"
+testpaths = ["tests"]
+addopts = "-q --strict-markers"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM"]
+
+[tool.mypy]
+strict = true
+python_version = "3.11"
+files = ["src/pragma"]

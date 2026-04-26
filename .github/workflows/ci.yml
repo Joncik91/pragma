@@ -7,149 +7,28 @@ on:
     branches: [main]
 
 jobs:
-  sdk-isolated:
-    name: SDK isolated tests
+  test:
+    name: test + lint
     runs-on: ubuntu-latest
     steps:
-      - name: Check out code
-        uses: actions/checkout@v6
+      - uses: actions/checkout@v6
 
-      - name: Set up Python 3.11
-        uses: actions/setup-python@v6
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.11"
 
-      - name: Install pragma-sdk
+      - name: Install
         run: |
           python -m pip install --upgrade pip
-          python -m pip install -e "packages/pragma-sdk[dev]"
+          python -m pip install -e ".[dev]"
 
-      - name: Run SDK tests
-        run: python -m pytest packages/pragma-sdk/tests -q
-
-  full:
-    name: test + lint + types + verify
-    runs-on: ubuntu-latest
-    steps:
-      - name: Check out code
-        uses: actions/checkout@v6
-
-      - name: Set up Python 3.11
-        uses: actions/setup-python@v6
-        with:
-          python-version: "3.11"
-
-      - name: Cache pip
-        uses: actions/cache@v5
-        with:
-          path: ~/.cache/pip
-          key: pip-${{ runner.os }}-3.11-${{ hashFiles('packages/pragma/pyproject.toml', 'packages/pragma-sdk/pyproject.toml') }}
-          restore-keys: pip-${{ runner.os }}-3.11-
-
-      - name: Install both packages
+      - name: Lint
         run: |
-          python -m pip install --upgrade pip
-          python -m pip install -e packages/pragma-sdk
-          python -m pip install -e "packages/pragma[dev]"
+          python -m ruff check src tests
+          python -m ruff format --check src tests
 
-      - name: Run tests
-        run: python -m pytest packages/pragma/tests -q
+      - name: Tests
+        run: python -m pytest tests/ -q
 
-      - name: Lint (ruff)
-        run: python -m ruff check packages/
-
-      - name: Format check (ruff)
-        run: python -m ruff format --check packages/
-
-      - name: Type check (mypy --strict, pragma dev-tool)
-        working-directory: packages/pragma
-        run: python -m mypy
-
-      - name: Type check (mypy --strict, pragma-sdk runtime)
-        working-directory: packages/pragma-sdk
-        run: python -m mypy --strict src
-
-      - name: Verify Pragma's manifest, gate, discipline, integrity
-        run: pragma verify all --ci
-
-  report-determinism:
-    name: report determinism check
-    runs-on: ubuntu-latest
-    needs: full
-    steps:
-      - name: Check out code
-        uses: actions/checkout@v6
-
-      - name: Set up Python 3.11
-        uses: actions/setup-python@v6
-        with:
-          python-version: "3.11"
-
-      - name: Install both packages
-        run: |
-          python -m pip install --upgrade pip
-          python -m pip install -e packages/pragma-sdk
-          python -m pip install -e "packages/pragma[dev]"
-
-      - name: Run tests (populate spans + junit at repo root)
-        run: python -m pytest packages/pragma/tests -q
-
-      - name: Assert spans and junit landed at repo root
-        run: |
-          # v1.0.2 KI-1: plugin now writes test-run-{timestamp}-{pid}-{uuid}.jsonl
-          # per session rather than a fixed test-run.jsonl. Glob-match + ensure
-          # at least one non-empty file exists.
-          shopt -s nullglob
-          spans=(.pragma/spans/*.jsonl)
-          if [ ${#spans[@]} -eq 0 ]; then
-            echo "ERROR: no span files in .pragma/spans/ — plugin or rootdir misconfigured"
-            exit 1
-          fi
-          any_nonempty=0
-          for f in "${spans[@]}"; do
-            if [ -s "$f" ]; then
-              any_nonempty=1
-              break
-            fi
-          done
-          if [ "$any_nonempty" -eq 0 ]; then
-            echo "ERROR: span files exist but are all empty — plugin emitted no spans"
-            exit 1
-          fi
-          test -s .pragma/pytest-junit.xml || { echo "ERROR: junit xml missing — pytest config not wired"; exit 1; }
-
-      - name: Generate report A
-        run: pragma report --json > /tmp/a.json
-
-      - name: Generate report B
-        run: pragma report --json > /tmp/b.json
-
-      - name: Assert report has at least one ok permutation (dogfood)
-        run: |
-          python -c "import json, sys; d=json.load(open('/tmp/a.json')); sys.exit(0 if d['summary']['ok'] > 0 else 1)" \
-            || { echo "ERROR: report shows zero ok permutations — dogfood is not exercising @trace"; exit 1; }
-
-      - name: Diff reports
-        run: diff /tmp/a.json /tmp/b.json
-
-  greenfield-smoke:
-    name: greenfield e2e
-    runs-on: ubuntu-latest
-    needs: full
-    steps:
-      - name: Check out code
-        uses: actions/checkout@v6
-
-      - name: Set up Python 3.11
-        uses: actions/setup-python@v6
-        with:
-          python-version: "3.11"
-
-      - name: Install both packages
-        run: |
-          python -m pip install --upgrade pip
-          python -m pip install -e packages/pragma-sdk
-          python -m pip install -e "packages/pragma[dev]"
-
-      - name: Run greenfield end-to-end smoke
-        run: bash tests/acceptance/test_greenfield_e2e.sh
+      - name: Dogfood
+        run: python -m pragma verify tests tests/test_inference.py tests/test_classifier.py tests/test_cli.py

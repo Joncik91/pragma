@@ -5,7 +5,45 @@ All notable changes to Pragma are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.3.0] — 2026-04-26
+## [1.0.0] — 2026-04-26
+
+**The reset.** v0.1.x and v0.2.x grew a sprawling test-first-gate
+framework (manifest schema, lockfile, audit log, gate state machine,
+PIL aggregator, narrative generator, OpenTelemetry SDK, two
+packages, 458 tests, 47 REQs across 31 slices). Most of it was
+scaffolding. The user named the actual problem worth solving:
+**AI assistants asked to write tests will write tests that pass
+without verifying anything**.
+
+v1.0.0 is the first version that does what the README says and
+nothing else. The repo is now a single-purpose Claude Code plugin
+with a small CLI underneath.
+
+### Added
+
+- **`pragma verify tests <files>...`** — AST classifier. Five verdicts (`verified | tautological | mocked-away | weak | mismatched`) per test function. JSON by default, `--human` for terminal use. Exit 1 if any test in the file is in the blocking set; exit 0 otherwise.
+- **`pragma init-precommit`** — drops a `.pre-commit-config.yaml` calling `pragma verify tests` on staged test files. Idempotent; refuses to overwrite without `--force`.
+- **Claude Code plugin** — installable via `/plugin install pragma@joncik91/pragma`.
+  - **PreToolUse hook** (`Edit|Write|MultiEdit` matcher): when Claude tries to `Write` a test file, scan the candidate content; refuse with exit 2 if gamed.
+  - **PostToolUse hook** (same matcher): re-scan on disk after the tool lands. Catches `Edit` cases where the candidate content isn't directly visible at PreToolUse time.
+  - **Skill** (`plugin/skills/pragma/SKILL.md`): ~10 lines, lists the four blocked patterns.
+- **Inference layer** — zero config:
+  - `expected: success | reject` is inferred from the test name (`_rejects_`/`_raises_`/`_refuses_`/`_denies_` → reject, else success).
+  - Production target `(module, symbol)` is inferred from the test's imports (most-recently-imported non-stdlib symbol the body actually calls).
+
+### Removed
+
+- The entire `packages/pragma/` and `packages/pragma-sdk/` workspace. Manifest schema, lockfile, audit log, gate state machine, PIL aggregator, narrative generator, doctor, span aggregator, hook dispatcher, plan-greenfield, all `pragma slice / spec / freeze / start / unlock / report / migrate / verify all / narrative` subcommands.
+- 46 `req/test_req_*.py` files.
+- `pragma.yaml`, `pragma.lock.json`, `.pragma/`, `PRAGMA.md`, `claude.md`, `pytest.ini`, `CHANGELOG-archive.md`, `logic_id_schema.md`.
+- Most of `docs/` (concepts, design, doctor, migrate, usage, reference, roadmap).
+- The plugin's prior SessionStart hook + the SKILL.md that drove it.
+
+### Methodology note
+
+Prior tags (v0.1.0 through v0.3.0) remain pinned for history, but the repo at HEAD only contains the v1.0.0 surface. Anyone tracking development before this commit should pin to a v0.x tag.
+
+## [0.3.0] — 2026-04-26 (archived — see v1.0.0 reset)
 
 **The anti-gaming layer.** v0.3.0 reframes Pragma around the
 problem it actually solves: AI assistants write tests that *pass*
