@@ -8,7 +8,7 @@ specification, a test-first gate, and a plain-English report of what
 actually ran — so you can ship code an AI wrote and know what you're
 shipping.
 
-- **Current version:** v0.1.6 (2026-04-25)
+- **Current version:** v0.2.0 (2026-04-26)
 - **License:** Apache-2.0
 - **Status:** Alpha. Python-only. Thesis works end-to-end on a fresh greenfield; dogfood is still finding bugs. See [`CHANGELOG.md`](CHANGELOG.md) for the release cadence plan and known issues.
 
@@ -42,6 +42,23 @@ Verify:
 ```shell
 pragma --help
 ```
+
+## One-command start (v0.2.0)
+
+```shell
+pragma start "User can log in with email and password"
+```
+
+Auto-detects greenfield (empty dir) vs brownfield (existing code or
+git history), scaffolds the manifest + lockfile + hooks, plans the
+slice, and lands at `gate=LOCKED`. From here, write a failing test,
+`pragma unlock`, write code, `pragma slice complete`. The five
+ceremonial bootstrap commands are gone — the user types intent, the
+tool handles the bookkeeping.
+
+The two manual flows below remain valid for users who want fine
+control over schema or who are wiring an existing repo with multiple
+REQs in one go.
 
 ## Quick start — brownfield (existing repo)
 

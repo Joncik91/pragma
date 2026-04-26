@@ -56,3 +56,6 @@
 {"actor":"cli","context":{},"event":"slice_cancelled","from_state":"LOCKED","reason":"pragma slice cancel (slice M01.S30)","slice":"M01.S30","to_state":null,"ts":"2026-04-25T14:20:13Z"}
 {"actor":"cli","context":{},"event":"slice_activated","from_state":null,"reason":"pragma slice activate M01.S31","slice":"M01.S31","to_state":"LOCKED","ts":"2026-04-25T14:35:03Z"}
 {"actor":"cli","context":{},"event":"slice_cancelled","from_state":"LOCKED","reason":"pragma slice cancel (slice M01.S31)","slice":"M01.S31","to_state":null,"ts":"2026-04-25T14:35:04Z"}
+{"actor":"cli","context":{},"event":"slice_activated","from_state":null,"reason":"pragma slice activate M02.S1","slice":"M02.S1","to_state":"LOCKED","ts":"2026-04-26T09:36:59Z"}
+{"actor":"cli","context":{},"event":"unlocked","from_state":"LOCKED","reason":"pragma unlock (slice M02.S1)","slice":"M02.S1","to_state":"UNLOCKED","ts":"2026-04-26T09:37:35Z"}
+{"actor":"cli","context":{},"event":"slice_completed","from_state":"UNLOCKED","reason":"pragma slice complete (slice M02.S1)","slice":"M02.S1","to_state":null,"ts":"2026-04-26T09:41:03Z"}

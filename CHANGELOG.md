@@ -5,6 +5,25 @@ All notable changes to Pragma are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0] — 2026-04-26
+
+**Friction reduction line.** First minor version after the
+v0.1.x bug-sweep alphas. Begins the M02 milestone — making Pragma
+invisible to the user, especially in Claude Code. v0.2.0 ships the
+first piece: one-command bootstrap.
+
+### Added
+
+- **REQ-043 / `pragma start "<intent>"`** — single-command orchestrator. Auto-detects greenfield (empty cwd, no git history) vs brownfield (existing src/ or git commits). Greenfield: runs init → writes `docs/problem.md` from the intent → runs `plan-greenfield` → freezes → activates `M01.S1`. Brownfield: runs init → freezes → activates `M00.S0` (the implicit slice from REQ-038). Either way the user lands at `gate=LOCKED` in one call. JSON output is plugin-friendly (`{ok, mode, slice, gate, intent}`).
+
+### Methodology note
+
+This is the first feature in Pragma's history that shipped through
+the full TDD gate flow without `--skip-tests`. M02.S1 was activated
+on a clean state, three red tests written, `pragma unlock` accepted
+them, the implementation followed, and `pragma slice complete`
+green-shipped. Pragma now genuinely dogfoods its own thesis.
+
 ## [0.1.6] — 2026-04-25
 
 **Last open known-issue closed.** BUG-046 was logged at v0.1.3 as a

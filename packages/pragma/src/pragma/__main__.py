@@ -14,6 +14,7 @@ from pragma.cli.commands.narrative import narrative_app
 from pragma.cli.commands.report import report
 from pragma.cli.commands.slice import slice_app
 from pragma.cli.commands.spec import spec_app
+from pragma.cli.commands.start import start
 from pragma.cli.commands.unlock import unlock
 from pragma.cli.commands.verify import verify_app
 
@@ -37,6 +38,7 @@ app.command(name="doctor")(doctor)
 app.command(name="migrate")(migrate)
 app.command(name="unlock")(unlock)
 app.command(name="report")(report)
+app.command(name="start")(start)
 app.add_typer(slice_app)
 app.add_typer(spec_app)
 app.add_typer(hooks_app)
