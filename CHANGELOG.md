@@ -5,6 +5,19 @@ All notable changes to Pragma are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.3] — 2026-04-30
+
+**Tier 3 now actually fires.** v2.1.2 wired DeepSeek but tier 3 stayed silent in real use because production-source resolution depended on tier-1's `infer_target` — which returns `None` exactly for the gaming patterns where production code is replaced (mock.patch + AsyncMock, monkeypatch, vi.mock, inline subclass). Every false-negative the lower tiers couldn't catch silently bypassed tier 3 too.
+
+### Fixed
+
+- **Two-tier production-source resolution.** When `infer_target` returns nothing, tier 3 now walks the test file's imports to find a sibling `<module>.py` (or `.ts`/`.tsx`/`.js`/`.jsx`) and reads it as the production source. If even that fails, the LLM judges the test alone with a `(production source not available)` placeholder — the prompt explicitly handles that case.
+- **Verified end-to-end against the 4 v2.1.1 false-negatives.** All 4 sandboxes that escaped tier 1 + tier 2 (py-async with AsyncMock, py-class with inline fake subclass, py-import-as with autouse monkeypatch fixture, vitest-default-export with `vi.mock(...default: vi.fn())`) now emit `<lang>.semantic_gaming` warning verdicts on every test, with accurate per-test explanations from DeepSeek.
+
+### Internal
+
+- New private helpers in `src/pragma/judge/classify.py`: `_resolve_python_prod_source`, `_find_sibling_python_module`, `_resolve_vitest_prod_source`, `_find_sibling_vitest_module`. Walks imports, filters stdlib/test-only modules via `sys.stdlib_module_names`.
+
 ## [2.1.2] — 2026-04-30
 
 **Tier 3 switches to provider-agnostic LLM via OpenAI SDK.** DeepSeek is the new default backend (faster, cheaper, OpenAI-compatible). Any OpenAI-compatible endpoint works — set `PRAGMA_LLM_BASE_URL` and `PRAGMA_LLM_MODEL` to swap providers without code changes.
