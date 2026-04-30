@@ -33,7 +33,8 @@ the file lands.
 - **swallowed** — `try { call(); } catch (_) {}` swallows the call under test.
 - **skipped** — `it.skip(...)`, `it.todo(...)`, `xit(...)`.
 - **conditional** — every `expect()` inside an `if`/`for`/`while`.
-- **name/body mismatch** — name says `*_throws_*` / `*_rejects_*` but body has no `expect(...).toThrow*()`. Stub-error matches like `.toThrow("not implemented yet")` are also flagged — they're gaming the production stub, not the validation.
+- **name/body mismatch** — name says `*_throws_*` / `*_rejects_*` but body has no `expect(...).toThrow*()`.
+- **stub-error match** — every `.toThrow(...)` / `.rejects.toThrow(...)` arg in the test matches a stub phrase (`"not implemented"`, `"backend offline"`, `"service unavailable"`). Fires regardless of test name — a positive-named test asserting on the production stub's error is gaming, not verifying.
 - **orphan mock** — `const m = vi.fn().mockReturnValue(L); expect(m()).toEqual(L)`. The mock is never wired to a production symbol; the test asserts the mock returns its own configured value.
 
 ## tier 1 — patterns it warns on

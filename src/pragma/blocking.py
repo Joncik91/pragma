@@ -16,6 +16,7 @@ BLOCKING_SUFFIXES: frozenset[str] = frozenset(
         "xfail_gaming",
         "conditional",
         "mismatched",
+        "stub_error_match",
         "target_not_covered",
     }
 )

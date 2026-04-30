@@ -1,4 +1,11 @@
-"""Rule: vitest.mismatched — test name implies error but body has no .toThrow*() / try-rethrow."""
+"""Rules: vitest.mismatched and vitest.stub_error_match.
+
+`mismatched` — test name implies error but body has no .toThrow*() / try-rethrow.
+`stub_error_match` — body's only throw-assertions match stub-phrase strings
+(e.g. `.rejects.toThrow("payments backend offline")`), regardless of test name.
+The second pattern catches BUG-029: positive-named tests that assert on the
+production stub's "not implemented" / "backend offline" error and ship green.
+"""
 
 from __future__ import annotations
 
@@ -39,15 +46,42 @@ _STUB_PHRASES: frozenset[str] = frozenset(
 
 
 def classify(test_node: Node, *, source: bytes, test_name: str) -> Verdict | None:
-    """Flag when test_name implies an error/rejection but the body doesn't assert it."""
-    if not _ERROR_NAME_RE.search(test_name):
-        return None
+    """Two-path classifier.
 
+    Path 1 (vitest.mismatched): test name implies rejection but body has no
+    real throw assertion at all.
+
+    Path 2 (vitest.stub_error_match): body has throw assertions, but every
+    `.toThrow(...)` / `.rejects.toThrow(...)` arg matches a stub phrase. Fires
+    regardless of test name — a positive-named test asserting the stub's
+    error message is gaming, not verifying.
+    """
     callback = _get_callback(test_node)
     if callback is None:
         return None
 
-    if _has_throw_assertion(callback):
+    throw_calls = list(_walk_throw_calls(callback))
+    has_try_rethrow = any(
+        node.type == "try_statement" and _try_has_rethrow(node) for node in _walk(callback)
+    )
+
+    if throw_calls and not has_try_rethrow:
+        all_stub = all(_to_throw_arg_is_stub(call) for call in throw_calls)
+        if all_stub:
+            return Verdict(
+                kind="vitest.stub_error_match",
+                evidence=(
+                    "test asserts .toThrow(...) only on stub-phrase strings "
+                    "(e.g. 'not implemented', 'backend offline') — matches the "
+                    "production stub's error, not validated behavior"
+                ),
+                test_name=test_name,
+            )
+
+    if not _ERROR_NAME_RE.search(test_name):
+        return None
+
+    if _has_specific_throw_assertion(callback):
         return None
 
     return Verdict(
@@ -67,7 +101,19 @@ def _get_callback(test_node: Node) -> Node | None:
     return actual_args[1]
 
 
-def _has_throw_assertion(callback: Node) -> bool:
+def _walk_throw_calls(callback: Node):
+    """Yield call_expression nodes whose function is `.toThrow*` or `.rejects.toThrow*`."""
+    for node in _walk(callback):
+        if node.type != "call_expression":
+            continue
+        func = node.child_by_field_name("function")
+        if func is None:
+            continue
+        if _is_to_throw_call(func) or _is_rejects_to_throw_chain(func):
+            yield node
+
+
+def _has_specific_throw_assertion(callback: Node) -> bool:
     """Return True if callback contains a meaningful throw assertion.
 
     A `.toThrow(...)` call only counts when it's specific:
@@ -78,20 +124,25 @@ def _has_throw_assertion(callback: Node) -> bool:
     - `.toThrow(Error)` (the bare base class) → not fine; too generic.
     Try-rethrow patterns and `.rejects.toThrow*` chains follow the same logic.
     """
-    for node in _walk(callback):
-        if node.type == "call_expression":
-            func = node.child_by_field_name("function")
-            if func is None:
-                continue
-            if _is_to_throw_call(func) and _to_throw_args_are_specific(node):
-                return True
-            if _is_rejects_to_throw_chain(func) and _to_throw_args_are_specific(node):
-                return True
+    if any(_to_throw_args_are_specific(call) for call in _walk_throw_calls(callback)):
+        return True
 
-        if node.type == "try_statement" and _try_has_rethrow(node):
-            return True
+    return any(node.type == "try_statement" and _try_has_rethrow(node) for node in _walk(callback))
 
-    return False
+
+def _to_throw_arg_is_stub(call: Node) -> bool:
+    """Return True if the .toThrow(...) call's first arg is a stub-phrase string."""
+    args = call.child_by_field_name("arguments")
+    if args is None:
+        return False
+    actual = [c for c in args.children if c.type not in {"(", ")", ","}]
+    if not actual:
+        return False
+    first = actual[0]
+    if first.type != "string":
+        return False
+    text = first.text.decode("utf-8").strip("\"'`").lower()
+    return any(phrase in text for phrase in _STUB_PHRASES)
 
 
 def _to_throw_args_are_specific(call: Node) -> bool:

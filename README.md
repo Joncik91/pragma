@@ -49,7 +49,8 @@ shadow classes, `vi.mock` on default exports, the lot.
 | `vitest.mocked-away` | `vi.mock("./module")` or `vi.spyOn(...).mockReturnValue(...)` on the target | yes |
 | `vitest.swallowed` | `try { call(); } catch (_) {}` swallows the call | yes |
 | `vitest.skipped` | `it.skip(...)` / `xit(...)` / `it.todo(...)` | yes |
-| `vitest.mismatched` | name says `*_throws_*` but no `expect(...).toThrow*()` (also flags stub-error matches like `.toThrow("not implemented yet")`) | yes |
+| `vitest.mismatched` | name says `*_throws_*` but no `expect(...).toThrow*()` | yes |
+| `vitest.stub_error_match` | every `.toThrow(...)` arg is a stub phrase (`"not implemented"`, `"backend offline"`) — fires regardless of test name | yes |
 | `vitest.conditional` | every `expect()` lives inside an `if`/`for`/`while` | yes |
 | `vitest.orphan_mock` | `const m = vi.fn().mockReturnValue(L); expect(m()).toEqual(L)` | yes |
 | `vitest.target_not_covered` | tier 2: test ran but the target's lines had zero V8 hits | yes |

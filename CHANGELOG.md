@@ -5,6 +5,20 @@ All notable changes to Pragma are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.4] — 2026-04-30
+
+**Catches BUG-029: positive-named tests that assert on stub errors.** v2.1.3 smoke surfaced one slip — a sandbox where Claude wrote three tests against an unimplemented `refund` stub that always throws "payments backend offline". One test was named `refund_rejects_negative_amount` (caught by tier 1's `vitest.mismatched`); the other two were positive-named (`refund_succeeds`, `refund_returns_refunded_true`) and slipped past tier 1 because `mismatched` requires a rejection-keyword in the test name before checking throw assertions.
+
+### Added
+
+- **New blocking verdict `vitest.stub_error_match`.** Fires when every `.toThrow(...)` / `.rejects.toThrow(...)` arg in a test callback matches a stub-phrase string (`not implemented`, `payments backend offline`, `service unavailable`, etc.) — independent of test name. Catches the SWE-bench gaming pattern where a positive-named test asserts on the production stub's error and ships green.
+- **Fixture `tests/fixtures/blocking/vitest_stub_error_positive_name.test.ts`** mirrors the v2.1.3 smoke pattern that motivated the rule.
+
+### Changed
+
+- **`vitest_mismatched_stub_error.test.ts` and `vitest_mismatched_backend_offline.test.ts`** now classify as `vitest.stub_error_match` (more specific) rather than `vitest.mismatched`. Same blocking outcome, more precise verdict.
+- **Test count: 402 → 408.**
+
 ## [2.1.3] — 2026-04-30
 
 **Tier 3 now actually fires.** v2.1.2 wired DeepSeek but tier 3 stayed silent in real use because production-source resolution depended on tier-1's `infer_target` — which returns `None` exactly for the gaming patterns where production code is replaced (mock.patch + AsyncMock, monkeypatch, vi.mock, inline subclass). Every false-negative the lower tiers couldn't catch silently bypassed tier 3 too.

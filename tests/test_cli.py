@@ -57,8 +57,9 @@ class TestVerifyTests:
             ("vitest_swallowed.test.ts", "vitest.swallowed"),
             ("vitest_conditional.test.ts", "vitest.conditional"),
             ("vitest_mismatched.test.ts", "vitest.mismatched"),
-            ("vitest_mismatched_stub_error.test.ts", "vitest.mismatched"),
-            ("vitest_mismatched_backend_offline.test.ts", "vitest.mismatched"),
+            ("vitest_mismatched_stub_error.test.ts", "vitest.stub_error_match"),
+            ("vitest_mismatched_backend_offline.test.ts", "vitest.stub_error_match"),
+            ("vitest_stub_error_positive_name.test.ts", "vitest.stub_error_match"),
             ("vitest_orphan_mock.test.ts", "vitest.orphan_mock"),
         ],
     )
