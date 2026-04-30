@@ -1,7 +1,19 @@
-"""Thin Anthropic SDK wrapper. Uses prompt caching on the system message.
+"""Thin OpenAI-compatible LLM client. Defaults to DeepSeek; configurable via env.
 
-Reads `PRAGMA_ANTHROPIC_API_KEY` from env. Returns None on any failure
-(missing key, 5xx, rate limit, JSON parse error) so the caller skips silently.
+Reads these env vars (in order of preference, first wins):
+- PRAGMA_LLM_API_KEY (preferred — provider-agnostic)
+- PRAGMA_DEEPSEEK_API_KEY (DeepSeek-specific alias)
+- PRAGMA_ANTHROPIC_API_KEY (legacy from v2.1.1, still honored)
+
+Other env vars (with defaults):
+- PRAGMA_LLM_BASE_URL (default: https://api.deepseek.com/v1)
+- PRAGMA_LLM_MODEL (default: deepseek-chat)
+
+Returns None on any failure (missing key, SDK missing, API error,
+malformed response) so the caller (judge.classify_file) skips silently.
+
+The OpenAI SDK works against any OpenAI-compatible endpoint, so swapping
+providers (DeepSeek → OpenAI → Groq → local Ollama) is one env var.
 """
 
 from __future__ import annotations
@@ -11,50 +23,60 @@ import os
 
 from pragma.judge.prompt import SYSTEM_PROMPT, build_user_message
 
-_MODEL_ID = "claude-haiku-4-5"
+_DEFAULT_BASE_URL = "https://api.deepseek.com/v1"
+_DEFAULT_MODEL = "deepseek-chat"
+
+
+def _resolve_api_key() -> str | None:
+    """Read the API key from env, in order of preference."""
+    for var in ("PRAGMA_LLM_API_KEY", "PRAGMA_DEEPSEEK_API_KEY", "PRAGMA_ANTHROPIC_API_KEY"):
+        val = os.environ.get(var)
+        if val:
+            return val
+    return None
 
 
 def judge_test(production_source: str, test_source: str, language: str) -> tuple[bool, str] | None:
-    """Ask Haiku whether `test_source` verifies `production_source`'s behavior.
+    """Ask an OpenAI-compatible LLM whether `test_source` verifies `production_source`.
 
     Returns `(verifies, reason)` on success, None on any failure (missing key,
-    API error, malformed response). The caller (judge.classify) treats None
-    as "skip — emit no semantic_gaming verdict."
+    SDK missing, API error, malformed response). The caller treats None as
+    "skip — emit no semantic_gaming verdict."
     """
-    api_key = os.environ.get("PRAGMA_ANTHROPIC_API_KEY")
+    api_key = _resolve_api_key()
     if not api_key:
         return None
 
     try:
-        import anthropic  # type: ignore[import-untyped]
+        from openai import OpenAI  # type: ignore[import-untyped]
     except ImportError:
         return None
 
+    base_url = os.environ.get("PRAGMA_LLM_BASE_URL", _DEFAULT_BASE_URL)
+    model = os.environ.get("PRAGMA_LLM_MODEL", _DEFAULT_MODEL)
     user_msg = build_user_message(production_source, test_source, language)
 
     try:
-        client = anthropic.Anthropic(api_key=api_key)
-        response = client.messages.create(
-            model=_MODEL_ID,
+        client = OpenAI(api_key=api_key, base_url=base_url)
+        response = client.chat.completions.create(
+            model=model,
             max_tokens=256,
-            system=[
-                {
-                    "type": "text",
-                    "text": SYSTEM_PROMPT,
-                    "cache_control": {"type": "ephemeral"},
-                }
+            messages=[
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "user", "content": user_msg},
             ],
-            messages=[{"role": "user", "content": user_msg}],
         )
     except Exception:
         return None
 
     try:
-        text_blocks = [b.text for b in response.content if b.type == "text"]
-        if not text_blocks:
+        choices = response.choices
+        if not choices:
             return None
-        raw = text_blocks[0].strip()
-        # Some models wrap JSON in code fences despite instructions; strip if present
+        raw = (choices[0].message.content or "").strip()
+        if not raw:
+            return None
+        # Some models wrap JSON in code fences despite instructions; strip.
         if raw.startswith("```"):
             lines = raw.splitlines()
             raw = "\n".join(lines[1:-1] if lines[-1].startswith("```") else lines[1:])

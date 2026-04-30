@@ -5,6 +5,24 @@ All notable changes to Pragma are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.2] — 2026-04-30
+
+**Tier 3 switches to provider-agnostic LLM via OpenAI SDK.** DeepSeek is the new default backend (faster, cheaper, OpenAI-compatible). Any OpenAI-compatible endpoint works — set `PRAGMA_LLM_BASE_URL` and `PRAGMA_LLM_MODEL` to swap providers without code changes.
+
+### Changed
+
+- **Tier 3 LLM judge backend: Anthropic → DeepSeek (default).** The `[llm]` extra now installs `openai>=1.40` instead of `anthropic`. The judge calls `client.chat.completions.create()` against the configured `base_url`. DeepSeek's automatic prompt caching kicks in for the system message — no explicit opt-in needed.
+- **New env vars:**
+  - `PRAGMA_LLM_API_KEY` (preferred) — provider-agnostic key.
+  - `PRAGMA_LLM_BASE_URL` (default `https://api.deepseek.com/v1`) — point at any OpenAI-compatible endpoint.
+  - `PRAGMA_LLM_MODEL` (default `deepseek-chat`) — model ID for the configured provider.
+- **Legacy env vars still honored:** `PRAGMA_DEEPSEEK_API_KEY` and `PRAGMA_ANTHROPIC_API_KEY` continue to work as the API key (read in that order of preference). Existing v2.1.1 setups with `PRAGMA_ANTHROPIC_API_KEY` set will now hit DeepSeek by default — set `PRAGMA_LLM_BASE_URL` if you want to keep using a different provider.
+
+### Notes
+
+- **Anthropic API not directly supported in v2.1.2.** Anthropic uses a different message format (`/v1/messages`) than OpenAI-compatible chat completions (`/v1/chat/completions`). DeepSeek, OpenAI, Groq, Together, and most local servers (Ollama, LM Studio, vLLM) all work out of the box. If first-class Anthropic support is needed back, file an issue.
+- **Test count: 391 → 402.** Same coverage area; more thorough env-var resolution and passthrough tests added.
+
 ## [2.1.1] — 2026-04-26
 
 **Tier 3 LLM judge (warning-only).** Closes the v2.1 three-tier defense. After tier 1 (AST) and tier 2 (coverage), tier 3 asks Anthropic Haiku 4.5 whether each remaining `verified` test actually verifies the production function's behavior. Emits `<lang>.semantic_gaming` as a warning verdict (NOT in `BLOCKING_SUFFIXES`) — conformal calibration is deferred to v2.2 before tier 3 can block.
