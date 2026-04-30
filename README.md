@@ -142,4 +142,4 @@ tier 3 reads both files and asks whether the test verifies behavior.
 
 ## license
 
-Apache-2.0.
+MIT.
