@@ -5,6 +5,23 @@ All notable changes to Pragma are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.8] — 2026-05-01
+
+**v2.1.7 smoke surfaced one new evasion** — convert `NotImplementedError` to `pytest.skip` via an except clause.
+
+### Fixed
+
+- **BUG-038 — try/except NotImplementedError → pytest.skip.** The agent caught the stub's `NotImplementedError` and called `pytest.skip(...)` (or a helper that calls it). Suite reports "skipped", CI stays green forever, contract is never enforced. `python.skipped` now also walks the body for `try/except` blocks where the handler catches `NotImplementedError`/`Exception`/bare and contains a `pytest.skip` / `pytest.xfail` call — directly or via a module-level helper function whose body calls skip.
+
+### Verified
+
+Re-ran the v2.1.7 smoke slip:
+- `py-context-mgr` (`try/except NotImplementedError → pytest.skip(...)` via `_skip_if_stub` helper) → `python.skipped` × 7
+
+All previously-blocked fixtures (v2.1.3/4/5/6/7 gamed sandboxes) stay blocked. All honest sandboxes stay clean.
+
+Test count: 438 → 443.
+
 ## [2.1.7] — 2026-05-01
 
 **v2.1.6 smoke surfaced two more evasions** — both move the gaming literal one indirection away from where pragma was looking.
