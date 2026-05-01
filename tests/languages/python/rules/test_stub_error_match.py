@@ -110,3 +110,87 @@ def test_inner_assert_does_not_count_as_real_value_assertion():
     v = _classify(src)
     assert v is not None
     assert v.kind == "python.stub_error_match"
+
+
+def test_constructor_input_echo_does_not_clear_rule():
+    """BUG-033: assert obj.attr == constructor_input echo doesn't count as honest."""
+    src = textwrap.dedent("""
+        def test_x():
+            rl = RateLimiter(capacity=10, refill_per_second=1.0)
+            assert rl.capacity == 10
+            assert rl.refill_per_second == 1.0
+            with pytest.raises(NotImplementedError):
+                rl.allow("client-A")
+    """).strip()
+    v = _classify(src)
+    assert v is not None
+    assert v.kind == "python.stub_error_match"
+
+
+def test_inspect_signature_does_not_clear_rule():
+    """BUG-035: inspect.signature() metadata is not a value assertion."""
+    src = textwrap.dedent("""
+        def test_x():
+            sig = inspect.signature(parse_csv)
+            assert list(sig.parameters.keys()) == ["text", "delimiter", "coerce"]
+            assert callable(parse_csv)
+            with pytest.raises(NotImplementedError):
+                parse_csv("")
+    """).strip()
+    v = _classify(src)
+    assert v is not None
+    assert v.kind == "python.stub_error_match"
+
+
+def test_metadata_attr_does_not_clear_rule():
+    """BUG-035 variant: asserts on __name__/__doc__ etc don't count."""
+    src = textwrap.dedent("""
+        def test_x():
+            assert parse_csv.__name__ == "parse_csv"
+            with pytest.raises(NotImplementedError):
+                parse_csv("")
+    """).strip()
+    v = _classify(src)
+    assert v is not None
+
+
+def test_real_value_outside_constructor_echo_clears_rule():
+    """An assert that's not echoing a constructor input still clears the rule."""
+    src = textwrap.dedent("""
+        def test_x():
+            rl = RateLimiter(capacity=10, refill_per_second=1.0)
+            result = setup_environment()
+            assert result.ready == True
+            with pytest.raises(NotImplementedError):
+                rl.allow("client-A")
+    """).strip()
+    v = _classify(src)
+    assert v is None
+
+
+def test_constructor_arg_assertion_on_different_var_clears_rule():
+    """assert other.attr == 10 doesn't echo `rl`'s constructor inputs."""
+    src = textwrap.dedent("""
+        def test_x():
+            rl = RateLimiter(capacity=10, refill_per_second=1.0)
+            other = setup_other()
+            assert other.score == 42
+            with pytest.raises(NotImplementedError):
+                rl.allow("c")
+    """).strip()
+    v = _classify(src)
+    assert v is None
+
+
+def test_signature_var_does_not_clear_rule():
+    """BUG-035: sig = inspect.signature(parse_csv); assert sig.parameters[...] == ..."""
+    src = textwrap.dedent("""
+        def test_x():
+            sig = inspect.signature(parse_csv)
+            assert sig.parameters["text"].kind is inspect.Parameter.POSITIONAL_OR_KEYWORD
+            with pytest.raises(NotImplementedError):
+                parse_csv("")
+    """).strip()
+    v = _classify(src)
+    assert v is not None
+    assert v.kind == "python.stub_error_match"

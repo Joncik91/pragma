@@ -112,12 +112,23 @@ def _is_stub_shaped(call: ast.Call) -> bool:
 
 
 def _has_value_assertion(func: ast.FunctionDef, raises_calls: list[ast.Call]) -> bool:
-    """True when the body has an `assert <comparison/value>` outside the raises block.
+    """True when the body has a meaningful `assert <comparison>` outside the raises block.
 
-    We exclude `assert True`/`assert False` since those are themselves gaming
-    patterns caught by python.tautological.
+    Excludes:
+    - `assert True`/`assert False` (caught by python.tautological).
+    - Asserts inside the `with pytest.raises(...):` block.
+    - Metadata-only asserts: `inspect.signature(...)`, `callable(...)`,
+      `hasattr(...)`, asserts on `.parameters`, `.__name__`, `.__module__`,
+      `.__doc__`, `.__qualname__`. These are reflection over the symbol,
+      not invocation — they don't validate behavior (BUG-035).
+    - Constructor-input echo: `assert obj.attr == <literal>` where the
+      literal value matches a kwarg passed when constructing `obj` in the
+      same function. The test echoes its own input, validating nothing
+      (BUG-033).
     """
     raises_call_ids = {id(c) for c in raises_calls}
+    constructor_echoes = _collect_constructor_input_pairs(func)
+    metadata_vars = _collect_metadata_assigned_vars(func)
     for node in ast.walk(func):
         if not isinstance(node, ast.Assert):
             continue
@@ -126,8 +137,111 @@ def _has_value_assertion(func: ast.FunctionDef, raises_calls: list[ast.Call]) ->
         test = node.test
         if isinstance(test, ast.Constant):
             continue
+        if _is_metadata_only(test, metadata_vars):
+            continue
+        if _is_constructor_input_echo(test, constructor_echoes):
+            continue
         return True
     return False
+
+
+_METADATA_ATTRS: frozenset[str] = frozenset(
+    {"parameters", "__name__", "__module__", "__doc__", "__qualname__", "__class__", "__bases__"}
+)
+_METADATA_CALLS: frozenset[str] = frozenset(
+    {"signature", "getsource", "getsourcelines", "getfullargspec", "getmembers"}
+)
+_METADATA_BUILTINS: frozenset[str] = frozenset(
+    {"callable", "hasattr", "isinstance", "issubclass", "type", "id"}
+)
+
+
+def _is_metadata_only(node: ast.expr, metadata_vars: set[str]) -> bool:
+    """True when `node` is an assertion shape that introspects the symbol rather
+    than invoking it. These don't count as value assertions.
+    """
+    for sub in ast.walk(node):
+        if isinstance(sub, ast.Attribute) and sub.attr in _METADATA_ATTRS:
+            return True
+        if isinstance(sub, ast.Call):
+            fn = sub.func
+            if isinstance(fn, ast.Attribute) and fn.attr in _METADATA_CALLS:
+                return True
+            if isinstance(fn, ast.Name) and fn.id in _METADATA_BUILTINS:
+                return True
+        if isinstance(sub, ast.Name) and sub.id in metadata_vars:
+            return True
+    return False
+
+
+def _collect_metadata_assigned_vars(func: ast.FunctionDef) -> set[str]:
+    """Return names assigned from metadata calls (`sig = inspect.signature(...)`).
+
+    Subsequent asserts on these vars (`assert sig.parameters[...] == ...`)
+    are treated as metadata-only, not value assertions.
+    """
+    out: set[str] = set()
+    for node in ast.walk(func):
+        if not isinstance(node, ast.Assign):
+            continue
+        if not isinstance(node.value, ast.Call):
+            continue
+        fn = node.value.func
+        is_meta = (isinstance(fn, ast.Attribute) and fn.attr in _METADATA_CALLS) or (
+            isinstance(fn, ast.Name) and fn.id in _METADATA_BUILTINS
+        )
+        if not is_meta:
+            continue
+        for tgt in node.targets:
+            if isinstance(tgt, ast.Name):
+                out.add(tgt.id)
+    return out
+
+
+def _collect_constructor_input_pairs(func: ast.FunctionDef) -> dict[str, set]:
+    """Return {var_name: {literal_value, ...}} for each `var = Cls(kw=literal, ...)`.
+
+    The literals are the kwarg values used to construct `var`. Echo-asserts
+    against these values are tautological — they re-assert the test's own input.
+    """
+    pairs: dict[str, set] = {}
+    for node in ast.walk(func):
+        if not isinstance(node, ast.Assign):
+            continue
+        if len(node.targets) != 1 or not isinstance(node.targets[0], ast.Name):
+            continue
+        if not isinstance(node.value, ast.Call):
+            continue
+        var = node.targets[0].id
+        for kw in node.value.keywords:
+            if isinstance(kw.value, ast.Constant):
+                pairs.setdefault(var, set()).add(kw.value.value)
+        for arg in node.value.args:
+            if isinstance(arg, ast.Constant):
+                pairs.setdefault(var, set()).add(arg.value)
+    return pairs
+
+
+def _is_constructor_input_echo(node: ast.expr, pairs: dict[str, set]) -> bool:
+    """True when node is `obj.attr == <literal>` and that literal was passed to
+    construct `obj` in the same function body."""
+    if not isinstance(node, ast.Compare) or len(node.comparators) != 1:
+        return False
+    if not isinstance(node.ops[0], ast.Eq):
+        return False
+    left, right = node.left, node.comparators[0]
+    return _attr_matches_constructor(left, right, pairs) or _attr_matches_constructor(
+        right, left, pairs
+    )
+
+
+def _attr_matches_constructor(side_a: ast.expr, side_b: ast.expr, pairs: dict[str, set]) -> bool:
+    if not isinstance(side_a, ast.Attribute) or not isinstance(side_a.value, ast.Name):
+        return False
+    if not isinstance(side_b, ast.Constant):
+        return False
+    var = side_a.value.id
+    return var in pairs and side_b.value in pairs[var]
 
 
 def _assert_inside_raises(

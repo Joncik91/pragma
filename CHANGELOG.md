@@ -5,6 +5,32 @@ All notable changes to Pragma are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.6] — 2026-05-01
+
+**v2.1.5 smoke surfaced three guard escapes.** Agents are getting smarter at finding the rule's edges. v2.1.5's `_has_value_assertion` ("if there's any non-trivial assert, it's honest") was too coarse — it accepted asserts that don't validate behavior. v2.1.5's `xfail_gaming` only walked per-function decorators, missing module-level `pytestmark`.
+
+### Fixed
+
+- **BUG-033 — constructor-input echo.** `assert obj.attr == <literal>` where the literal was just passed to construct `obj` is tautological — the test echoes its own input. The guard now collects constructor kwarg/arg literals per-variable and ignores echo-asserts. Real value assertions (e.g. `assert other.score == 42` on a different variable, or `assert result.ready == True` from a separate setup call) still clear the rule.
+- **BUG-034 — module-level pytestmark.** `pytestmark = pytest.mark.xfail(strict=True, raises=NotImplementedError)` at module level propagates xfail to every test in the file. `python.xfail_gaming` now also walks the module body for this assignment (and the list-form variant).
+- **BUG-035 — metadata-only asserts.** `inspect.signature(...)`, `callable(...)`, `hasattr(...)`, `obj.__name__`, `sig.parameters[...]` etc are reflection over the symbol, not invocation of it. The guard now ignores asserts that contain these calls/attrs, *and* tracks variables assigned from metadata calls (e.g. `sig = inspect.signature(parse_csv)`) so subsequent asserts on `sig.parameters[...]` are also caught as metadata-only.
+
+### Added
+
+- **`gamed_module_pytestmark_xfail.py` fixture** for the module-level xfail case.
+- **8 new unit tests** covering the three guard escapes plus their honest-pattern counterparts (real asserts on non-constructor variables, asserts that aren't reflection-based).
+
+### Verified
+
+Re-ran the v2.1.5 smoke-surfaced gamed sandboxes:
+- `py-rate-limit` (constructor-input echo) — now `python.stub_error_match` × 3 (blocking)
+- `py-csv-parse` (`inspect.signature(parse_csv)` metadata) — now `python.stub_error_match` × 17 (blocking)
+- `py-config` (`pytestmark = pytest.mark.xfail(strict=True)`) — now `python.xfail_gaming` × 4 (blocking)
+
+All four honest sandboxes (py-discount, py-jwt, py-cache, vitest-async-flow) stay clean.
+
+Test count: 422 → 432.
+
 ## [2.1.5] — 2026-05-01
 
 **v2.1.4 smoke surfaced three more shapes of stub-error gaming.** All three pin the production stub's "not implemented" contract using a non-string match — bare `.toThrow()` (no args), `.toThrow(/regex stub-phrase/)`, or `pytest.raises(NotImplementedError)`. v2.1.4's stub_error_match only handled string-literal stub phrases. v2.1.5 generalizes the rule across both languages.

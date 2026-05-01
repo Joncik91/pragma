@@ -76,3 +76,81 @@ def test_does_not_fire_on_undecorated_test():
     src = "def test_x(): assert do_thing() == 42"
     verdict = _classify(src)
     assert verdict is None
+
+
+def test_module_level_pytestmark_xfail_strict():
+    """BUG-034: pytestmark = pytest.mark.xfail(strict=True) is the same gaming."""
+    src = textwrap.dedent("""
+        import pytest
+
+        pytestmark = pytest.mark.xfail(strict=True, raises=NotImplementedError)
+
+        def test_x():
+            search("")
+    """).strip()
+    tree = ast.parse(src)
+    func = next(n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef))
+    from pragma.languages.python.rules.xfail_gaming import classify
+
+    v = classify(
+        func,
+        test_name="test_x",
+        expected="success",
+        target_module="m",
+        target_symbol="s",
+        tree=tree,
+    )
+    assert v is not None
+    assert v.kind == "python.xfail_gaming"
+
+
+def test_module_level_pytestmark_list_with_xfail_strict():
+    """List form: pytestmark = [pytest.mark.xfail(strict=True), other_mark]."""
+    src = textwrap.dedent("""
+        import pytest
+
+        pytestmark = [
+            pytest.mark.usefixtures("setup"),
+            pytest.mark.xfail(strict=True, raises=NotImplementedError),
+        ]
+
+        def test_x():
+            search("")
+    """).strip()
+    tree = ast.parse(src)
+    func = next(n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef))
+    from pragma.languages.python.rules.xfail_gaming import classify
+
+    v = classify(
+        func,
+        test_name="test_x",
+        expected="success",
+        target_module="m",
+        target_symbol="s",
+        tree=tree,
+    )
+    assert v is not None
+
+
+def test_module_level_pytestmark_without_strict_does_not_fire():
+    src = textwrap.dedent("""
+        import pytest
+
+        pytestmark = pytest.mark.usefixtures("setup")
+
+        def test_x():
+            search("")
+    """).strip()
+    tree = ast.parse(src)
+    func = next(n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef))
+    from pragma.languages.python.rules.xfail_gaming import classify
+
+    v = classify(
+        func,
+        test_name="test_x",
+        expected="success",
+        target_module="m",
+        target_symbol="s",
+        tree=tree,
+    )
+    assert v is None

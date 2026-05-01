@@ -8,7 +8,7 @@
       "name": "pragma",
       "source": "./plugin",
       "description": "Catches AI test-gaming. PreToolUse and PostToolUse hooks scan test files for tautological asserts, mocked-away targets, and name/body mismatches; block the tool call when found.",
-      "version": "2.1.5"
+      "version": "2.1.6"
     }
   ]
 }
