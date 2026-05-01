@@ -5,9 +5,9 @@ All notable changes to Pragma are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.4.0] — 2026-05-01
+## [0.3.0] — 2026-05-01
 
-**Jest test runner support.** (Originally tagged as v0.3.0 and re-released as v0.4.0 within minutes — the version sequence is counted from the v2.0 baseline, where 0.2 = step 2 from v2.0, the renumber commit = step 3, and this Jest release = step 4.) Pragma now classifies Jest test files alongside Vitest and Python. The JS/TS rule chain has been refactored into a dialect-parameterized core (`_jsts_core`) so future runners (Bun's test, Deno's test) become small adapters rather than full ports.
+**Jest test runner support.** Pragma now classifies Jest test files alongside Vitest and Python. The JS/TS rule chain has been refactored into a dialect-parameterized core (`_jsts_core`) so future runners (Bun's test, Deno's test) become small adapters rather than full ports.
 
 ### Added
 
