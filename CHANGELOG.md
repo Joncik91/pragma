@@ -5,6 +5,25 @@ All notable changes to Pragma are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0] — 2026-05-01
+
+**Renumbered to 0.x.** Pragma started at v2.0.0 by mistake — the project name was a fork of an earlier internal tool. The runtime hasn't earned 2.x semantics: we're still discovering AI test-gaming patterns (10 BUGs filed across 5 smoke rounds in v2.1.4 → v2.1.8), the rule API can change, and any release may break test fixtures that depend on specific verdict kinds. **Pre-1.0 = expect breaking changes.**
+
+### Changed
+
+- Version bumped from `2.1.9` → `0.2.0` across `pyproject.toml`, `plugin.json`, `marketplace.json`, and `pragma.__version__`. The wire-format JSON, CLI surface, and verdict kinds are unchanged from v2.1.9.
+- Existing `pipx install pragma==2.1.x` users will need to reinstall: `pipx install --force pragma==0.2.0`. (Or `pipx install --force pragma` for latest.)
+- v2.x git tags and GitHub releases stay as-is for archaeology — don't break anyone who pinned `pragma==2.1.7`.
+
+### Why now
+
+The v2.1.9 structural fix (`no_success_assertion` rule) is a meaningful shift in how pragma works: from per-shape AST rules to a file-level structural property. Before pushing more agents/users at it, the version number should match the maturity. 0.2.0 communicates: "real, working, but iterating fast — pin the exact version if you depend on specific verdict shapes."
+
+### What stays
+
+- All previous CHANGELOG history below this entry. Old release notes describe the v2.x line accurately.
+- The semantic content of v2.1.9 (file-level `no_success_assertion`) ships unchanged in v0.2.0.
+
 ## [2.1.9] — 2026-05-01
 
 **Structural fix for the whack-a-mole.** Across v2.1.4 → v2.1.8 we filed 10 BUGs (BUG-029 → BUG-038). Every single one shared the same semantic shape: *the test asserts the production target FAILS (throws / raises NotImplementedError / is skipped / is xfailed) without any test in the file asserting the target SUCCEEDS at returning a real value*. Each fix added a new AST shape — frozensets of stub phrases, decorator-via-variable resolvers, helper-via-name resolvers, metadata-only-assert filters, constructor-input-echo filters. Each release closed one shape; agents found a new one indirection deeper.
