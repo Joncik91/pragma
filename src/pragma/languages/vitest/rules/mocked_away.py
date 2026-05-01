@@ -1,9 +1,10 @@
-"""Rule: vitest.mocked-away — assertion on a vi.mock()ed symbol tests the mock."""
+"""Rule: <lang>.mocked-away — assertion on a vi.mock()ed / jest.mock()ed symbol tests the mock."""
 
 from __future__ import annotations
 
 from tree_sitter import Node
 
+from pragma.languages._jsts_core.dialect import VITEST_DIALECT, Dialect
 from pragma.verdict import Verdict
 
 _MOCK_METHODS: frozenset[str] = frozenset(
@@ -20,14 +21,23 @@ _MOCK_METHODS: frozenset[str] = frozenset(
 )
 
 
-def classify(test_node: Node, *, source: bytes, test_name: str) -> Verdict | None:
+def classify(
+    test_node: Node,
+    *,
+    source: bytes,
+    test_name: str,
+    dialect: Dialect = VITEST_DIALECT,
+) -> Verdict | None:
     """Flag when the test body calls and asserts on a mocked symbol.
 
     Two detection paths:
-    1. vi.mock("./path") at module level + import { X } from "./path"
-    2. vi.spyOn(<alias>, "<sym>").mock*(...) where alias is from
+    1. <ns>.mock("./path") at module level + import { X } from "./path"
+    2. <ns>.spyOn(<alias>, "<sym>").mock*(...) where alias is from
        ``import * as <alias> from "./path"``
     """
+    ns = dialect.mock_namespace
+    kind = f"{dialect.language_prefix}.mocked-away"
+
     root = _find_program_root(test_node)
     if root is None:
         return None
@@ -38,7 +48,7 @@ def classify(test_node: Node, *, source: bytes, test_name: str) -> Verdict | Non
         return None
 
     # --- Path 1: vi.mock(...) at module level ---
-    mocked_paths = _collect_vi_mock_paths(root)
+    mocked_paths = _collect_vi_mock_paths(root, ns)
     if mocked_paths:
         imports_by_path = _collect_imports(root)
         for path in mocked_paths:
@@ -48,28 +58,26 @@ def classify(test_node: Node, *, source: bytes, test_name: str) -> Verdict | Non
             for symbol in imported_names:
                 if _body_calls_and_asserts_symbol(callback, symbol):
                     evidence = (
-                        f"vi.mock on '{path}' + assertion on {symbol}(...)"
+                        f"{ns}.mock on '{path}' + assertion on {symbol}(...)"
                         f" — testing the mock, not the implementation"
                     )
-                    return Verdict(
-                        kind="vitest.mocked-away", evidence=evidence, test_name=test_name
-                    )
+                    return Verdict(kind=kind, evidence=evidence, test_name=test_name)
 
     # --- Path 2: vi.spyOn(<alias>, "<sym>").mock*(...) ---
     namespace_imports = _collect_namespace_imports(root)
     if namespace_imports:
-        spyon_targets = _collect_spyon_replacements(callback)
+        spyon_targets = _collect_spyon_replacements(callback, ns)
         for alias, symbol in spyon_targets:
             if alias not in namespace_imports:
                 continue
             module_path = namespace_imports[alias]
             if _body_calls_and_asserts_member(callback, alias, symbol):
                 evidence = (
-                    f"vi.spyOn({alias}, '{symbol}').mock*(...) on '{module_path}'"
+                    f"{ns}.spyOn({alias}, '{symbol}').mock*(...) on '{module_path}'"
                     f" + assertion on {alias}.{symbol}(...)"
                     f" — testing the mock, not the implementation"
                 )
-                return Verdict(kind="vitest.mocked-away", evidence=evidence, test_name=test_name)
+                return Verdict(kind=kind, evidence=evidence, test_name=test_name)
 
     # --- Path 3: vi.mock(<path>) + import * as <alias> (namespace import) ---
     if mocked_paths:
@@ -83,12 +91,10 @@ def classify(test_node: Node, *, source: bytes, test_name: str) -> Verdict | Non
                 for symbol in _collect_member_calls_on(callback, alias):
                     if _body_calls_and_asserts_member(callback, alias, symbol):
                         evidence = (
-                            f"vi.mock on {path!r} + assertion on {alias}.{symbol}(...)"
+                            f"{ns}.mock on {path!r} + assertion on {alias}.{symbol}(...)"
                             f" — testing the mock, not the implementation"
                         )
-                        return Verdict(
-                            kind="vitest.mocked-away", evidence=evidence, test_name=test_name
-                        )
+                        return Verdict(kind=kind, evidence=evidence, test_name=test_name)
 
     return None
 
@@ -101,8 +107,8 @@ def _find_program_root(node: Node) -> Node | None:
     return current if current.type == "program" else None
 
 
-def _collect_vi_mock_paths(root: Node) -> set[str]:
-    """Find all top-level vi.mock("./path", ...) calls and return the module paths."""
+def _collect_vi_mock_paths(root: Node, ns: str = "vi") -> set[str]:
+    """Find all top-level <ns>.mock("./path", ...) calls and return the module paths."""
     paths: set[str] = set()
     for child in root.children:
         # Must be top-level: expression_statement containing a call_expression
@@ -118,7 +124,7 @@ def _collect_vi_mock_paths(root: Node) -> set[str]:
             prop = func.child_by_field_name("property")
             if obj is None or prop is None:
                 continue
-            if obj.text.decode("utf-8") != "vi":
+            if obj.text.decode("utf-8") != ns:
                 continue
             if prop.text.decode("utf-8") != "mock":
                 continue
@@ -302,16 +308,16 @@ def _collect_namespace_imports(root: Node) -> dict[str, str]:
     return result
 
 
-def _collect_spyon_replacements(callback: Node) -> set[tuple[str, str]]:
-    """Walk callback for ``vi.spyOn(<alias>, "<sym>").<mock*>(...)`` chains.
+def _collect_spyon_replacements(callback: Node, ns: str = "vi") -> set[tuple[str, str]]:
+    """Walk callback for ``<ns>.spyOn(<alias>, "<sym>").<mock*>(...)`` chains.
 
     Returns a set of (alias, symbol) pairs where a mock* method is chained.
-    Plain ``vi.spyOn(...)`` without a mock* chain is excluded (observation only).
+    Plain ``<ns>.spyOn(...)`` without a mock* chain is excluded (observation only).
     """
     targets: set[tuple[str, str]] = set()
     for node in _walk(callback):
         # Looking for: call_expression whose function is a member_expression
-        # with property in _MOCK_METHODS, and whose object is the vi.spyOn call.
+        # with property in _MOCK_METHODS, and whose object is the <ns>.spyOn call.
         if node.type != "call_expression":
             continue
         func = node.child_by_field_name("function")
@@ -320,18 +326,18 @@ def _collect_spyon_replacements(callback: Node) -> set[tuple[str, str]]:
         prop = func.child_by_field_name("property")
         if prop is None or prop.text.decode("utf-8") not in _MOCK_METHODS:
             continue
-        # The object of the member_expression must be the vi.spyOn(...) call
+        # The object of the member_expression must be the <ns>.spyOn(...) call
         obj = func.child_by_field_name("object")
         if obj is None or obj.type != "call_expression":
             continue
-        spyon_pair = _extract_spyon_args(obj)
+        spyon_pair = _extract_spyon_args(obj, ns)
         if spyon_pair is not None:
             targets.add(spyon_pair)
     return targets
 
 
-def _extract_spyon_args(call_node: Node) -> tuple[str, str] | None:
-    """If call_node is ``vi.spyOn(<alias>, "<sym>")``, return (alias, sym)."""
+def _extract_spyon_args(call_node: Node, ns: str = "vi") -> tuple[str, str] | None:
+    """If call_node is ``<ns>.spyOn(<alias>, "<sym>")``, return (alias, sym)."""
     spyon_func = call_node.child_by_field_name("function")
     if spyon_func is None or spyon_func.type != "member_expression":
         return None
@@ -339,7 +345,7 @@ def _extract_spyon_args(call_node: Node) -> tuple[str, str] | None:
     vi_prop = spyon_func.child_by_field_name("property")
     if vi_obj is None or vi_prop is None:
         return None
-    if vi_obj.text.decode("utf-8") != "vi":
+    if vi_obj.text.decode("utf-8") != ns:
         return None
     if vi_prop.text.decode("utf-8") != "spyOn":
         return None

@@ -5,6 +5,33 @@ All notable changes to Pragma are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] — 2026-05-01
+
+**Jest test runner support.** Pragma now classifies Jest test files alongside Vitest and Python. The JS/TS rule chain has been refactored into a dialect-parameterized core (`_jsts_core`) so future runners (Bun's test, Deno's test) become small adapters rather than full ports.
+
+### Added
+
+- **New language: Jest.** `src/pragma/languages/jest/` registered in the language registry. Verdict prefix is `jest.<kind>`. Reuses the entire Vitest rule chain (skipped, tautological, mocked_away, orphan_mock, swallowed, empty_body, conditional, mismatched, no_success_assertion) via the shared `_jsts_core` module.
+- **New blocking verdict: `jest.test_failing_gaming`.** Jest's `test.failing("name", () => { ... })` is the runner's xfail-strict equivalent — the test passes only if the body throws. Pinning a stub's throw with `test.failing` is structurally identical to `@pytest.mark.xfail(strict=True, raises=NotImplementedError)`. Fires on any `test.failing(...)` / `it.failing(...)` / `test.only.failing(...)` call.
+- **Path-based file matching for Jest.** Jest tests usually use auto-injected globals. `jest.matches(path)` matches `*.test.*`, `*.spec.*`, `__tests__/<file>.*` purely by path. Files that import `from "vitest"` are explicitly rejected so vitest and jest stay disjoint.
+
+### Changed
+
+- **`_jsts_core` shared module.** New `src/pragma/languages/_jsts_core/` directory: `dialect.py` (the `Dialect` dataclass + `VITEST_DIALECT`, `JEST_DIALECT`) and `__init__.py` (`classify_with_dialect(path, dialect, extra_rules=())`). Vitest rule files now accept a `dialect: Dialect = VITEST_DIALECT` kwarg; behavior unchanged when called without one.
+- **Mock namespace parameterization.** `mocked_away` and `orphan_mock` accept the namespace from the dialect (`vi` for Vitest, `jest` for Jest) instead of hardcoding `"vi"`.
+- **Verdict prefix parameterization.** Every rule's `Verdict(kind=...)` interpolates `{dialect.language_prefix}`. Vitest is byte-identical; Jest gets `jest.<kind>` verdicts.
+
+### Verified
+
+- 5 new Jest fixtures fire the expected `jest.<kind>` verdict.
+- Every existing Vitest test still passes byte-for-byte. The refactor is strictly additive.
+- Test count: 446 → 451.
+
+### Migration notes
+
+- **No breaking changes.** Wire-format JSON, CLI surface, and existing verdict kinds are unchanged.
+- **Cross-contamination check:** a `*.test.ts` file with `from "vitest"` routes to vitest; the same path without that import routes to jest.
+
 ## [0.2.0] — 2026-05-01
 
 **Renumbered to 0.x.** Pragma started at v2.0.0 by mistake — the project name was a fork of an earlier internal tool. The runtime hasn't earned 2.x semantics: we're still discovering AI test-gaming patterns (10 BUGs filed across 5 smoke rounds in v2.1.4 → v2.1.8), the rule API can change, and any release may break test fixtures that depend on specific verdict kinds. **Pre-1.0 = expect breaking changes.**

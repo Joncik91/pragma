@@ -1,13 +1,20 @@
-"""Rule: vitest.swallowed — try { call(); } catch (_) {} swallows the call under test."""
+"""Rule: <lang>.swallowed — try { call(); } catch (_) {} swallows the call under test."""
 
 from __future__ import annotations
 
 from tree_sitter import Node
 
+from pragma.languages._jsts_core.dialect import VITEST_DIALECT, Dialect
 from pragma.verdict import Verdict
 
 
-def classify(test_node: Node, *, source: bytes, test_name: str) -> Verdict | None:
+def classify(
+    test_node: Node,
+    *,
+    source: bytes,
+    test_name: str,
+    dialect: Dialect = VITEST_DIALECT,
+) -> Verdict | None:
     """Flag when:
     - The callback contains a try_statement with an empty catch (or console.* only)
     - No expect() exists OUTSIDE the try_statement
@@ -28,7 +35,7 @@ def classify(test_node: Node, *, source: bytes, test_name: str) -> Verdict | Non
     for try_node in try_nodes:
         if _has_swallowed_catch(try_node):
             return Verdict(
-                kind="vitest.swallowed",
+                kind=f"{dialect.language_prefix}.swallowed",
                 evidence="try { call(); } catch (_) {} swallows the call under test",
                 test_name=test_name,
             )

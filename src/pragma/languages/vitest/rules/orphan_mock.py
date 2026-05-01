@@ -1,9 +1,10 @@
-"""Rule: vitest.orphan_mock — vi.fn() return value asserted without wiring to production symbol."""
+"""Rule: <lang>.orphan_mock — assert on a <ns>.fn()'s configured return value."""
 
 from __future__ import annotations
 
 from tree_sitter import Node
 
+from pragma.languages._jsts_core.dialect import VITEST_DIALECT, Dialect
 from pragma.verdict import Verdict
 
 # vi.fn() chained mock methods that set a return literal
@@ -23,14 +24,20 @@ _MOCK_METHODS = frozenset(
 _MATCHERS = frozenset({"toBe", "toEqual", "toStrictEqual"})
 
 
-def classify(test_node: Node, *, source: bytes, test_name: str) -> Verdict | None:
-    """Flag orphan mock assertions: const m = vi.fn().<mock*>(L); expect(m(...)).toXxx(L)."""
+def classify(
+    test_node: Node,
+    *,
+    source: bytes,
+    test_name: str,
+    dialect: Dialect = VITEST_DIALECT,
+) -> Verdict | None:
+    """Flag orphan mock assertions: const m = <ns>.fn().<mock*>(L); expect(m(...)).toXxx(L)."""
     callback = _get_callback(test_node)
     if callback is None:
         return None
 
     # Phase 1: collect orphan mock bindings: {mock_name: literal_bytes}
-    orphan_mocks = _collect_orphan_mocks(callback)
+    orphan_mocks = _collect_orphan_mocks(callback, dialect.mock_namespace)
     if not orphan_mocks:
         return None
 
@@ -46,7 +53,9 @@ def classify(test_node: Node, *, source: bytes, test_name: str) -> Verdict | Non
     if evidence is None:
         return None
 
-    return Verdict(kind="vitest.orphan_mock", evidence=evidence, test_name=test_name)
+    return Verdict(
+        kind=f"{dialect.language_prefix}.orphan_mock", evidence=evidence, test_name=test_name
+    )
 
 
 def _get_callback(test_node: Node) -> Node | None:
@@ -60,8 +69,8 @@ def _get_callback(test_node: Node) -> Node | None:
     return actual_args[1]
 
 
-def _collect_orphan_mocks(callback: Node) -> dict[str, bytes]:
-    """Walk for `const <name> = vi.fn().<mock*>(<literal>)` declarations.
+def _collect_orphan_mocks(callback: Node, ns: str = "vi") -> dict[str, bytes]:
+    """Walk for `const <name> = <ns>.fn().<mock*>(<literal>)` declarations.
 
     Returns {name: literal_bytes} for each binding found.
     """
@@ -78,7 +87,7 @@ def _collect_orphan_mocks(callback: Node) -> dict[str, bytes]:
                 continue
             if name_node.type != "identifier":
                 continue
-            literal = _extract_vi_fn_mock_literal(value_node)
+            literal = _extract_vi_fn_mock_literal(value_node, ns)
             if literal is None:
                 continue
             result[name_node.text.decode("utf-8")] = literal
@@ -112,15 +121,15 @@ def _collect_result_bindings(
     return result
 
 
-def _extract_vi_fn_mock_literal(node: Node) -> bytes | None:
-    """If node is `vi.fn().<mockMethod>(<literal>)`, return the literal bytes; else None.
+def _extract_vi_fn_mock_literal(node: Node, ns: str = "vi") -> bytes | None:
+    """If node is `<ns>.fn().<mockMethod>(<literal>)`, return the literal bytes; else None.
 
     Shape (from AST inspection):
       call_expression
         function: member_expression
-          object: call_expression  (vi.fn())
+          object: call_expression  (<ns>.fn())
             function: member_expression
-              object: identifier 'vi'
+              object: identifier '<ns>'
               property: property_identifier 'fn'
             arguments: '()'
           property: property_identifier '<mockMethod>'
@@ -142,8 +151,8 @@ def _extract_vi_fn_mock_literal(node: Node) -> bytes | None:
     if mock_method not in _MOCK_METHODS:
         return None
 
-    # obj must be vi.fn() — a call_expression whose function is 'vi.fn'
-    if not _is_vi_fn_call(obj):
+    # obj must be <ns>.fn() — a call_expression whose function is '<ns>.fn'
+    if not _is_vi_fn_call(obj, ns):
         return None
 
     args = node.child_by_field_name("arguments")
@@ -156,8 +165,8 @@ def _extract_vi_fn_mock_literal(node: Node) -> bytes | None:
     return actual_args[0].text
 
 
-def _is_vi_fn_call(node: Node) -> bool:
-    """True when node is the call_expression `vi.fn()`."""
+def _is_vi_fn_call(node: Node, ns: str = "vi") -> bool:
+    """True when node is the call_expression `<ns>.fn()`."""
     if node.type != "call_expression":
         return False
     func = node.child_by_field_name("function")
@@ -167,7 +176,8 @@ def _is_vi_fn_call(node: Node) -> bool:
     fn_prop = func.child_by_field_name("property")
     if vi_obj is None or fn_prop is None:
         return False
-    return vi_obj.type == "identifier" and vi_obj.text == b"vi" and fn_prop.text == b"fn"
+    ns_bytes = ns.encode("utf-8")
+    return vi_obj.type == "identifier" and vi_obj.text == ns_bytes and fn_prop.text == b"fn"
 
 
 def _find_orphan_assertion(

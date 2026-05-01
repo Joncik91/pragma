@@ -1,16 +1,23 @@
-"""Rule: vitest.skipped — it.skip / it.todo / xit / xtest declares a non-running test."""
+"""Rule: <lang>.skipped — it.skip / it.todo / xit / xtest declares a non-running test."""
 
 from __future__ import annotations
 
 from tree_sitter import Node
 
+from pragma.languages._jsts_core.dialect import VITEST_DIALECT, Dialect
 from pragma.verdict import Verdict
 
 _SKIP_IDENTIFIERS = frozenset({"xit", "xtest"})
 _SKIP_ATTRS = frozenset({"skip", "todo"})
 
 
-def classify(test_node: Node, *, source: bytes, test_name: str) -> Verdict | None:
+def classify(
+    test_node: Node,
+    *,
+    source: bytes,
+    test_name: str,
+    dialect: Dialect = VITEST_DIALECT,
+) -> Verdict | None:
     """Flag skipped/todo/xit/xtest test declarations."""
     func = test_node.child_by_field_name("function")
     if func is None:
@@ -20,7 +27,7 @@ def classify(test_node: Node, *, source: bytes, test_name: str) -> Verdict | Non
         name = func.text.decode("utf-8")
         if name in _SKIP_IDENTIFIERS:
             return Verdict(
-                kind="vitest.skipped",
+                kind=f"{dialect.language_prefix}.skipped",
                 evidence=f"{name}(...) declares a non-running test",
                 test_name=test_name,
             )
@@ -33,7 +40,7 @@ def classify(test_node: Node, *, source: bytes, test_name: str) -> Verdict | Non
             obj_name = obj.text.decode("utf-8")
             if attr in _SKIP_ATTRS:
                 return Verdict(
-                    kind="vitest.skipped",
+                    kind=f"{dialect.language_prefix}.skipped",
                     evidence=f"{obj_name}.{attr}(...) declares a non-running test",
                     test_name=test_name,
                 )

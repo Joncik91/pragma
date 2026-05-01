@@ -1,20 +1,27 @@
-"""Rule: vitest.empty_body — test body has no expect() and no assert call."""
+"""Rule: <lang>.empty_body — test body has no expect() and no assert call."""
 
 from __future__ import annotations
 
 from tree_sitter import Node
 
+from pragma.languages._jsts_core.dialect import VITEST_DIALECT, Dialect
 from pragma.verdict import Verdict
 
 
-def classify(test_node: Node, *, source: bytes, test_name: str) -> Verdict | None:
+def classify(
+    test_node: Node,
+    *,
+    source: bytes,
+    test_name: str,
+    dialect: Dialect = VITEST_DIALECT,
+) -> Verdict | None:
     """Flag when the test callback has no expect() or assert.* call."""
     callback = _get_callback(test_node)
     if callback is None:
         return None
     if not _has_any_assertion(callback):
         return Verdict(
-            kind="vitest.empty_body",
+            kind=f"{dialect.language_prefix}.empty_body",
             evidence="test body has no expect() and no assert",
             test_name=test_name,
         )

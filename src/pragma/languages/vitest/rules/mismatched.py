@@ -13,6 +13,7 @@ import re
 
 from tree_sitter import Node
 
+from pragma.languages._jsts_core.dialect import VITEST_DIALECT, Dialect
 from pragma.verdict import Verdict
 
 _ERROR_NAME_RE = re.compile(r"(rejects?|raises?|refuses?|denies|throws)", re.IGNORECASE)
@@ -45,13 +46,19 @@ _STUB_PHRASES: frozenset[str] = frozenset(
 )
 
 
-def classify(test_node: Node, *, source: bytes, test_name: str) -> Verdict | None:
+def classify(
+    test_node: Node,
+    *,
+    source: bytes,
+    test_name: str,
+    dialect: Dialect = VITEST_DIALECT,
+) -> Verdict | None:
     """Two-path classifier.
 
-    Path 1 (vitest.mismatched): test name implies rejection but body has no
+    Path 1 (<lang>.mismatched): test name implies rejection but body has no
     real throw assertion at all.
 
-    Path 2 (vitest.stub_error_match): body has throw assertions, but every
+    Path 2 (<lang>.stub_error_match): body has throw assertions, but every
     `.toThrow(...)` / `.rejects.toThrow(...)` arg matches a stub phrase. Fires
     regardless of test name — a positive-named test asserting the stub's
     error message is gaming, not verifying.
@@ -70,7 +77,7 @@ def classify(test_node: Node, *, source: bytes, test_name: str) -> Verdict | Non
         all_stub = all(_to_throw_arg_is_stub(call, stub_idents) for call in throw_calls)
         if all_stub and not _has_value_assertion(callback, throw_calls):
             return Verdict(
-                kind="vitest.stub_error_match",
+                kind=f"{dialect.language_prefix}.stub_error_match",
                 evidence=(
                     "test's only throw assertions are stub-shaped "
                     "(stub-phrase string, regex, bare .toThrow(), or bare Error class) "
@@ -87,7 +94,7 @@ def classify(test_node: Node, *, source: bytes, test_name: str) -> Verdict | Non
         return None
 
     return Verdict(
-        kind="vitest.mismatched",
+        kind=f"{dialect.language_prefix}.mismatched",
         evidence="test name implies rejection but body has no .toThrow*() / try-rethrow",
         test_name=test_name,
     )

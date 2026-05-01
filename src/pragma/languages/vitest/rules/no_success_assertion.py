@@ -17,21 +17,26 @@ from pathlib import Path
 
 from tree_sitter import Node
 
+from pragma.languages._jsts_core.dialect import VITEST_DIALECT, Dialect
 from pragma.languages.vitest.rules.mismatched import (
     _STUB_PHRASES,
     _walk,
 )
 from pragma.verdict import Verdict
 
-ALLOWED_REPLACEMENTS: frozenset[str] = frozenset(
-    {
-        "vitest.verified",
-        "vitest.stub_error_match",
-        "vitest.skipped",
-        "vitest.mismatched",
-        "vitest.swallowed",
-    }
+# Replacement-eligible verdict suffixes (without language prefix). Built per call
+# from `dialect.language_prefix`.
+_REPLACE_SUFFIXES: frozenset[str] = frozenset(
+    {"verified", "stub_error_match", "skipped", "mismatched", "swallowed"}
 )
+
+
+def _allowed_replacements(prefix: str) -> frozenset[str]:
+    return frozenset(f"{prefix}.{s}" for s in _REPLACE_SUFFIXES)
+
+
+# Back-compat: existing imports of ALLOWED_REPLACEMENTS still resolve, defaulted to vitest.
+ALLOWED_REPLACEMENTS: frozenset[str] = _allowed_replacements("vitest")
 
 _REJECT_RE = re.compile(r"(rejects?|raises?|refuses?|denies|throws)", re.IGNORECASE)
 
@@ -70,11 +75,12 @@ def apply_file_pass(
     source: bytes,
     test_path: Path,
     prior_verdicts: list[Verdict],
+    dialect: Dialect = VITEST_DIALECT,
 ) -> list[Verdict]:
-    """Replace eligible verdicts with vitest.no_success_assertion when the file
+    """Replace eligible verdicts with <lang>.no_success_assertion when the file
     has imported production targets but no test asserts on a real return value
     (and the file isn't a pure-validator file)."""
-    imported = _imported_targets(root_node, test_path)
+    imported = _imported_targets(root_node, test_path, dialect.runner_module_substring)
     if not imported:
         return prior_verdicts
     if _file_has_success_assertion(root_node, imported):
@@ -89,18 +95,20 @@ def apply_file_pass(
         "on a real return value — every test in this file pins the stub's "
         "failure-mode contract"
     )
+    allowed = _allowed_replacements(dialect.language_prefix)
+    new_kind = f"{dialect.language_prefix}.no_success_assertion"
     return [
-        Verdict(kind="vitest.no_success_assertion", evidence=evidence, test_name=v.test_name)
-        if v.kind in ALLOWED_REPLACEMENTS
-        else v
+        Verdict(kind=new_kind, evidence=evidence, test_name=v.test_name) if v.kind in allowed else v
         for v in prior_verdicts
     ]
 
 
-def _imported_targets(root_node: Node, test_path: Path) -> set[str]:
+def _imported_targets(
+    root_node: Node, test_path: Path, runner_substring: str = "vitest"
+) -> set[str]:
     """Return identifiers from `import { a, b } from "<rel>"` where <rel>
     resolves to a sibling file. Also `import X from "<rel>"` (default).
-    Skips `from "vitest"` and node builtins.
+    Skips runner-self imports (`from "vitest"` / `from "@jest/globals"`).
     """
     out: set[str] = set()
     for node in _walk(root_node):
@@ -109,7 +117,7 @@ def _imported_targets(root_node: Node, test_path: Path) -> set[str]:
         src = _import_source(node)
         if not src or not src.startswith("."):
             continue
-        if "vitest" in src.lower():
+        if runner_substring in src.lower():
             continue
         # Resolve to verify it's a sibling (skip if no file exists — defensive,
         # this is just used to filter out broken imports).

@@ -28,16 +28,19 @@ the file lands.
 - **conditional** — every assertion lives inside an `if`/`for`/`while` branch the inputs never enter. Assertions that may not run can't catch bugs.
 - **orphan test** — `tests/test_X.py` that never imports `X` and instead redefines a fake locally. The production code is never exercised.
 
-## tier 1 — patterns it blocks (Vitest)
+## tier 1 — patterns it blocks (Vitest and Jest)
+
+Same rules apply to both runners; the only difference is the mock namespace (`vi.*` for Vitest, `jest.*` for Jest) and one Jest-only rule (`test.failing` — see below).
 
 - **tautological asserts** — `expect(true).toBe(true)`, `expect(x).toBe(x)`.
-- **mock-the-target** — `vi.mock("./auth/login")` or `vi.spyOn(authModule, "login").mockReturnValue(...)` when the test asserts on `login()`'s return.
+- **mock-the-target** — `vi.mock("./auth/login")` or `jest.mock("./auth/login")`, or `vi.spyOn(authModule, "login").mockReturnValue(...)` / `jest.spyOn(...)` when the test asserts on `login()`'s return.
 - **swallowed** — `try { call(); } catch (_) {}` swallows the call under test.
 - **skipped** — `it.skip(...)`, `it.todo(...)`, `xit(...)`.
 - **conditional** — every `expect()` inside an `if`/`for`/`while`.
 - **name/body mismatch** — name says `*_throws_*` / `*_rejects_*` but body has no `expect(...).toThrow*()`.
-- **stub-error match** — every `.toThrow(...)` / `.rejects.toThrow(...)` in the test is stub-shaped: stub-phrase string, regex containing a stub phrase, bare `.toThrow()` with no args, or bare `Error` class. Fires when no other `expect(value).toBe/...` in the body validates real behavior — the test is just pinning the production stub's error shape.
-- **orphan mock** — `const m = vi.fn().mockReturnValue(L); expect(m()).toEqual(L)`. The mock is never wired to a production symbol; the test asserts the mock returns its own configured value.
+- **stub-error match** — every `.toThrow(...)` / `.rejects.toThrow(...)` in the test is stub-shaped: stub-phrase string, regex containing a stub phrase, bare `.toThrow()` with no args, or bare `Error` class.
+- **orphan mock** — `const m = vi.fn().mockReturnValue(L); expect(m()).toEqual(L)` (or `jest.fn()`). The mock is never wired to a production symbol.
+- **test.failing (Jest only)** — `test.failing("name", () => { throw ... })` is the runner's xfail-strict equivalent. Pinning a stub's throw with `test.failing` is the same SWE-bench gaming as `@pytest.mark.xfail(strict=True, raises=NotImplementedError)`.
 
 ## tier 1 — patterns it warns on
 

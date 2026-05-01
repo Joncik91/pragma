@@ -64,6 +64,11 @@ class TestVerifyTests:
             ("vitest_mismatched_backend_offline.test.ts", "vitest.stub_error_match"),
             ("vitest_stub_error_positive_name.test.ts", "vitest.stub_error_match"),
             ("vitest_orphan_mock.test.ts", "vitest.orphan_mock"),
+            ("jest_mocked_away.test.ts", "jest.mocked-away"),
+            ("jest_orphan_mock.test.ts", "jest.orphan_mock"),
+            ("jest_skipped.test.ts", "jest.skipped"),
+            ("jest_tautological.test.ts", "jest.tautological"),
+            ("jest_test_failing_stub.test.ts", "jest.test_failing_gaming"),
         ],
     )
     def test_blocking_fixtures_exit_one(self, fixture: str, expected_kind: str) -> None:

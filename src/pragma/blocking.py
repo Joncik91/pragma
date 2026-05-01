@@ -18,6 +18,7 @@ BLOCKING_SUFFIXES: frozenset[str] = frozenset(
         "mismatched",
         "stub_error_match",
         "no_success_assertion",
+        "test_failing_gaming",
         "target_not_covered",
     }
 )

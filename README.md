@@ -61,6 +61,14 @@ shadow classes, `vi.mock` on default exports, the lot.
 | `vitest.empty_body` | test callback has no `expect()` | warn |
 | `vitest.verified` | calls the production target, asserts on return / thrown error | pass |
 
+## what it catches — Jest (TypeScript / JavaScript)
+
+Jest support uses the same rule chain as Vitest, plus one Jest-only verdict for the `test.failing` shape that Vitest doesn't have. Substitute `jest.` for the `vitest.` prefix in the table above (the `vi.mock` patterns become `jest.mock`, `vi.fn` becomes `jest.fn`, etc.). Plus:
+
+| Verdict | Pattern | Blocked? |
+|---|---|---|
+| `jest.test_failing_gaming` | `test.failing("name", () => { throw ... })` / `it.failing(...)` — pins a stub's throw, the runner's xfail-strict equivalent | yes |
+
 `expected: success | reject` is **inferred from the test name**.
 Production target (`module.symbol`) is **inferred from the imports**.
 Zero config to start.

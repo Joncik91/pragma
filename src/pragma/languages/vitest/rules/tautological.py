@@ -1,22 +1,33 @@
-"""Rule: vitest.tautological — expect(x).toBe(x) / expect(true).toBe(true) etc."""
+"""Rule: <lang>.tautological — expect(x).toBe(x) / expect(true).toBe(true) etc."""
 
 from __future__ import annotations
 
 from tree_sitter import Node
 
+from pragma.languages._jsts_core.dialect import VITEST_DIALECT, Dialect
 from pragma.verdict import Verdict
 
 _MATCHERS = frozenset({"toBe", "toEqual", "toStrictEqual"})
 
 
-def classify(test_node: Node, *, source: bytes, test_name: str) -> Verdict | None:
+def classify(
+    test_node: Node,
+    *,
+    source: bytes,
+    test_name: str,
+    dialect: Dialect = VITEST_DIALECT,
+) -> Verdict | None:
     """Flag tautological assertions: expect(X).toXxx(X) where both sides are the same."""
     callback = _get_callback(test_node)
     if callback is None:
         return None
     evidence = _find_tautological(callback)
     if evidence:
-        return Verdict(kind="vitest.tautological", evidence=evidence, test_name=test_name)
+        return Verdict(
+            kind=f"{dialect.language_prefix}.tautological",
+            evidence=evidence,
+            test_name=test_name,
+        )
     return None
 
 

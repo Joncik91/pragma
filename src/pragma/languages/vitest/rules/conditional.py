@@ -1,9 +1,10 @@
-"""Rule: vitest.conditional — all expect() calls live inside conditional branches."""
+"""Rule: <lang>.conditional — all expect() calls live inside conditional branches."""
 
 from __future__ import annotations
 
 from tree_sitter import Node
 
+from pragma.languages._jsts_core.dialect import VITEST_DIALECT, Dialect
 from pragma.verdict import Verdict
 
 _CONDITIONAL_KINDS = frozenset(
@@ -18,7 +19,13 @@ _CONDITIONAL_KINDS = frozenset(
 )
 
 
-def classify(test_node: Node, *, source: bytes, test_name: str) -> Verdict | None:
+def classify(
+    test_node: Node,
+    *,
+    source: bytes,
+    test_name: str,
+    dialect: Dialect = VITEST_DIALECT,
+) -> Verdict | None:
     """Flag when at least one expect() exists AND every expect() is inside a conditional."""
     callback = _get_callback(test_node)
     if callback is None:
@@ -31,7 +38,7 @@ def classify(test_node: Node, *, source: bytes, test_name: str) -> Verdict | Non
     # Check every expect is nested inside a conditional node within the callback
     if all(_is_inside_conditional(exp, callback) for exp in expect_nodes):
         return Verdict(
-            kind="vitest.conditional",
+            kind=f"{dialect.language_prefix}.conditional",
             evidence="all expect() calls live inside conditional branches",
             test_name=test_name,
         )
