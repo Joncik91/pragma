@@ -46,6 +46,7 @@ class TestVerifyTests:
             ("gamed_module_shimmed.py", "python.module_shimmed"),
             ("gamed_module_attr_reassignment.py", "python.module_attr_reassignment"),
             ("gamed_xfail_strict.py", "python.xfail_gaming"),
+            ("gamed_stub_error_match.py", "python.stub_error_match"),
             ("test_orphan_target.py", "python.orphan_test"),
             ("gamed_async_mocked_away.py", "python.mocked-away"),
             ("vitest_tautological.test.ts", "vitest.tautological"),

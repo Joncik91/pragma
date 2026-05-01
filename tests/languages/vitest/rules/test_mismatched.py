@@ -100,9 +100,9 @@ it("throws_on_weak_password", () => {
     assert "vitest.stub_error_match" in kinds, f"got {kinds}"
 
 
-def test_mismatched_fires_when_toThrow_takes_bare_Error(tmp_path: Path) -> None:
+def test_stub_error_match_fires_when_toThrow_takes_bare_Error(tmp_path: Path) -> None:
     # `.toThrow(Error)` matches any Error subclass, including the unimplemented
-    # stub's `throw new Error(...)`. Too generic to count as a real assertion.
+    # stub's `throw new Error(...)`. Now classified as stub_error_match (more specific).
     src = """\
 import { expect, it } from "vitest";
 it("throws_on_bad_input", () => {
@@ -112,7 +112,8 @@ it("throws_on_bad_input", () => {
     f = tmp_path / "x.test.ts"
     f.write_text(src)
     verdicts = classify_file(f)
-    assert any(v.kind == "vitest.mismatched" for v in verdicts), f"got {[v.kind for v in verdicts]}"
+    kinds = [v.kind for v in verdicts]
+    assert "vitest.stub_error_match" in kinds, f"got {kinds}"
 
 
 def test_mismatched_clear_when_toThrow_uses_specific_validation_message(
@@ -315,3 +316,73 @@ it("validates_input", () => {
     verdicts = classify_file(f)
     kinds = [v.kind for v in verdicts]
     assert "vitest.stub_error_match" not in kinds
+
+
+# BUG-030: bare .toThrow() (no args) on a stub-throwing function and no
+# other expect() in the body. The agent uses .toThrow() to pin the stub's
+# throw without committing to a specific error.
+
+
+def test_stub_error_match_bare_toThrow_no_other_assertions(tmp_path: Path) -> None:
+    src = """\
+import { expect, it } from "vitest";
+it("validates_input", () => {
+    expect(() => validateEmail("user@example.com")).toThrow();
+});
+"""
+    f = tmp_path / "x.test.ts"
+    f.write_text(src)
+    verdicts = classify_file(f)
+    kinds = [v.kind for v in verdicts]
+    assert "vitest.stub_error_match" in kinds, f"got {kinds}"
+
+
+def test_stub_error_match_bare_toThrow_clear_with_value_assertion(tmp_path: Path) -> None:
+    # Honest pattern: also asserts on a real return value, so the throw can be bare.
+    src = """\
+import { expect, it } from "vitest";
+it("setup_and_check", () => {
+    const r = setup();
+    expect(r.ready).toBe(true);
+    expect(() => doSomething("bad")).toThrow();
+});
+"""
+    f = tmp_path / "x.test.ts"
+    f.write_text(src)
+    verdicts = classify_file(f)
+    kinds = [v.kind for v in verdicts]
+    assert "vitest.stub_error_match" not in kinds
+
+
+# BUG-031: .toThrow(/regex stub-phrase/) — regex literal containing a stub
+# phrase. Same gaming as the string variant.
+
+
+def test_stub_error_match_regex_stub_phrase(tmp_path: Path) -> None:
+    src = """\
+import { expect, it } from "vitest";
+it("cart_total_returns_zero_for_empty_cart", () => {
+    expect(() => cartTotal([])).toThrow(/not implemented/i);
+});
+"""
+    f = tmp_path / "x.test.ts"
+    f.write_text(src)
+    verdicts = classify_file(f)
+    kinds = [v.kind for v in verdicts]
+    assert "vitest.stub_error_match" in kinds, f"got {kinds}"
+
+
+def test_stub_error_match_regex_real_validation_message(tmp_path: Path) -> None:
+    # Real validation regex — should NOT fire.
+    src = """\
+import { expect, it } from "vitest";
+it("validate_throws_on_bad_input", () => {
+    expect(() => validate("bad")).toThrow(/invalid email/i);
+});
+"""
+    f = tmp_path / "x.test.ts"
+    f.write_text(src)
+    verdicts = classify_file(f)
+    kinds = [v.kind for v in verdicts]
+    assert "vitest.stub_error_match" not in kinds
+    assert "vitest.mismatched" not in kinds

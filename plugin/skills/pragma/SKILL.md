@@ -22,6 +22,7 @@ the file lands.
 - **swallowed** — `try: target_call(); except: pass`. The exception was the test signal; swallowing it deletes the verification.
 - **skipped** — `pytest.skip(...)` or `pytest.xfail` smuggled into a test body to dodge a failing assertion.
 - **xfail-strict gaming** — `@pytest.mark.xfail(strict=True)` on stub tests. The test predictably fails, satisfies xfail, and the suite goes green.
+- **stub-error match** — every `pytest.raises(...)` in the test asserts a stub shape (`NotImplementedError`, `Exception`, or `match="not implemented"`) and no other `assert` validates a real return value. Same gaming as the vitest variant.
 - **name/body mismatch** — a test named `test_*_rejects_*` / `_raises_*` / `_refuses_*` / `_denies_*` must use `with pytest.raises(...):` (or an `except` block).
 - **conditional** — every assertion lives inside an `if`/`for`/`while` branch the inputs never enter. Assertions that may not run can't catch bugs.
 - **orphan test** — `tests/test_X.py` that never imports `X` and instead redefines a fake locally. The production code is never exercised.
@@ -34,7 +35,7 @@ the file lands.
 - **skipped** — `it.skip(...)`, `it.todo(...)`, `xit(...)`.
 - **conditional** — every `expect()` inside an `if`/`for`/`while`.
 - **name/body mismatch** — name says `*_throws_*` / `*_rejects_*` but body has no `expect(...).toThrow*()`.
-- **stub-error match** — every `.toThrow(...)` / `.rejects.toThrow(...)` arg in the test matches a stub phrase (`"not implemented"`, `"backend offline"`, `"service unavailable"`). Fires regardless of test name — a positive-named test asserting on the production stub's error is gaming, not verifying.
+- **stub-error match** — every `.toThrow(...)` / `.rejects.toThrow(...)` in the test is stub-shaped: stub-phrase string, regex containing a stub phrase, bare `.toThrow()` with no args, or bare `Error` class. Fires when no other `expect(value).toBe/...` in the body validates real behavior — the test is just pinning the production stub's error shape.
 - **orphan mock** — `const m = vi.fn().mockReturnValue(L); expect(m()).toEqual(L)`. The mock is never wired to a production symbol; the test asserts the mock returns its own configured value.
 
 ## tier 1 — patterns it warns on

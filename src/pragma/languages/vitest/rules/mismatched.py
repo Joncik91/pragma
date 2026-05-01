@@ -67,13 +67,14 @@ def classify(test_node: Node, *, source: bytes, test_name: str) -> Verdict | Non
 
     if throw_calls and not has_try_rethrow:
         all_stub = all(_to_throw_arg_is_stub(call) for call in throw_calls)
-        if all_stub:
+        if all_stub and not _has_value_assertion(callback, throw_calls):
             return Verdict(
                 kind="vitest.stub_error_match",
                 evidence=(
-                    "test asserts .toThrow(...) only on stub-phrase strings "
-                    "(e.g. 'not implemented', 'backend offline') — matches the "
-                    "production stub's error, not validated behavior"
+                    "test's only throw assertions are stub-shaped "
+                    "(stub-phrase string, regex, bare .toThrow(), or bare Error class) "
+                    "and no other expect() validates real behavior — pins the stub's "
+                    "'not implemented' contract, not validated behavior"
                 ),
                 test_name=test_name,
             )
@@ -131,18 +132,70 @@ def _has_specific_throw_assertion(callback: Node) -> bool:
 
 
 def _to_throw_arg_is_stub(call: Node) -> bool:
-    """Return True if the .toThrow(...) call's first arg is a stub-phrase string."""
+    """Return True if the .toThrow(...) call's arg shape is stub-gaming-shaped.
+
+    Stub shapes:
+    - No args (bare `.toThrow()`) — accepts any throw, matches the stub's throw.
+    - String literal containing a stub phrase (`"not implemented"`, etc.).
+    - Regex literal containing a stub phrase (`/not implemented/i`).
+    - Bare `Error` identifier — matches the stub's `throw new Error(...)`.
+    """
     args = call.child_by_field_name("arguments")
     if args is None:
-        return False
+        return True
     actual = [c for c in args.children if c.type not in {"(", ")", ","}]
     if not actual:
-        return False
+        return True
     first = actual[0]
-    if first.type != "string":
+
+    if first.type == "string":
+        text = first.text.decode("utf-8").strip("\"'`").lower()
+        return any(phrase in text for phrase in _STUB_PHRASES)
+
+    if first.type == "regex":
+        text = first.text.decode("utf-8").lower()
+        return any(phrase in text for phrase in _STUB_PHRASES)
+
+    return first.type == "identifier" and first.text.decode("utf-8") == "Error"
+
+
+def _has_value_assertion(callback: Node, throw_calls: list[Node]) -> bool:
+    """Return True if callback contains an expect() chain that isn't a .toThrow chain.
+
+    `expect(value).toBe(42)` / `expect(arr).toEqual([...])` / `expect(x).not.toBe(null)` —
+    real value assertions. They distinguish honest tests with throw assertions from
+    tests whose only verification is the throw shape.
+    """
+    throw_call_ids = {id(c) for c in throw_calls}
+    for node in _walk(callback):
+        if node.type != "call_expression":
+            continue
+        if id(node) in throw_call_ids:
+            continue
+        func = node.child_by_field_name("function")
+        if func is None or func.type != "member_expression":
+            continue
+        if not _chain_starts_with_expect(func):
+            continue
+        prop = func.child_by_field_name("property")
+        if prop is None:
+            continue
+        prop_text = prop.text.decode("utf-8")
+        if prop_text.startswith("toThrow") or prop_text == "rejects" or prop_text == "resolves":
+            continue
+        return True
+    return False
+
+
+def _chain_starts_with_expect(member_expr: Node) -> bool:
+    """Walk down the .object chain. True if the bottom is `expect(...)`."""
+    cur = member_expr
+    while cur is not None and cur.type == "member_expression":
+        cur = cur.child_by_field_name("object")
+    if cur is None or cur.type != "call_expression":
         return False
-    text = first.text.decode("utf-8").strip("\"'`").lower()
-    return any(phrase in text for phrase in _STUB_PHRASES)
+    fn = cur.child_by_field_name("function")
+    return fn is not None and fn.type == "identifier" and fn.text.decode("utf-8") == "expect"
 
 
 def _to_throw_args_are_specific(call: Node) -> bool:

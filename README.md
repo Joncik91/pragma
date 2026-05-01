@@ -34,6 +34,7 @@ shadow classes, `vi.mock` on default exports, the lot.
 | `python.mismatched` | name says `test_*_rejects_*` etc. but body has no `pytest.raises` | yes |
 | `python.conditional` | every assertion lives inside an `if`/`for`/`while` branch | yes |
 | `python.orphan_test` | `test_X.py` never imports `X`; redefines a fake locally | yes |
+| `python.stub_error_match` | every `pytest.raises(...)` is `NotImplementedError`, `Exception`, or `match="not implemented"`, no other assert validates real value | yes |
 | `python.target_not_covered` | tier 2: test ran but the target's lines had zero hits | yes |
 | `python.semantic_gaming` | tier 3: the LLM judge says the test verifies nothing | warn |
 | `python.empty_body` | test body has no assertion and no `pytest.raises` | warn |
@@ -50,7 +51,7 @@ shadow classes, `vi.mock` on default exports, the lot.
 | `vitest.swallowed` | `try { call(); } catch (_) {}` swallows the call | yes |
 | `vitest.skipped` | `it.skip(...)` / `xit(...)` / `it.todo(...)` | yes |
 | `vitest.mismatched` | name says `*_throws_*` but no `expect(...).toThrow*()` | yes |
-| `vitest.stub_error_match` | every `.toThrow(...)` arg is a stub phrase (`"not implemented"`, `"backend offline"`) — fires regardless of test name | yes |
+| `vitest.stub_error_match` | every `.toThrow(...)` is stub-shaped — stub-phrase string/regex, bare `.toThrow()`, or bare `Error` class — and no other `expect(value)...` validates real behavior | yes |
 | `vitest.conditional` | every `expect()` lives inside an `if`/`for`/`while` | yes |
 | `vitest.orphan_mock` | `const m = vi.fn().mockReturnValue(L); expect(m()).toEqual(L)` | yes |
 | `vitest.target_not_covered` | tier 2: test ran but the target's lines had zero V8 hits | yes |

@@ -22,6 +22,7 @@ from pragma.languages.python.rules import monkeypatched as _monkeypatched
 from pragma.languages.python.rules import orphan_test as _orphan_test
 from pragma.languages.python.rules import parametrize_thin as _parametrize_thin
 from pragma.languages.python.rules import skipped as _skipped
+from pragma.languages.python.rules import stub_error_match as _stub_error_match
 from pragma.languages.python.rules import swallowed as _swallowed
 from pragma.languages.python.rules import tautological as _tautological
 from pragma.languages.python.rules import verified_fallback as _verified_fallback
@@ -36,6 +37,7 @@ RULES: list[Callable] = [
     _swallowed.classify,
     _skipped.classify,
     _xfail_gaming.classify,
+    _stub_error_match.classify,
     _mismatched.classify,
     _conditional.classify,
     _tautological.classify,
