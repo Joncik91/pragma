@@ -386,3 +386,51 @@ it("validate_throws_on_bad_input", () => {
     kinds = [v.kind for v in verdicts]
     assert "vitest.stub_error_match" not in kinds
     assert "vitest.mismatched" not in kinds
+
+
+def test_stub_error_match_hoisted_regex_const(tmp_path: Path) -> None:
+    """BUG-036: regex stub-phrase hoisted to const at module level."""
+    src = """\
+import { it, expect } from "vitest";
+const NOT_IMPLEMENTED = /not yet implemented/;
+it("convert_basic", () => {
+    expect(() => convert(usd, "EUR", 0.92)).toThrow(NOT_IMPLEMENTED);
+});
+"""
+    f = tmp_path / "x.test.ts"
+    f.write_text(src)
+    verdicts = classify_file(f)
+    kinds = [v.kind for v in verdicts]
+    assert "vitest.stub_error_match" in kinds, f"got {kinds}"
+
+
+def test_stub_error_match_hoisted_string_const(tmp_path: Path) -> None:
+    """Same shape but with a string const instead of regex."""
+    src = """\
+import { it, expect } from "vitest";
+const STUB_MSG = "not yet implemented";
+it("convert_basic", () => {
+    expect(() => convert(usd, "EUR", 0.92)).toThrow(STUB_MSG);
+});
+"""
+    f = tmp_path / "x.test.ts"
+    f.write_text(src)
+    verdicts = classify_file(f)
+    kinds = [v.kind for v in verdicts]
+    assert "vitest.stub_error_match" in kinds, f"got {kinds}"
+
+
+def test_clear_when_hoisted_const_is_real_message(tmp_path: Path) -> None:
+    """Hoisted const with a real message — should not fire."""
+    src = """\
+import { it, expect } from "vitest";
+const WEAK_PW = "password too weak";
+it("login_throws_on_weak", () => {
+    expect(() => login("u@e.com", "x")).toThrow(WEAK_PW);
+});
+"""
+    f = tmp_path / "x.test.ts"
+    f.write_text(src)
+    verdicts = classify_file(f)
+    kinds = [v.kind for v in verdicts]
+    assert "vitest.stub_error_match" not in kinds

@@ -66,7 +66,8 @@ def classify(test_node: Node, *, source: bytes, test_name: str) -> Verdict | Non
     )
 
     if throw_calls and not has_try_rethrow:
-        all_stub = all(_to_throw_arg_is_stub(call) for call in throw_calls)
+        stub_idents = _collect_stub_phrase_identifiers(test_node)
+        all_stub = all(_to_throw_arg_is_stub(call, stub_idents) for call in throw_calls)
         if all_stub and not _has_value_assertion(callback, throw_calls):
             return Verdict(
                 kind="vitest.stub_error_match",
@@ -131,7 +132,7 @@ def _has_specific_throw_assertion(callback: Node) -> bool:
     return any(node.type == "try_statement" and _try_has_rethrow(node) for node in _walk(callback))
 
 
-def _to_throw_arg_is_stub(call: Node) -> bool:
+def _to_throw_arg_is_stub(call: Node, stub_idents: frozenset[str]) -> bool:
     """Return True if the .toThrow(...) call's arg shape is stub-gaming-shaped.
 
     Stub shapes:
@@ -139,6 +140,7 @@ def _to_throw_arg_is_stub(call: Node) -> bool:
     - String literal containing a stub phrase (`"not implemented"`, etc.).
     - Regex literal containing a stub phrase (`/not implemented/i`).
     - Bare `Error` identifier — matches the stub's `throw new Error(...)`.
+    - Identifier bound to a stub-phrase string/regex at module scope (BUG-036).
     """
     args = call.child_by_field_name("arguments")
     if args is None:
@@ -156,7 +158,46 @@ def _to_throw_arg_is_stub(call: Node) -> bool:
         text = first.text.decode("utf-8").lower()
         return any(phrase in text for phrase in _STUB_PHRASES)
 
-    return first.type == "identifier" and first.text.decode("utf-8") == "Error"
+    if first.type == "identifier":
+        ident = first.text.decode("utf-8")
+        if ident == "Error":
+            return True
+        if ident in stub_idents:
+            return True
+
+    return False
+
+
+def _collect_stub_phrase_identifiers(test_node: Node) -> frozenset[str]:
+    """Return module-level identifiers bound to a stub-phrase string or regex.
+
+    Catches BUG-036: `const NOT_IMPLEMENTED = /not yet implemented/;` at the
+    top of the file, then `.toThrow(NOT_IMPLEMENTED)` inside the test.
+    """
+    root = test_node
+    while root.parent is not None:
+        root = root.parent
+
+    out: set[str] = set()
+    for node in _walk(root):
+        if node.type not in {"variable_declarator", "assignment_expression"}:
+            continue
+        name_node = node.child_by_field_name("name")
+        value_node = node.child_by_field_name("value")
+        if name_node is None or value_node is None:
+            continue
+        if name_node.type != "identifier":
+            continue
+        name = name_node.text.decode("utf-8")
+        if value_node.type == "string":
+            text = value_node.text.decode("utf-8").strip("\"'`").lower()
+            if any(phrase in text for phrase in _STUB_PHRASES):
+                out.add(name)
+        elif value_node.type == "regex":
+            text = value_node.text.decode("utf-8").lower()
+            if any(phrase in text for phrase in _STUB_PHRASES):
+                out.add(name)
+    return frozenset(out)
 
 
 def _has_value_assertion(callback: Node, throw_calls: list[Node]) -> bool:

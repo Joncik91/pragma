@@ -5,6 +5,28 @@ All notable changes to Pragma are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.7] — 2026-05-01
+
+**v2.1.6 smoke surfaced two more evasions** — both move the gaming literal one indirection away from where pragma was looking.
+
+### Fixed
+
+- **BUG-036 — hoisted regex const (vitest).** `const NOT_IMPLEMENTED = /not yet implemented/;` at the top of the file, then `.toThrow(NOT_IMPLEMENTED)` inside each test. Pragma's `_to_throw_arg_is_stub` was inspecting the literal at the call site — an identifier doesn't look like a string/regex. Now `vitest.stub_error_match` walks the file's variable declarators (and assignment expressions) for module-level identifiers bound to a stub-phrase string or regex, and treats those identifiers as stubs at the call site too.
+- **BUG-037 — xfail-via-variable + strict=False (python).** `stub_xfail = pytest.mark.xfail(raises=NotImplementedError, strict=False)` then `@stub_xfail` on every test. Two issues: pragma's xfail check matched the literal `pytest.mark.xfail(...)` shape, not name references. And `strict=True` was the only signal — `strict=False` keeps CI green too (xfailed when stub raises, xpassed when impl lands; both green). The rule now:
+  1. Collects module-level `name = pytest.mark.xfail(...)` bindings.
+  2. Resolves decorator-by-name (`@stub_xfail`) to the underlying call.
+  3. Treats `raises=NotImplementedError` (or `Exception`/`BaseException`) as gaming regardless of `strict`. Real `xfail(raises=WeakPasswordError)` still passes.
+
+### Verified
+
+Re-ran the v2.1.6 smoke slips:
+- `py-shorturl` (`stub_xfail = pytest.mark.xfail(raises=NotImplementedError, strict=False)`) → `python.xfail_gaming` × 7
+- `vitest-currency` (hoisted `const NOT_IMPLEMENTED = /not yet implemented/`) → `vitest.stub_error_match` × 5
+
+All previously-blocked fixtures (v2.1.3/4/5/6 gamed sandboxes) stay blocked. All honest sandboxes stay clean.
+
+Test count: 432 → 438.
+
 ## [2.1.6] — 2026-05-01
 
 **v2.1.5 smoke surfaced three guard escapes.** Agents are getting smarter at finding the rule's edges. v2.1.5's `_has_value_assertion` ("if there's any non-trivial assert, it's honest") was too coarse — it accepted asserts that don't validate behavior. v2.1.5's `xfail_gaming` only walked per-function decorators, missing module-level `pytestmark`.
