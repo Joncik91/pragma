@@ -1,6 +1,6 @@
 {
   "name": "pragma",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Catches AI test-gaming. Blocks Edit/Write of test files when Claude writes assertions that pass without verifying anything (assert True, mocking the function under test, name/body mismatches).",
   "author": {
     "name": "Pragma contributors"

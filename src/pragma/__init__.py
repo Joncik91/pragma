@@ -1,3 +1,3 @@
 """Pragma — Claude Code plugin that catches AI test-gaming."""
 
-__version__ = "0.3.0"
+__version__ = "0.4.0"
