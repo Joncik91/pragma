@@ -73,7 +73,15 @@ class TestVerifyTests:
         assert payload["blocking"] is True
         verdicts = payload["results"][str(BLOCKING_DIR / fixture)]
         kinds = [v["kind"] for v in verdicts]
-        assert expected_kind in kinds, f"expected {expected_kind} in {kinds}"
+        # Accept either the legacy per-test verdict OR the file-level structural
+        # verdict (python.no_success_assertion / vitest.no_success_assertion).
+        # The file-level pass supersedes legacy verdicts in the stub-pinning
+        # category as the migration progresses.
+        prefix = expected_kind.split(".", 1)[0]
+        structural = f"{prefix}.no_success_assertion"
+        assert expected_kind in kinds or structural in kinds, (
+            f"expected {expected_kind} or {structural} in {kinds}"
+        )
 
     @pytest.mark.parametrize(
         "fixture, expected_kind",
@@ -213,36 +221,35 @@ class TestCoverageGate:
     inference resolves `inventory` correctly.
     """
 
-    def test_no_flag_keeps_verified_on_imports_only(self) -> None:
-        """Without --with-coverage, the orphan-import fixture stays verified."""
-        fixture = (
-            REPO_ROOT / "tests" / "fixtures" / "coverage_gated" / "test_inventory_imports_only.py"
-        )
-        result = _run("verify", "tests", str(fixture))
-        assert result.returncode == 0, result.stdout + result.stderr
-        payload = json.loads(result.stdout)
-        assert payload["blocking"] is False
-        verdicts = payload["results"][str(fixture)]
-        assert any(v["kind"] == "python.verified" for v in verdicts)
-
-    def test_with_flag_conservative_when_no_inferable_target(self) -> None:
-        """With --with-coverage, a fixture with no inferable target stays verified.
-
-        test_inventory_imports_only.py imports reserve but never calls it,
-        so infer_target returns (None, None). Gate is conservative: no
-        target inference → keep verified. This test confirms the flag is
-        accepted and forwarded, and that the gate's conservative behavior
-        is preserved end-to-end.
+    def test_no_flag_blocks_imports_only_via_structural_check(self) -> None:
+        """Without --with-coverage, the orphan-import fixture is now blocked
+        by the file-level no_success_assertion check. The file imports
+        `reserve` but no test calls it and asserts on its return value —
+        catches the gaming structurally, no coverage instrumentation needed.
         """
         fixture = (
             REPO_ROOT / "tests" / "fixtures" / "coverage_gated" / "test_inventory_imports_only.py"
         )
-        result = _run("verify", "tests", "--with-coverage", str(fixture))
-        assert result.returncode == 0, result.stdout + result.stderr
+        result = _run("verify", "tests", str(fixture))
+        assert result.returncode == 1, result.stdout + result.stderr
         payload = json.loads(result.stdout)
-        assert payload["blocking"] is False
+        assert payload["blocking"] is True
         verdicts = payload["results"][str(fixture)]
-        assert any(v["kind"] == "python.verified" for v in verdicts)
+        assert any(v["kind"] == "python.no_success_assertion" for v in verdicts)
+
+    def test_with_flag_blocks_imports_only_via_structural_check(self) -> None:
+        """Same fixture with --with-coverage: still blocks. The file-level
+        check fires before tier 2 runs, so the verdict is structural rather
+        than coverage-based. Either way, blocking=true is the right outcome."""
+        fixture = (
+            REPO_ROOT / "tests" / "fixtures" / "coverage_gated" / "test_inventory_imports_only.py"
+        )
+        result = _run("verify", "tests", "--with-coverage", str(fixture))
+        assert result.returncode == 1, result.stdout + result.stderr
+        payload = json.loads(result.stdout)
+        assert payload["blocking"] is True
+        verdicts = payload["results"][str(fixture)]
+        assert any(v["kind"] == "python.no_success_assertion" for v in verdicts)
 
     def test_with_flag_keeps_verified_on_real_test(self) -> None:
         """The honest fixture stays verified even with --with-coverage."""

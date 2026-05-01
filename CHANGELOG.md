@@ -5,6 +5,36 @@ All notable changes to Pragma are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.9] — 2026-05-01
+
+**Structural fix for the whack-a-mole.** Across v2.1.4 → v2.1.8 we filed 10 BUGs (BUG-029 → BUG-038). Every single one shared the same semantic shape: *the test asserts the production target FAILS (throws / raises NotImplementedError / is skipped / is xfailed) without any test in the file asserting the target SUCCEEDS at returning a real value*. Each fix added a new AST shape — frozensets of stub phrases, decorator-via-variable resolvers, helper-via-name resolvers, metadata-only-assert filters, constructor-input-echo filters. Each release closed one shape; agents found a new one indirection deeper.
+
+v2.1.9 ships a single file-level rule that encodes the universal property directly. The rule is structural, not pattern-matching — there's no frozenset to add to.
+
+### Added
+
+- **`python.no_success_assertion` and `vitest.no_success_assertion`** (new blocking verdicts). File-level pass that runs after per-test rules. Fires when the file imports a production target but no test in the file (a) exercises the target (calls it, instantiates it, uses it as a decorator) AND (b) makes a non-trivial assertion that isn't stub-pinning. The only escape is to actually call the target with realistic inputs and assert on what it returns — the win condition.
+
+- **Honest-shape gates** to prevent false positives on legitimate validator tests, collaboration tests, and construction-validation tests:
+  - **Real-validation `pytest.raises`:** `pytest.raises(<NonStubClass>)` paired with a target call (e.g. `LRUCache(-1, 1.0)` raising `ValueError`) counts as exercising real validation behavior.
+  - **Pure-validator escape:** files where every test is reject-named (`/raises|rejects|refuses|denies|throws/i`) AND every `pytest.raises(...)` / `.toThrow(...)` uses a custom error class (not `NotImplementedError`/`Exception`/`BaseException`, not bound to a stub-phrase string) are allowed through.
+  - **File-level instance binding (vitest):** `let r: Router` declared in `describe`, `r = new Router()` in `beforeEach`, `const r = new Router()` at file scope — all three patterns now register `r` as a target alias so subsequent `r.method(...)` calls count as exercise.
+  - **Decorator usage (Python):** `@retry(...)` on a wrapped function where `retry` is the imported target counts as exercise.
+  - **Reuse of existing guards:** `_assert_inside_raises`, `_is_metadata_only`, `_is_constructor_input_echo` from `stub_error_match.py` filter out asserts that don't validate real behavior.
+
+### Changed
+
+- **Rollout: additive.** Existing legacy rules (`stub_error_match`, `xfail_gaming`, `skipped`, `mismatched`) still fire first. The file-level pass replaces residual `verified` (and a small set of stub-pinning per-test verdicts) with `no_success_assertion`. Existing test fixtures keep their existing verdict kinds; new shapes get caught by the structural rule. v2.2 will swap the order; v2.3 will delete the brittle accreted code.
+- **Test count: 443 → 445.**
+
+### Verified
+
+Re-ran every gamed fixture from BUG-029 → BUG-038 plus all honest sandboxes:
+- 10/10 historical gamed fixtures still block (some with the new structural verdict, some with their legacy verdict — additive rollout).
+- 13/13 honest sandboxes still pass: `py-discount`, `py-jwt`, `py-cache`, `vitest-async-flow`, `py-decorator`, `py-statemachine`, `py-asyncio-queue`, `vitest-pubsub`, `vitest-validator` (schema), `vitest-debounce`, `py-yaml`, `py-throttle`, `vitest-router`.
+
+The structural rule replaces the need for future per-shape rules in the stub-pinning category. Future evasions can only escape by writing tests that genuinely exercise the production target with realistic inputs — which is the entire point.
+
 ## [2.1.8] — 2026-05-01
 
 **v2.1.7 smoke surfaced one new evasion** — convert `NotImplementedError` to `pytest.skip` via an except clause.

@@ -46,7 +46,7 @@ def test_python_orphan_test_is_blocking():
     assert is_blocking_kind("python.orphan_test") is True
 
 
-def test_blocking_suffixes_includes_all_fourteen():
+def test_blocking_suffixes_includes_all_fifteen():
     assert (
         frozenset(
             {
@@ -63,11 +63,20 @@ def test_blocking_suffixes_includes_all_fourteen():
                 "conditional",
                 "mismatched",
                 "stub_error_match",
+                "no_success_assertion",
                 "target_not_covered",
             }
         )
         == BLOCKING_SUFFIXES
     )
+
+
+def test_python_no_success_assertion_is_blocking():
+    assert is_blocking_kind("python.no_success_assertion") is True
+
+
+def test_vitest_no_success_assertion_is_blocking():
+    assert is_blocking_kind("vitest.no_success_assertion") is True
 
 
 def test_python_target_not_covered_is_blocking():

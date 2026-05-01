@@ -98,8 +98,10 @@ def _walk_nodes(node):
 
 
 def classify_file(path: Path) -> list[Verdict]:
-    """Classify every Vitest test call in `path`."""
+    """Classify every Vitest test call in `path`, then apply the file-level
+    no_success_assertion pass over the resulting verdicts."""
     from pragma.languages.vitest.rules import RULES
+    from pragma.languages.vitest.rules.no_success_assertion import apply_file_pass
 
     tree = parse_file(path)
     source = path.read_bytes()
@@ -118,4 +120,4 @@ def classify_file(path: Path) -> list[Verdict]:
                     test_name=test_name,
                 )
             )
-    return verdicts
+    return apply_file_pass(tree.root_node, source, path, verdicts)

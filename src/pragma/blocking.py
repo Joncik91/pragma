@@ -17,6 +17,7 @@ BLOCKING_SUFFIXES: frozenset[str] = frozenset(
         "conditional",
         "mismatched",
         "stub_error_match",
+        "no_success_assertion",
         "target_not_covered",
     }
 )

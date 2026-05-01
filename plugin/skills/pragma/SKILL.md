@@ -23,6 +23,7 @@ the file lands.
 - **skipped** — `pytest.skip(...)` or `pytest.xfail` smuggled into a test body to dodge a failing assertion.
 - **xfail-strict gaming** — `@pytest.mark.xfail(strict=True)` on stub tests. The test predictably fails, satisfies xfail, and the suite goes green.
 - **stub-error match** — every `pytest.raises(...)` in the test asserts a stub shape (`NotImplementedError`, `Exception`, or `match="not implemented"`) and no other `assert` validates a real return value. Same gaming as the vitest variant.
+- **no success assertion (file-level)** — the file imports a production target but NO test in the file calls the target and asserts on a real return value. The structural rule that replaces whack-a-mole. Even if every individual test looks reasonable, a file where no test exercises real-target behavior is pinning the stub's contract.
 - **name/body mismatch** — a test named `test_*_rejects_*` / `_raises_*` / `_refuses_*` / `_denies_*` must use `with pytest.raises(...):` (or an `except` block).
 - **conditional** — every assertion lives inside an `if`/`for`/`while` branch the inputs never enter. Assertions that may not run can't catch bugs.
 - **orphan test** — `tests/test_X.py` that never imports `X` and instead redefines a fake locally. The production code is never exercised.

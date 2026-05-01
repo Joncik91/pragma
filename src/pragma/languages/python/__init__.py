@@ -28,10 +28,14 @@ def matches(path: Path) -> bool:
 
 
 def classify_file(path: Path) -> list[Verdict]:
-    """Classify every `test_*` function in `path`."""
+    """Classify every `test_*` function in `path`, then apply the file-level
+    `no_success_assertion` pass over the resulting verdicts."""
+    from pragma.languages.python.rules.no_success_assertion import apply_file_pass
+
     source = path.read_text(encoding="utf-8")
     tree = ast.parse(source)
-    return [_classify_one(source, tree, func.name, path) for func in walk_test_functions(tree)]
+    verdicts = [_classify_one(source, tree, func.name, path) for func in walk_test_functions(tree)]
+    return apply_file_pass(tree, source, verdicts, path)
 
 
 def _classify_one(source: str, tree: ast.AST, test_name: str, path: Path) -> Verdict:
