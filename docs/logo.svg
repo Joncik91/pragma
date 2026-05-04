@@ -1,19 +1,19 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" role="img" aria-label="Pragma">
   <title>Pragma</title>
-
   <rect width="400" height="400" rx="48" fill="#0E0E0F"/>
 
-  <!-- The check, split into two stroked segments so the ascender can
-       carry display-weight (32) while the short stroke stays at 28.
-       Heavier ascender = "this rising stroke is the load-bearing part
-       of the inquiry"; the bend lands harder. -->
-  <g fill="none" stroke="#E8954A" stroke-linecap="square" stroke-linejoin="miter">
-    <path d="M 100 218 L 168 286" stroke-width="28"/>
-    <path d="M 168 286 L 318 90 L 286 130" stroke-width="32"/>
-  </g>
+  <!-- Magnifying glass: lens (stroked circle) + diagonal handle -->
+  <g fill="none" stroke="#E8954A" stroke-linecap="round">
+    <!-- Lens -->
+    <circle cx="170" cy="170" r="92" stroke-width="22"/>
 
-  <!-- The arrowhead — slightly larger than v1 (was 18→ now 22) so the
-       inspection reward at 160px is unambiguous. -->
-  <path d="M 286 130 L 264 119 L 280 146 Z" fill="#E8954A"/>
+    <!-- Handle: diagonal from lens edge toward bottom-right -->
+    <line x1="244" y1="244" x2="324" y2="324" stroke-width="28"/>
+
+    <!-- Hairline crack across the lens — short jagged stroke,
+         the test that "passed" but has a flaw. -->
+    <path d="M 130 150 L 156 174 L 148 196 L 184 218"
+          stroke-width="6" stroke-linejoin="round"/>
+  </g>
 </svg>
