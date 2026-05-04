@@ -39,12 +39,4 @@
   -->
   <path d="M 286 130 L 268 122 L 282 144 Z" fill="#E8954A"/>
 
-  <!--
-    The single emerald dot: pinned at the vertex of the check — the
-    assertion site, the place the arrowhead is asking about. One non-
-    amber accent, used once, exactly where the meaning sits.
-
-    Position 168, 286 = the joint of the ✓.
-  -->
-  <circle cx="168" cy="286" r="9" fill="#58D070"/>
 </svg>
