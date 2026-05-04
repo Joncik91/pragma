@@ -2,41 +2,18 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" role="img" aria-label="Pragma">
   <title>Pragma</title>
 
-  <!-- Substrate: same dark panel + rounded corners as the rest of the portfolio. -->
   <rect width="400" height="400" rx="48" fill="#0E0E0F"/>
 
-  <!--
-    The mark: a checkmark whose long ascender doesn't terminate cleanly.
-    It rises to the upper-right, peaks, then bends sharply back down-left
-    into a short return-stroke that ends in an arrowhead pointing at the
-    check's own joint — the spot where, in a real test, the assertion
-    would be written.
-
-    The reader sees a ✓; on second look, the ✓ is interrogating itself.
-    That is exactly what Pragma does.
-
-    Construction is one path so the form is read as a single mark, not
-    a composition of pieces. Square stroke caps reject the friendly,
-    rounded-cap default — this glyph is mechanical, not soft.
-  -->
-  <g fill="none" stroke="#E8954A" stroke-width="28" stroke-linecap="square" stroke-linejoin="miter">
-    <!--
-      Path beats:
-        M 100 218          ← start of the short stroke (lower-left of ✓)
-        L 168 286          ← descend into the joint (the vertex of ✓)
-        L 318 90           ← rise to the upper-right peak (the "tail")
-        L 286 130          ← bend back: short return-stroke aimed inward
-                            (this is the moment the check turns into a pointer)
-    -->
-    <path d="M 100 218 L 168 286 L 318 90 L 286 130"/>
+  <!-- The check, split into two stroked segments so the ascender can
+       carry display-weight (32) while the short stroke stays at 28.
+       Heavier ascender = "this rising stroke is the load-bearing part
+       of the inquiry"; the bend lands harder. -->
+  <g fill="none" stroke="#E8954A" stroke-linecap="square" stroke-linejoin="miter">
+    <path d="M 100 218 L 168 286" stroke-width="28"/>
+    <path d="M 168 286 L 318 90 L 286 130" stroke-width="32"/>
   </g>
 
-  <!--
-    The arrowhead: a small filled amber triangle at the end of the
-    return-stroke, pointing back-and-down toward the joint of the check.
-    Drawn as a separate filled shape so the line geometry stays a clean
-    stroked path. Triangle sits exactly along the return-stroke's axis.
-  -->
-  <path d="M 286 130 L 268 122 L 282 144 Z" fill="#E8954A"/>
-
+  <!-- The arrowhead — slightly larger than v1 (was 18→ now 22) so the
+       inspection reward at 160px is unambiguous. -->
+  <path d="M 286 130 L 264 119 L 280 146 Z" fill="#E8954A"/>
 </svg>
