@@ -5,6 +5,45 @@ All notable changes to Pragma are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased] — 2026-06-11
+
+**Audit-fix release.** Addresses findings from a code audit: false-positive
+verdicts, an O(n²) classification hot path, fail-open parsing, and the tier-2
+security default. No new verdict kinds block that did not block before; the
+two new verdicts are non-blocking warnings. Wire-format JSON and the CLI
+surface are unchanged.
+
+### Added
+
+- **`python.tautological_warn`** (non-blocking warn). An `x == x` assertion in a
+  test whose name implies a reflexivity / `__eq__` check exercises real equality
+  semantics, so it is downgraded from the blocking `python.tautological` to a
+  warning. Constant-truthy asserts (`assert True`) still block.
+- **`python.mismatched_warn`** (non-blocking warn). When `reject` is inferred
+  only from a bare `raises` token in the test name but the body asserts a real
+  return value, the verdict is downgraded from blocking `python.mismatched` to a
+  warning — the token likely names the subject, not an exception.
+- **`python.unparseable`** (non-blocking skip verdict). A file that cannot be
+  parsed (syntax error / non-UTF-8) now emits one explicit skip verdict instead
+  of letting the exception propagate. Previously a parse crash failed open and
+  the file was silently treated as clean. The plugin hook logs the skip but does
+  not block.
+
+### Changed
+
+- **Tier 2 is opt-in.** The coverage gate executes the test file under audit, so
+  the plugin hook now runs it only when `PRAGMA_COVERAGE=1` is set explicitly
+  (previously it could run by default). CLI flag `--with-coverage` is unchanged.
+- **Tier 2 subprocess environment is scrubbed.** The coverage subprocess no
+  longer inherits the parent environment. It is built from a minimal allowlist
+  (`PATH`, `HOME`, temp-dir and locale vars, a few `PYTHON*` vars, the coverage
+  DB pointer); secret-bearing variables (`PRAGMA_*_API_KEY`, cloud credentials,
+  tokens, passwords) are dropped so the test under audit cannot read them.
+- **O(n²) classification fixed.** The Python classifier now parses the file once
+  and threads the AST and file-level facts (skip helpers, local defs, module
+  reassignments) into every per-test pass, instead of re-walking the whole module
+  per test. This removed a multi-second slowdown on large files.
+
 ## [0.3.0] — 2026-05-01
 
 **Jest test runner support.** Pragma now classifies Jest test files alongside Vitest and Python. The JS/TS rule chain has been refactored into a dialect-parameterized core (`_jsts_core`) so future runners (Bun's test, Deno's test) become small adapters rather than full ports.
