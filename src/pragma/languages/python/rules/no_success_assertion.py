@@ -31,7 +31,7 @@ from pathlib import Path
 from pragma.languages.python.inference import (
     _STDLIB_PREFIXES,
     _TEST_ONLY_PREFIXES,
-    infer_target,
+    infer_target_for_func,
 )
 from pragma.languages.python.parser import walk_test_functions
 from pragma.languages.python.rules.stub_error_match import (
@@ -61,14 +61,13 @@ _REJECT_RE = re.compile(r"(rejects?|raises?|refuses?|denies|throws)", re.IGNOREC
 
 def apply_file_pass(
     tree: ast.Module,
-    source: str,
     prior_verdicts: list[Verdict],
     file_path: Path,
 ) -> list[Verdict]:
     """Replace eligible verdicts with python.no_success_assertion when the file
     has imported production targets but no test asserts on a real return value
     (and the file isn't a pure-validator file)."""
-    imported = _imported_targets(tree, source)
+    imported = _imported_targets(tree)
     if not imported:
         return prior_verdicts
     if _file_has_success_assertion(tree, imported):
@@ -89,7 +88,7 @@ def apply_file_pass(
     ]
 
 
-def _imported_targets(tree: ast.Module, source: str) -> set[str]:
+def _imported_targets(tree: ast.Module) -> set[str]:
     """Return the set of imported production-target symbol names.
 
     From `from <X> import <Y>` where <X> isn't stdlib/test-only, every <Y> is a
@@ -114,7 +113,7 @@ def _imported_targets(tree: ast.Module, source: str) -> set[str]:
             if alias.name != "*":
                 out.add(alias.asname or alias.name)
     for func in walk_test_functions(tree):
-        _, symbol = infer_target(source, func.name)
+        _, symbol = infer_target_for_func(tree, func)
         if symbol:
             out.add(symbol)
     return out

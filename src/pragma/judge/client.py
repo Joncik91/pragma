@@ -8,6 +8,7 @@ Reads these env vars (in order of preference, first wins):
 Other env vars (with defaults):
 - PRAGMA_LLM_BASE_URL (default: https://api.deepseek.com/v1)
 - PRAGMA_LLM_MODEL (default: deepseek-chat)
+- PRAGMA_LLM_TIMEOUT (default: 30.0 seconds, per-request)
 
 Returns None on any failure (missing key, SDK missing, API error,
 malformed response) so the caller (judge.classify_file) skips silently.
@@ -25,6 +26,18 @@ from pragma.judge.prompt import SYSTEM_PROMPT, build_user_message
 
 _DEFAULT_BASE_URL = "https://api.deepseek.com/v1"
 _DEFAULT_MODEL = "deepseek-chat"
+_DEFAULT_TIMEOUT = 30.0
+
+
+def _resolve_timeout() -> float:
+    """Read the per-request timeout (seconds) from env, falling back to the default."""
+    raw = os.environ.get("PRAGMA_LLM_TIMEOUT")
+    if raw is None:
+        return _DEFAULT_TIMEOUT
+    try:
+        return float(raw)
+    except ValueError:
+        return _DEFAULT_TIMEOUT
 
 
 def _resolve_api_key() -> str | None:
@@ -54,6 +67,7 @@ def judge_test(production_source: str, test_source: str, language: str) -> tuple
 
     base_url = os.environ.get("PRAGMA_LLM_BASE_URL", _DEFAULT_BASE_URL)
     model = os.environ.get("PRAGMA_LLM_MODEL", _DEFAULT_MODEL)
+    timeout = _resolve_timeout()
     user_msg = build_user_message(production_source, test_source, language)
 
     try:
@@ -61,6 +75,7 @@ def judge_test(production_source: str, test_source: str, language: str) -> tuple
         response = client.chat.completions.create(
             model=model,
             max_tokens=256,
+            timeout=timeout,
             messages=[
                 {"role": "system", "content": SYSTEM_PROMPT},
                 {"role": "user", "content": user_msg},

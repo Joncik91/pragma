@@ -21,6 +21,15 @@ import re
 
 _REJECT_PATTERN = re.compile(r"_(?:rejects?|raises?|refuses?|denies)_")
 
+# The `raise(s)` token alone is a weak signal for an error-path expectation:
+# a name like `test_button_raises_click_event` describes the *subject* under
+# test (an event), not an exception. Reject inference driven *only* by this
+# token must be corroborated by structure (pytest.raises / except) before it
+# hard-blocks; otherwise it downgrades to a non-blocking warn. The other
+# verbs (rejects/refuses/denies) are unambiguous and keep hard-blocking.
+_RAISE_ONLY_PATTERN = re.compile(r"_raises?_")
+_OTHER_REJECT_PATTERN = re.compile(r"_(?:rejects?|refuses?|denies)_")
+
 # Modules whose imports are never the production target. Hard-coded
 # because requiring the user to configure this defeats the "zero
 # config" promise. Add to this list rather than inventing config.
@@ -87,12 +96,37 @@ def infer_expected(test_name: str) -> str:
     return "success"
 
 
+def reject_is_raise_token_only(test_name: str) -> bool:
+    """True when the only reason `test_name` infers `reject` is a `raise(s)`
+    token (no `rejects/refuses/denies`). Such reject inference is uncorroborated
+    by name alone and needs structural backing before it hard-blocks."""
+    return bool(_RAISE_ONLY_PATTERN.search(test_name)) and not _OTHER_REJECT_PATTERN.search(
+        test_name
+    )
+
+
 def infer_target(source: str, test_name: str) -> tuple[str | None, str | None]:
-    """Pick (module, symbol) the test exercises, or (None, None) if unclear."""
-    tree = ast.parse(source)
+    """Pick (module, symbol) the test exercises, or (None, None) if unclear.
+
+    Convenience wrapper that parses `source` itself. Hot callers that already
+    hold a parsed tree should call `infer_target_in_tree` to avoid re-parsing
+    the whole file once per test (the O(n^2) path — see Fix 2)."""
+    return infer_target_in_tree(ast.parse(source), test_name)
+
+
+def infer_target_in_tree(tree: ast.AST, test_name: str) -> tuple[str | None, str | None]:
+    """Pick (module, symbol) the test exercises, given an already-parsed tree."""
     func = _find_test_func(tree, test_name)
     if func is None:
         return None, None
+    return infer_target_for_func(tree, func)
+
+
+def infer_target_for_func(tree: ast.AST, func: ast.FunctionDef) -> tuple[str | None, str | None]:
+    """Same as `infer_target_in_tree` but the caller already holds `func`, so
+    we skip the per-test `_find_test_func` walk. The hot path threads this in
+    (Fix 2): finding the func via a full tree walk per test was the second
+    O(n^2) factor on top of the per-test re-parse."""
     imports = _collect_module_level_imports(tree) + _collect_imports_in(func)
     called = _called_names(func)
     # Walk `from`-style imports in reverse so the most-recently-declared wins.

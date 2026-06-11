@@ -19,6 +19,41 @@ import sys
 import tempfile
 from pathlib import Path
 
+# The subprocess runs `coverage run -m pytest <untrusted test file>`. The test
+# file is the very artifact under audit and may be gamed or hostile, so the
+# child must not inherit the parent's full environment — that would hand any
+# PRAGMA_*_API_KEY, cloud credential, or token straight to attacker-controlled
+# code. Instead we build the child env from a minimal allowlist of vars the
+# interpreter and pytest legitimately need, plus the coverage DB pointer.
+_ENV_ALLOWLIST: frozenset[str] = frozenset(
+    {
+        "PATH",  # locate the interpreter and any tooling pytest shells out to
+        "HOME",  # some libs and pytest plugins read user config from $HOME
+        "TMPDIR",  # honor a custom temp dir if the parent set one
+        "TEMP",
+        "TMP",
+        "LANG",  # locale — keeps text encoding / collation deterministic
+        "LC_ALL",
+        "LC_CTYPE",
+        "PYTHONHASHSEED",  # reproducibility if the parent pinned it
+        "PYTHONDONTWRITEBYTECODE",
+        "PYTHONPATH",  # src-layout repos need it for imports; not secret-bearing
+        "SYSTEMROOT",  # required for the Python interpreter to start on Windows
+    }
+)
+
+
+def _build_child_env(db_path: Path) -> dict[str, str]:
+    """Build a minimal, secret-free environment for the coverage subprocess.
+
+    Only allowlisted vars are forwarded from the parent process; everything
+    else (API keys, tokens, DB passwords, cloud creds) is dropped. COVERAGE_FILE
+    is set so the child writes coverage data to our temp DB.
+    """
+    env = {k: v for k, v in os.environ.items() if k in _ENV_ALLOWLIST}
+    env["COVERAGE_FILE"] = str(db_path)
+    return env
+
 
 def run_python_with_coverage(test_path: Path, target_file: Path) -> Path | None:
     """Run pytest on `test_path` with coverage of `target_file`'s lines.
@@ -67,7 +102,7 @@ def run_python_with_coverage(test_path: Path, target_file: Path) -> Path | None:
         "no:cacheprovider",
         str(test_path),
     ]
-    env = {**os.environ, "COVERAGE_FILE": str(db_path)}
+    env = _build_child_env(db_path)
 
     try:
         proc = subprocess.run(

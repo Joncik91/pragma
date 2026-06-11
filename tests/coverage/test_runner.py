@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import subprocess
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 
@@ -134,3 +136,89 @@ def test_runner_timeout_test_returns_none(tmp_path: Path) -> None:
     result = run_python_with_coverage(slow_test, prod)
     # --timeout=5 means pytest exits with failure; no coverage data written
     assert result is None
+
+
+# ---------------------------------------------------------------------------
+# Environment-scrubbing tests
+#
+# The subprocess runs `coverage run -m pytest <untrusted test file>`. The
+# child must NOT inherit secret-bearing vars from the parent process: a gamed
+# or malicious test under audit could exfiltrate API keys via the environment.
+# ---------------------------------------------------------------------------
+
+
+def _capture_child_env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, str]:
+    """Run the runner with subprocess.run stubbed; return the child env it built."""
+    prod = _write_production_module(tmp_path)
+    test_file = _write_passing_test(tmp_path, prod)
+
+    captured: dict[str, dict[str, str]] = {}
+
+    def fake_run(cmd, **kwargs):  # noqa: ANN001, ANN003
+        captured["env"] = dict(kwargs.get("env") or {})
+        # Mimic a failed run so the runner returns None without touching the DB.
+        raise subprocess.TimeoutExpired(cmd, kwargs.get("timeout", 10))
+
+    with patch("pragma.coverage.runner.subprocess.run", side_effect=fake_run):
+        run_python_with_coverage(test_file, prod)
+
+    assert "env" in captured, "subprocess.run was never called with an env"
+    return captured["env"]
+
+
+def test_runner_strips_pragma_api_keys_from_child_env(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """PRAGMA_*_API_KEY secrets in the parent env must not reach the child."""
+    monkeypatch.setenv("PRAGMA_LLM_API_KEY", "sk-secret-llm")
+    monkeypatch.setenv("PRAGMA_OPENAI_API_KEY", "sk-secret-openai")
+
+    env = _capture_child_env(tmp_path, monkeypatch)
+
+    assert "PRAGMA_LLM_API_KEY" not in env, f"PRAGMA_LLM_API_KEY leaked: {env.keys()}"
+    assert "PRAGMA_OPENAI_API_KEY" not in env, f"PRAGMA_OPENAI_API_KEY leaked: {env.keys()}"
+
+
+def test_runner_strips_common_secret_vars_from_child_env(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Common secret-bearing vars (tokens, AWS creds) must not reach the child."""
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-secret")
+    monkeypatch.setenv("AWS_SECRET_ACCESS_KEY", "aws-secret")
+    monkeypatch.setenv("GITHUB_TOKEN", "ghp_secret")
+    monkeypatch.setenv("MY_DB_PASSWORD", "hunter2")
+
+    env = _capture_child_env(tmp_path, monkeypatch)
+    keys = sorted(env.keys())
+
+    assert "OPENAI_API_KEY" not in env, f"OPENAI_API_KEY leaked into child env: {keys}"
+    assert "AWS_SECRET_ACCESS_KEY" not in env, f"AWS_SECRET_ACCESS_KEY leaked: {keys}"
+    assert "GITHUB_TOKEN" not in env, f"GITHUB_TOKEN leaked into child env: {keys}"
+    assert "MY_DB_PASSWORD" not in env, f"MY_DB_PASSWORD leaked into child env: {keys}"
+
+
+def test_runner_child_env_keeps_essentials(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """The allowlisted child env must still carry PATH and the coverage DB pointer."""
+    monkeypatch.setenv("PATH", "/usr/bin:/bin")
+
+    env = _capture_child_env(tmp_path, monkeypatch)
+
+    assert env.get("PATH"), "PATH must be forwarded so the interpreter/tools resolve"
+    assert env.get("COVERAGE_FILE"), "COVERAGE_FILE must point the child at the temp DB"
+
+
+def test_runner_forwards_pythonpath_to_child_env(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """PYTHONPATH must reach the child: src-layout repos need it for imports.
+
+    It is not secret-bearing, and without it tier 2 silently skips when the
+    target imports resolve via PYTHONPATH rather than an installed package.
+    """
+    monkeypatch.setenv("PYTHONPATH", "/proj/src:/proj/extra")
+
+    env = _capture_child_env(tmp_path, monkeypatch)
+
+    assert env.get("PYTHONPATH") == "/proj/src:/proj/extra", (
+        f"PYTHONPATH must be forwarded so src-layout imports resolve: {sorted(env.keys())}"
+    )

@@ -32,12 +32,12 @@ if [ ! -f "$path" ]; then
 fi
 
 # On-disk file IS the candidate post-edit. Diff against git HEAD.
-# Pass --with-coverage by default so tier 2 (coverage-based gaming detection)
-# runs on every edit. Opt out by setting PRAGMA_COVERAGE_DEFAULT_OFF=1.
+# Tier 2 (coverage) EXECUTES the edited test file under audit, so it is
+# opt-in: pass --with-coverage only when PRAGMA_COVERAGE=1 is set explicitly.
 # Pass --with-llm when PRAGMA_HOOK_WITH_LLM=1 is set (opt-in, off by default).
 COVERAGE_FLAG=""
 LLM_FLAG=""
-if [ "${PRAGMA_COVERAGE_DEFAULT_OFF:-}" != "1" ]; then
+if [ "${PRAGMA_COVERAGE:-}" = "1" ]; then
     COVERAGE_FLAG="--with-coverage"
 fi
 if [ "${PRAGMA_HOOK_WITH_LLM:-}" = "1" ]; then

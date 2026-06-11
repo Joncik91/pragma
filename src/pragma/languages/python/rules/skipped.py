@@ -23,9 +23,14 @@ def classify(
     target_module: str | None,
     target_symbol: str | None,
     tree: ast.AST | None = None,
+    skip_helpers: set[str] | None = None,
     **_: object,
 ) -> Verdict | None:
-    skip_helpers = _collect_skip_helper_names(tree) if tree is not None else set()
+    # `skip_helpers` is a file-level fact; the orchestrator precomputes it once
+    # and threads it in (Fix 2). Fall back to per-call computation for callers
+    # that don't (e.g. the classify_test shim).
+    if skip_helpers is None:
+        skip_helpers = _collect_skip_helper_names(tree) if tree is not None else set()
     evidence = _skipped_evidence(func, skip_helpers)
     if evidence:
         return Verdict(kind="python.skipped", evidence=evidence, test_name=test_name)

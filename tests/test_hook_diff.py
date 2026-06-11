@@ -239,15 +239,83 @@ def test_main_without_flag_calls_run_pragma_with_coverage_false(tmp_path: Path) 
     )
 
 
-def test_post_tool_use_sh_passes_with_coverage_by_default() -> None:
-    """post-tool-use.sh must reference --with-coverage and PRAGMA_COVERAGE_DEFAULT_OFF."""
+def test_post_tool_use_sh_coverage_is_opt_in() -> None:
+    """post-tool-use.sh must gate --with-coverage behind PRAGMA_COVERAGE=1 opt-in.
+
+    The old default-on opt-out path (PRAGMA_COVERAGE_DEFAULT_OFF) is removed:
+    tier 2 executes the test file under audit, so it must not run unless the
+    user explicitly opts in.
+    """
     script = (REPO_ROOT / "plugin" / "hooks" / "post-tool-use.sh").read_text()
     assert "--with-coverage" in script, (
-        "post-tool-use.sh must pass --with-coverage to check_diff.py by default"
+        "post-tool-use.sh must still be able to pass --with-coverage when opted in"
     )
-    assert "PRAGMA_COVERAGE_DEFAULT_OFF" in script, (
-        "post-tool-use.sh must respect PRAGMA_COVERAGE_DEFAULT_OFF opt-out env var"
+    assert "PRAGMA_COVERAGE" in script, (
+        "post-tool-use.sh must gate --with-coverage behind the PRAGMA_COVERAGE opt-in env var"
     )
+    assert "PRAGMA_COVERAGE_DEFAULT_OFF" not in script, (
+        "the PRAGMA_COVERAGE_DEFAULT_OFF opt-out path must be removed; coverage is now opt-in"
+    )
+
+
+POST_TOOL_USE = REPO_ROOT / "plugin" / "hooks" / "post-tool-use.sh"
+
+
+def _run_post_tool_use_argv(tmp_path: Path, extra_env: dict[str, str]) -> list[str]:
+    """Run post-tool-use.sh against a fake test edit; return the argv it execs.
+
+    Points CLAUDE_PLUGIN_ROOT at a temp dir whose ``hooks/check_diff.py`` is a
+    stub that dumps ``sys.argv`` (minus argv[0]) as JSON to a sentinel file, so
+    we can assert which flags the wrapper forwards under a given environment.
+    Returns [] if the wrapper short-circuited (exit 0 without exec).
+    """
+    if not shutil.which("bash"):
+        pytest.skip("bash not on PATH")
+    if not shutil.which("pragma"):
+        pytest.skip("pragma not on PATH (wrapper would short-circuit)")
+
+    plugin_root = tmp_path / "plugin_root"
+    (plugin_root / "hooks").mkdir(parents=True)
+    sentinel = tmp_path / "argv.json"
+    stub = plugin_root / "hooks" / "check_diff.py"
+    stub.write_text(
+        f"import json, sys\nopen({str(sentinel)!r}, 'w').write(json.dumps(sys.argv[1:]))\n",
+        encoding="utf-8",
+    )
+
+    test_file = tmp_path / "tests" / "test_thing.py"
+    test_file.parent.mkdir(parents=True, exist_ok=True)
+    test_file.write_text("def test_thing():\n    assert True\n", encoding="utf-8")
+
+    payload = '{"tool_name": "Edit", "tool_input": {"file_path": "' + str(test_file) + '"}}'
+    env = {**__import__("os").environ, "CLAUDE_PLUGIN_ROOT": str(plugin_root), **extra_env}
+    subprocess.run(
+        ["bash", str(POST_TOOL_USE)],
+        input=payload,
+        text=True,
+        capture_output=True,
+        env=env,
+        check=False,
+    )
+    if not sentinel.exists():
+        return []
+    import json as _json
+
+    return _json.loads(sentinel.read_text(encoding="utf-8"))
+
+
+def test_post_tool_use_omits_coverage_without_opt_in(tmp_path: Path) -> None:
+    """With no PRAGMA_COVERAGE set, the wrapper must NOT forward --with-coverage."""
+    argv = _run_post_tool_use_argv(tmp_path, {})
+    assert argv, "stub check_diff.py was never invoked"
+    assert "--with-coverage" not in argv, f"coverage leaked without opt-in: {argv}"
+
+
+def test_post_tool_use_forwards_coverage_when_opted_in(tmp_path: Path) -> None:
+    """With PRAGMA_COVERAGE=1, the wrapper must forward --with-coverage."""
+    argv = _run_post_tool_use_argv(tmp_path, {"PRAGMA_COVERAGE": "1"})
+    assert argv, "stub check_diff.py was never invoked"
+    assert "--with-coverage" in argv, f"coverage not forwarded on opt-in: {argv}"
 
 
 # ---------------------------------------------------------------------------

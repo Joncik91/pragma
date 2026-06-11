@@ -43,6 +43,38 @@ def is_docstring_stmt(stmt: ast.stmt) -> bool:
     )
 
 
+def has_real_value_assertion(func: ast.FunctionDef) -> bool:
+    """True when the body has at least one assertion comparing against a
+    concrete (non-None) expected value — `assert call(...) == <value>`,
+    `assert x in y`, or `assert isinstance(x, T)`. Constant-only asserts
+    (`assert True`, `assert x == x`) don't count; those are tautologies the
+    dedicated rule handles. Used to decide whether an uncorroborated reject
+    name is backed by a real return-value check."""
+    for node in ast.walk(func):
+        if isinstance(node, ast.Assert) and _is_concrete_value_assertion(node.test):
+            return True
+    return False
+
+
+def _is_concrete_value_assertion(test: ast.expr) -> bool:
+    if isinstance(test, ast.Compare) and len(test.ops) == 1:
+        op = test.ops[0]
+        if isinstance(op, ast.Eq | ast.NotEq):
+            return any(not _is_trivial_operand(c) for c in test.comparators)
+        if isinstance(op, ast.In | ast.NotIn | ast.Lt | ast.LtE | ast.Gt | ast.GtE):
+            return True
+    return (
+        isinstance(test, ast.Call)
+        and isinstance(test.func, ast.Name)
+        and test.func.id == "isinstance"
+    )
+
+
+def _is_trivial_operand(node: ast.expr) -> bool:
+    """A None constant or a bare-name echo that proves nothing on its own."""
+    return isinstance(node, ast.Constant) and node.value is None
+
+
 def node_inside_any(target: ast.AST, parents: list[ast.AST]) -> bool:
     """True when `target` is a descendant of any node in `parents`."""
     for parent in parents:

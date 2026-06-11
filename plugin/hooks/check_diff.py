@@ -73,6 +73,29 @@ def _run_pragma(
     return {}
 
 
+_SKIP_SUFFIXES = frozenset({"unparseable"})
+
+
+def _skip_lines(payload: dict[str, object]) -> list[str]:
+    """Render `<path> [kind] evidence` for explicit skip verdicts (e.g. an
+    unparseable file). These don't block, but the hook logs them so a broken
+    or non-UTF-8 file is never silently treated as clean."""
+    lines: list[str] = []
+    results = payload.get("results", {})
+    if not isinstance(results, dict):
+        return lines
+    for path_str, verdicts in results.items():
+        if not isinstance(verdicts, list):
+            continue
+        for v in verdicts:
+            if not isinstance(v, dict):
+                continue
+            kind = v.get("kind")
+            if isinstance(kind, str) and kind.rsplit(".", 1)[-1] in _SKIP_SUFFIXES:
+                lines.append(f"{path_str} [{kind}] {v.get('evidence', '')}")
+    return lines
+
+
 def _blocking_names(payload: dict[str, object]) -> set[str]:
     """Extract the set of test names with blocking verdicts."""
     names: set[str] = set()
@@ -154,6 +177,15 @@ def main(argv: list[str]) -> int:
         return 0
 
     new_payload = _run_pragma(candidate, with_coverage=with_coverage, with_llm=with_llm)
+
+    # Log (but don't block on) explicit skip verdicts — an unparseable or
+    # non-UTF-8 file is noise, not gaming, yet must never be silently passed.
+    skip_lines = _skip_lines(new_payload)
+    if skip_lines:
+        print("Pragma skipped a file it could not parse (not blocked):", file=sys.stderr)
+        for line in skip_lines:
+            print(line, file=sys.stderr)
+
     new_blocking = _blocking_names(new_payload)
     if not new_blocking:
         return 0

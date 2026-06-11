@@ -234,6 +234,114 @@ class TestEnvVarPassthrough:
         assert len(constructor_calls) == 1
         assert constructor_calls[0]["base_url"] == "https://api.deepseek.com/v1"
 
+    def test_create_called_with_explicit_timeout(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """The chat completion call passes an explicit request timeout (no hang)."""
+        monkeypatch.setenv("PRAGMA_LLM_API_KEY", "test-key")
+        monkeypatch.delenv("PRAGMA_LLM_TIMEOUT", raising=False)
+
+        create_kwargs: list[dict] = []
+
+        def fake_openai_class(*args: object, **kwargs: object) -> MagicMock:
+            client = MagicMock()
+            response = MagicMock()
+            response.choices = [
+                MagicMock(message=MagicMock(content='{"verifies": true, "reason": "ok"}'))
+            ]
+
+            def capturing_create(**kw: object) -> MagicMock:
+                create_kwargs.append(dict(kw))
+                return response
+
+            client.chat.completions.create.side_effect = capturing_create
+            return client
+
+        import importlib
+
+        import openai as openai_mod
+
+        monkeypatch.setattr(openai_mod, "OpenAI", fake_openai_class)
+
+        import pragma.judge.client as client_mod
+
+        importlib.reload(client_mod)
+        client_mod.judge_test("def foo(): pass", "def test_foo(): pass", "python")
+
+        assert len(create_kwargs) == 1
+        assert "timeout" in create_kwargs[0]
+        assert create_kwargs[0]["timeout"] == client_mod._DEFAULT_TIMEOUT
+
+    def test_timeout_env_var_passed_to_create(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """PRAGMA_LLM_TIMEOUT overrides the default request timeout."""
+        monkeypatch.setenv("PRAGMA_LLM_API_KEY", "test-key")
+        monkeypatch.setenv("PRAGMA_LLM_TIMEOUT", "12.5")
+
+        create_kwargs: list[dict] = []
+
+        def fake_openai_class(*args: object, **kwargs: object) -> MagicMock:
+            client = MagicMock()
+            response = MagicMock()
+            response.choices = [
+                MagicMock(message=MagicMock(content='{"verifies": true, "reason": "ok"}'))
+            ]
+
+            def capturing_create(**kw: object) -> MagicMock:
+                create_kwargs.append(dict(kw))
+                return response
+
+            client.chat.completions.create.side_effect = capturing_create
+            return client
+
+        import importlib
+
+        import openai as openai_mod
+
+        monkeypatch.setattr(openai_mod, "OpenAI", fake_openai_class)
+
+        import pragma.judge.client as client_mod
+
+        importlib.reload(client_mod)
+        client_mod.judge_test("def foo(): pass", "def test_foo(): pass", "python")
+
+        assert len(create_kwargs) == 1
+        assert create_kwargs[0]["timeout"] == 12.5
+
+    def test_invalid_timeout_env_falls_back_to_default(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """A non-numeric PRAGMA_LLM_TIMEOUT falls back to the default, not a crash."""
+        monkeypatch.setenv("PRAGMA_LLM_API_KEY", "test-key")
+        monkeypatch.setenv("PRAGMA_LLM_TIMEOUT", "not-a-number")
+
+        create_kwargs: list[dict] = []
+
+        def fake_openai_class(*args: object, **kwargs: object) -> MagicMock:
+            client = MagicMock()
+            response = MagicMock()
+            response.choices = [
+                MagicMock(message=MagicMock(content='{"verifies": true, "reason": "ok"}'))
+            ]
+
+            def capturing_create(**kw: object) -> MagicMock:
+                create_kwargs.append(dict(kw))
+                return response
+
+            client.chat.completions.create.side_effect = capturing_create
+            return client
+
+        import importlib
+
+        import openai as openai_mod
+
+        monkeypatch.setattr(openai_mod, "OpenAI", fake_openai_class)
+
+        import pragma.judge.client as client_mod
+
+        importlib.reload(client_mod)
+        client_mod.judge_test("def foo(): pass", "def test_foo(): pass", "python")
+
+        assert len(create_kwargs) == 1
+        assert create_kwargs[0]["timeout"] == client_mod._DEFAULT_TIMEOUT
+
     def test_default_model_is_deepseek_chat(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setenv("PRAGMA_LLM_API_KEY", "test-key")
         monkeypatch.delenv("PRAGMA_LLM_MODEL", raising=False)

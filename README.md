@@ -4,7 +4,7 @@
 
 # Pragma
 
-[![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![PyPI](https://img.shields.io/badge/pypi-pragma-E8954A?logo=pypi&logoColor=white)](https://pypi.org/project/pragma/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-E8954A.svg)](LICENSE)
 [![Local-first](https://img.shields.io/badge/local--first-✓-58D070)](https://www.inkandswitch.com/local-first/)
@@ -40,7 +40,7 @@ catching a different kind of cheat.
 ## Three Tiers, Layered
 
 - **Tier 1 — AST classifier.** Fast, deterministic, ~10ms. Catches the obvious stuff: `assert True`, `mock.patch` on the function under test, `pytest.skip` smuggled into a body, `vi.spyOn(...).mockReturnValue`. Always on.
-- **Tier 2 — coverage-of-target gate.** Runs the test under coverage instrumentation, then asks: *did the production code's lines actually execute?* If the answer is no, the test isn't a test. Opt in with `--with-coverage`.
+- **Tier 2 — coverage-of-target gate.** Runs the test under coverage instrumentation, then asks: *did the production code's lines actually execute?* If the answer is no, the test isn't a test. This **executes the test file under audit**, so it is opt-in: `--with-coverage` on the CLI, `PRAGMA_COVERAGE=1` in the plugin hook.
 - **Tier 3 — the LLM judge.** A small model reads the test alongside the production code and decides whether the test verifies behavior or just confidently asserts on its own mocks. Powered by DeepSeek by default; any OpenAI-compatible endpoint works. Opt in with `--with-llm`.
 
 Each tier catches what the previous one misses. Combined, they reach
@@ -115,9 +115,10 @@ In Claude Code:
 
 That's it. The plugin's PreToolUse hook scans every `Write` of a file
 matching `test_*.py` / `*/tests/*.py` / `*.test.ts` etc.; PostToolUse
-re-scans on disk to catch `Edit` cases. Tier 1 always runs. Tier 2 is
-on by default in the hook (set `PRAGMA_COVERAGE_DEFAULT_OFF=1` to
-disable). Tier 3 is opt-in via `PRAGMA_HOOK_WITH_LLM=1`.
+re-scans on disk to catch `Edit` cases. Tier 1 always runs. Tier 2
+**executes the edited test file under coverage**, so it is opt-in: set
+`PRAGMA_COVERAGE=1` to enable it in the hook. Tier 3 is opt-in via
+`PRAGMA_HOOK_WITH_LLM=1`.
 
 ## Tier 3 — Bring Your Own LLM
 
@@ -194,9 +195,20 @@ the **test source plus the production source** to whichever endpoint
    wiring runs Tier 1 and Tier 2 only. Set `PRAGMA_HOOK_WITH_LLM=1`
    when you've decided the endpoint is acceptable for your code.
 
-Tiers 1 and 2 stay fully local: AST parsing happens in-process,
-coverage instrumentation runs in the local interpreter. Nothing leaves
-the machine unless Tier 3 is on.
+Tiers 1 and 2 stay fully local: nothing leaves the machine unless
+Tier 3 is on. But they are not equivalent in what they *do* locally:
+
+- **Tier 1 only parses.** AST analysis is static — the test code is read,
+  never run.
+- **Tier 2 executes the test file under audit.** To measure coverage it
+  actually runs `pytest` on the very file being checked, in a subprocess.
+  That file may be AI-written, gamed, or hostile. For this reason Tier 2 is
+  **opt-in** (`--with-coverage` on the CLI, `PRAGMA_COVERAGE=1` in the
+  plugin hook) and the subprocess runs with a **scrubbed environment**: a
+  minimal allowlist of variables is forwarded, and secret-bearing vars
+  (`PRAGMA_*_API_KEY`, cloud credentials, tokens, passwords) are stripped so
+  the test under audit cannot read them. Even so, only enable Tier 2 when
+  you are comfortable executing the test files in question.
 
 ## Contributing
 

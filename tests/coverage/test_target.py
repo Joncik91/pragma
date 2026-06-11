@@ -1,4 +1,10 @@
-"""Tests for production_lines_python and production_target_vitest resolvers."""
+"""Tests for production_lines_python and production_target_vitest resolvers.
+
+`production_lines_python` resolves the target module's file by statically
+walking ``sys.path`` directories and ``ast.parse``-ing the ``.py`` source —
+it never imports or executes the module. These tests pin that static
+resolution behavior.
+"""
 
 from __future__ import annotations
 
@@ -17,7 +23,11 @@ from pragma.coverage.target import (
 
 
 def _add_to_sys_path(path: Path):
-    """Context manager that temporarily adds a dir to sys.path."""
+    """Context manager that temporarily adds a dir to sys.path.
+
+    No module import happens, so there are no ``sys.modules`` entries to
+    evict — the resolver only reads files off ``sys.path`` directories.
+    """
     import contextlib
 
     @contextlib.contextmanager
@@ -27,14 +37,6 @@ def _add_to_sys_path(path: Path):
             yield
         finally:
             sys.path.remove(str(path))
-            # Evict any modules loaded from this path so tests are isolated.
-            to_remove = [
-                k
-                for k, v in sys.modules.items()
-                if hasattr(v, "__file__") and v.__file__ and str(path) in v.__file__
-            ]
-            for k in to_remove:
-                del sys.modules[k]
 
     return _ctx()
 
@@ -115,11 +117,12 @@ def test_production_lines_python_both_none() -> None:
 
 
 def test_production_lines_python_missing_module() -> None:
+    """No `.py` for the module on any sys.path dir → None (no import attempted)."""
     assert production_lines_python("definitely_not_a_module_42", "fn") is None
 
 
 def test_production_lines_python_missing_symbol(tmp_path: Path) -> None:
-    """Module exists, symbol does not → None."""
+    """Module file exists, symbol not defined in its source → None."""
     (tmp_path / "present_mod.py").write_text("x = 1\n")
     with _add_to_sys_path(tmp_path):
         result = production_lines_python("present_mod", "nonexistent_symbol_xyz")
@@ -127,17 +130,97 @@ def test_production_lines_python_missing_symbol(tmp_path: Path) -> None:
 
 
 def test_production_lines_python_builtin_no_source() -> None:
-    """builtins.len has no Python source → None."""
+    """builtins is a C module with no `.py` on sys.path → None."""
     result = production_lines_python("builtins", "len")
     assert result is None
 
 
-def test_production_lines_python_import_error_handled(tmp_path: Path) -> None:
-    """Module with a syntax/import error at import time → None, not crash."""
-    bad = tmp_path / "bad_import_mod.py"
-    bad.write_text("raise RuntimeError('intentional import failure')\n")
+def test_production_lines_python_does_not_execute_module(tmp_path: Path) -> None:
+    """Module-level code that would raise on import is NEVER executed.
+
+    The resolver statically parses the source, so a module whose top level
+    raises still yields the symbol's line range instead of returning None.
+    """
+    mod = tmp_path / "side_effect_mod.py"
+    mod.write_text(
+        "raise RuntimeError('this must never run')\n"  # line 1
+        "\n"  # line 2
+        "def reserve(x):\n"  # line 3
+        "    return x\n"  # line 4
+    )
     with _add_to_sys_path(tmp_path):
-        result = production_lines_python("bad_import_mod", "anything")
+        result = production_lines_python("side_effect_mod", "reserve")
+    assert result is not None
+    file_path, line_range = result
+    assert file_path == mod.resolve()
+    assert 3 in line_range
+    assert 4 in line_range
+
+
+def test_production_lines_python_syntax_error_returns_none(tmp_path: Path) -> None:
+    """A module file that can't be ast.parsed → None, not a crash."""
+    bad = tmp_path / "syntax_err_mod.py"
+    bad.write_text("def reserve(:\n    pass\n")  # invalid syntax
+    with _add_to_sys_path(tmp_path):
+        result = production_lines_python("syntax_err_mod", "reserve")
+    assert result is None
+
+
+def test_production_lines_python_dotted_module(tmp_path: Path) -> None:
+    """A dotted module path resolves to pkg/sub/mod.py under a sys.path dir."""
+    pkg = tmp_path / "mypkg" / "sub"
+    pkg.mkdir(parents=True)
+    (tmp_path / "mypkg" / "__init__.py").write_text("")
+    (pkg / "__init__.py").write_text("")
+    mod = pkg / "mod.py"
+    mod.write_text("def reserve(x):\n    return x\n")
+    with _add_to_sys_path(tmp_path):
+        result = production_lines_python("mypkg.sub.mod", "reserve")
+    assert result is not None
+    file_path, line_range = result
+    assert file_path == mod.resolve()
+    assert 1 in line_range
+
+
+def test_production_lines_python_package_init(tmp_path: Path) -> None:
+    """A package name resolves to its __init__.py and finds symbols there."""
+    pkg = tmp_path / "mypkg2"
+    pkg.mkdir()
+    init = pkg / "__init__.py"
+    init.write_text("# header\ndef reserve(x):\n    return x\n")
+    with _add_to_sys_path(tmp_path):
+        result = production_lines_python("mypkg2", "reserve")
+    assert result is not None
+    file_path, line_range = result
+    assert file_path == init.resolve()
+    assert 2 in line_range
+
+
+def test_production_lines_python_assigned_symbol(tmp_path: Path) -> None:
+    """A module-level assignment (not def/class) resolves to its line."""
+    mod = tmp_path / "assigned_mod.py"
+    mod.write_text("# c\nVERSION = '1.2.3'\n")
+    with _add_to_sys_path(tmp_path):
+        result = production_lines_python("assigned_mod", "VERSION")
+    assert result is not None
+    _, line_range = result
+    assert 2 in line_range
+
+
+def test_production_lines_python_reexported_symbol_not_resolved(tmp_path: Path) -> None:
+    """A symbol only re-exported via `from x import name` is NOT resolved.
+
+    Static resolution is deliberately scoped to symbols *defined* at the
+    module's top level; it does not follow re-export imports (that would
+    require executing or transitively parsing other modules). Call sites
+    only pass symbols inferred from the test's own import of this module,
+    so this narrowing is intentional, not a regression.
+    """
+    (tmp_path / "impl_mod.py").write_text("def reserve(x):\n    return x\n")
+    reexport = tmp_path / "facade_mod.py"
+    reexport.write_text("from impl_mod import reserve\n")
+    with _add_to_sys_path(tmp_path):
+        result = production_lines_python("facade_mod", "reserve")
     assert result is None
 
 

@@ -1,16 +1,76 @@
 """Resolve `(target_module, target_symbol)` -> `(file_path, line_range)`.
 
-Per-language: Python uses `inspect.getsourcelines` after a guarded
-`import_module`; Vitest delegates to a tree-sitter parse of the test
-file's import statements. Both return None when the production target
-doesn't exist on disk — tier 2 then skips the test silently.
+Per-language: Python resolves the module's `.py` file by statically
+walking `sys.path` directories, then `ast.parse`-s the source to locate
+the symbol's line range — it never imports or executes the target.
+Vitest delegates to a tree-sitter parse of the test file's import
+statements. Both return None when the production target doesn't exist on
+disk (or the symbol can't be found) — tier 2 then skips the test silently.
 """
 
 from __future__ import annotations
 
-import importlib
-import inspect
+import ast
+import sys
 from pathlib import Path
+
+
+def _resolve_module_file(target_module: str) -> Path | None:
+    """Find the `.py` file backing `target_module` by walking sys.path dirs.
+
+    Never imports. Resolves a dotted name (`pkg.sub.mod`) to either
+    `<dir>/pkg/sub/mod.py` or the package's `<dir>/pkg/sub/mod/__init__.py`.
+    Returns the first existing candidate, or None.
+    """
+    rel = Path(*target_module.split("."))
+    for entry in sys.path:
+        # An empty string means "current working directory"; "" / x == x.
+        base = Path(entry) if entry else Path()
+        module_file = base / rel.with_suffix(".py")
+        if module_file.is_file():
+            return module_file.resolve()
+        package_init = base / rel / "__init__.py"
+        if package_init.is_file():
+            return package_init.resolve()
+    return None
+
+
+def _symbol_lines_from_source(source: str, target_symbol: str) -> range | None:
+    """Return the 1-indexed inclusive line range of `target_symbol` in `source`.
+
+    Matches a top-level function, async function, class, or name binding
+    (assignment / annotated assignment). Returns None when the symbol isn't
+    defined at module level or the source can't be parsed.
+    """
+    try:
+        tree = ast.parse(source)
+    except SyntaxError:
+        return None
+
+    for node in tree.body:
+        if (
+            isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))
+            and node.name == target_symbol
+        ):
+            return _node_range(node)
+        if isinstance(node, ast.Assign):
+            for tgt in node.targets:
+                if isinstance(tgt, ast.Name) and tgt.id == target_symbol:
+                    return _node_range(node)
+        elif (
+            isinstance(node, ast.AnnAssign)
+            and isinstance(node.target, ast.Name)
+            and node.target.id == target_symbol
+        ):
+            return _node_range(node)
+    return None
+
+
+def _node_range(node: ast.AST) -> range:
+    """1-indexed inclusive line range for an AST node (lineno..end_lineno)."""
+    start = node.lineno
+    end = getattr(node, "end_lineno", None) or start
+    return range(start, end + 1)
 
 
 def production_lines_python(
@@ -18,36 +78,29 @@ def production_lines_python(
 ) -> tuple[Path, range] | None:
     """Map a Python (module, symbol) pair to its (file, line range).
 
-    Uses `importlib.import_module` + `inspect.getsourcelines`.
-    Returns None on import failure or when the target is unknown —
-    tier 2 then emits no verdict.
+    Resolves the module file statically by walking `sys.path` and reading
+    the `.py` source — the inferred module name is treated as untrusted and
+    is never imported or executed. Returns None when the file can't be
+    located, the source can't be parsed, or the symbol isn't defined at
+    module level; tier 2 then emits no verdict.
     """
     if target_module is None or target_symbol is None:
         return None
-    try:
-        module = importlib.import_module(target_module)
-    except Exception:
+
+    module_file = _resolve_module_file(target_module)
+    if module_file is None:
         return None
 
     try:
-        symbol = getattr(module, target_symbol)
-    except AttributeError:
+        source = module_file.read_text(encoding="utf-8")
+    except OSError:
         return None
 
-    try:
-        source_file = inspect.getsourcefile(symbol)
-    except Exception:
-        return None
-    if source_file is None:
+    line_range = _symbol_lines_from_source(source, target_symbol)
+    if line_range is None:
         return None
 
-    try:
-        source_lines, start_line = inspect.getsourcelines(symbol)
-    except Exception:
-        return None
-
-    end_line = start_line + len(source_lines) - 1
-    return (Path(source_file), range(start_line, end_line + 1))
+    return (module_file, line_range)
 
 
 # ---------------------------------------------------------------------------

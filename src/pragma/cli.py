@@ -34,7 +34,7 @@ def verify_tests(
     with_llm: bool = typer.Option(
         False,
         "--with-llm",
-        help="Tier 3 (warning): LLM judge via Haiku. Requires PRAGMA_ANTHROPIC_API_KEY.",
+        help="Tier 3 (warning): LLM judge via DeepSeek. Requires PRAGMA_LLM_API_KEY.",
     ),
 ) -> None:
     """Classify tests in <files>; exit 1 if any are tautological/mocked-away/mismatched."""
